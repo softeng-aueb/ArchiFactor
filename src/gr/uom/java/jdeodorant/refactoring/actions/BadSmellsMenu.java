@@ -48,6 +48,9 @@ public class BadSmellsMenu implements IWorkbenchWindowActionDelegate {
 			else if(action.getId().equals("gr.uom.java.jdeodorant.actions.DuplicatedCode")) {
 				page.showView("gr.uom.java.jdeodorant.views.DuplicatedCode");
 			}
+			else if(action.getId().equals("gr.uom.java.jdeodorant.actions.MicroserviceExtraction")) {
+				page.showView("gr.uom.java.jdeodorant.views.MicroserviceExtraction");
+			}
 		} catch (PartInitException e) {
 			e.printStackTrace();
 		}

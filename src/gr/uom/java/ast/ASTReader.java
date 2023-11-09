@@ -471,6 +471,14 @@ public class ASTReader {
 			if((fieldModifiers & Modifier.STATIC) != 0)
 				fieldObject.setStatic(true);
 			
+			List<IExtendedModifier> extendedModifiers = fieldDeclaration.modifiers();
+			for(IExtendedModifier extendedModifier : extendedModifiers) {
+				if(extendedModifier.isAnnotation()) {
+					Annotation annotation = (Annotation)extendedModifier;
+					System.out.println(annotation.getTypeName().getFullyQualifiedName());
+				}
+			}
+			
 			classObject.addField(fieldObject);
 		}
 	}

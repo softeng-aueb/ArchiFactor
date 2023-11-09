@@ -268,6 +268,6 @@ public class CodeSmellPackageExplorer extends ViewPart {
 	}
 
 	protected enum CodeSmellType{
-		FEATURE_ENVY, GOD_CLASS;
+		FEATURE_ENVY, GOD_CLASS, MICROSERVICE_EXTRACTION;
 	}
 }
