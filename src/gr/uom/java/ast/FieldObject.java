@@ -16,6 +16,7 @@ public class FieldObject extends VariableDeclarationObject {
     private List<CommentObject> commentList;
     private boolean _static;
     private Access access;
+    private List<String> annotations;
     private String className;
     //private VariableDeclarationFragment fragment;
     private ASTInformation fragment;
@@ -26,6 +27,7 @@ public class FieldObject extends VariableDeclarationObject {
         this.name = name;
         this._static = false;
         this.access = Access.NONE;
+        this.annotations = new ArrayList<String>(); 
         this.commentList = new ArrayList<CommentObject>();
     }
 
@@ -100,6 +102,14 @@ public class FieldObject extends VariableDeclarationObject {
             	this.variableBindingKey.equals(fieldObject.variableBindingKey);
         }
         return false;
+    }
+    
+    public void addAnnotation(String annotation) {
+    	this.annotations.add(annotation);
+    }
+    
+    public List<String> getAnnotations() {
+    	return this.annotations;
     }
 
     public void setClassName(String className) {

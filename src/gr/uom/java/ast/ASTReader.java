@@ -375,6 +375,15 @@ public class ASTReader {
 		for(MethodDeclaration methodDeclaration : methodDeclarations) {
 			processMethodDeclaration(classObject, methodDeclaration);
 		}
+		
+		List<IExtendedModifier> extendedModifiers = typeDeclaration.modifiers();
+		for(IExtendedModifier extendedModifier : extendedModifiers) {
+			if(extendedModifier.isAnnotation()) {
+				Annotation annotation = (Annotation)extendedModifier;
+				classObject.addAnnotation(annotation.getTypeName().getFullyQualifiedName());
+				//System.out.println(annotation.getTypeName().getFullyQualifiedName());
+			}
+		}
 		return classObject;
 	}
 
@@ -475,7 +484,8 @@ public class ASTReader {
 			for(IExtendedModifier extendedModifier : extendedModifiers) {
 				if(extendedModifier.isAnnotation()) {
 					Annotation annotation = (Annotation)extendedModifier;
-					System.out.println(annotation.getTypeName().getFullyQualifiedName());
+					fieldObject.addAnnotation(annotation.getTypeName().getFullyQualifiedName());
+					//System.out.println(annotation.getTypeName().getFullyQualifiedName());
 				}
 			}
 			

@@ -24,6 +24,7 @@ public class ClassObject extends ClassDeclarationObject {
     private boolean _static;
     private boolean _enum;
     private Access access;
+    private List<String> annotations;
     //private TypeDeclaration typeDeclaration;
     private ASTInformation typeDeclaration;
     private IFile iFile;
@@ -35,6 +36,7 @@ public class ClassObject extends ClassDeclarationObject {
 		this._abstract = false;
         this._interface = false;
         this._static = false;
+        this.annotations = new ArrayList<String>();
         this._enum = false;
         this.access = Access.NONE;
     }
@@ -175,6 +177,14 @@ public class ClassObject extends ClassDeclarationObject {
 
     public Access getAccess() {
         return access;
+    }
+    
+    public void addAnnotation(String annotation) {
+    	this.annotations.add(annotation);
+    }
+    
+    public List<String> getAnnotations() {
+    	return this.annotations;
     }
 
     public void setSuperclass(TypeObject superclass) {
