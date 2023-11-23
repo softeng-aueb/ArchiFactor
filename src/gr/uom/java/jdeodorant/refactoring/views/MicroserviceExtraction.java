@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -23,6 +24,8 @@ import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.CompilationErrorDetectedException;
 import gr.uom.java.ast.CompilationUnitCache;
+import gr.uom.java.ast.FieldObject;
+import gr.uom.java.ast.MethodObject;
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.distance.CandidateRefactoring;
 import gr.uom.java.distance.DistanceMatrix;
@@ -50,7 +53,11 @@ import org.eclipse.ui.texteditor.ITextEditor;
 import org.eclipse.core.commands.operations.IOperationHistoryListener;
 import org.eclipse.core.commands.operations.OperationHistoryEvent;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
@@ -58,6 +65,7 @@ import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.refactoring.*;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
@@ -73,12 +81,21 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.jface.action.*;
 import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.Refactoring;
+import org.eclipse.ltk.core.refactoring.RefactoringContribution;
+import org.eclipse.ltk.core.refactoring.RefactoringCore;
+import org.eclipse.ltk.core.refactoring.RefactoringDescriptor;
+import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.ltk.core.refactoring.participants.MoveRefactoring;
+import org.eclipse.jdt.internal.corext.refactoring.structure.*;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import org.eclipse.ui.*;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.jdt.core.refactoring.descriptors.RenameJavaElementDescriptor;
+import org.eclipse.jdt.core.refactoring.descriptors.MoveDescriptor;
 
 
 /**
@@ -114,6 +131,18 @@ public class MicroserviceExtraction extends ViewPart {
 	private IPackageFragment selectedPackageFragment;
 	private ICompilationUnit selectedCompilationUnit;
 	private IType selectedType;
+	//classes of microservice to be extracted
+	List<ClassObject> chosenClasses;
+	List<ClassObject> monolithClasses;
+	//map classesToBeMoved/classesToBeCopied with destination
+	//Map<ClassObject, IJavaElement> map = new HashMap<ClassObject, IJavaElement>();
+	List<ClassObject> classesToBeMoved = new ArrayList<ClassObject>();
+	List<ClassObject> classesToBeCopied = new ArrayList<ClassObject>();
+	//Accessibilities that may need changing
+	List<FieldObject> fieldsNeedAccess =  new ArrayList<FieldObject>();
+	List<MethodObject> methodsNeedAccess =  new ArrayList<MethodObject>();
+	//find relations
+	//List<Object[]> relations = new ArrayList<Object[]>();
 
 	class ViewContentProvider implements ITreeContentProvider {
 		public void inputChanged(Viewer v, Object oldInput, Object newInput) {
@@ -746,6 +775,16 @@ public class MicroserviceExtraction extends ViewPart {
 				});
 			}
 			SystemObject systemObject = ASTReader.getSystemObject();
+			/*while(systemObject.getClassListIterator().hasNext()) {
+				ClassObject classOb = systemObject.getClassListIterator().next().getClassObject();
+				if (classOb.getAnnotations().size()>0) {
+					for (String annotation : classOb.getAnnotations()) {
+						if (annotation.equals("Entity")) {
+							System.out.println(classOb.getName()+" is Entity");
+						}
+					}
+				}
+			}*/
 			if(systemObject != null) {
 				Set<ClassObject> classObjectsToBeExamined = new LinkedHashSet<ClassObject>();
 				if(selectedPackageFragmentRoot != null) {
@@ -763,6 +802,166 @@ public class MicroserviceExtraction extends ViewPart {
 				else {
 					classObjectsToBeExamined.addAll(systemObject.getClassObjects());
 				}
+				ClassObject brFile=null;
+				List<ClassObject> classes = new ArrayList<ClassObject>();
+				classes.addAll(systemObject.getClassObjects());
+				//TEMPORARY
+				chosenClasses = new ArrayList<ClassObject>();
+				monolithClasses = new ArrayList<ClassObject>();
+				for(final ClassObject classOb : classes) {
+					if((classOb.getName().equals("com.mgiandia.library.domain.Book"))||(classOb.getName().equals("com.mgiandia.library.domain.Author"))||(classOb.getName().equals("com.mgiandia.library.domain.Publisher"))) {
+						chosenClasses.add(classOb);
+					}else if((classOb.getITypeRoot().getParent().getElementName().equals(selectedType.getTypeRoot().getParent().getElementName()))&&(!classOb.containsMethodWithTestAnnotation())) {
+						monolithClasses.add(classOb);
+					}
+				}
+				for(final ClassObject classOb : classes) {
+					/*if (classOb.getName().equals("com.mgiandia.library.loans.domain.Borrower")) {
+						brFile=classOb;
+					}*/
+					boolean isEntity= false;
+					boolean isTest= false;
+					if (classOb.getAnnotations().size()>0) {
+						for (String annotation : classOb.getAnnotations()) {
+							if (annotation.equals("Entity")) {
+								isEntity=true;
+								//ICompilationUnit  cu = (ICompilationUnit)classOb.getIFile();
+								//System.out.println(classOb.getName()+" is Entity "+classOb.getITypeRoot().getResource()+" , "+classOb.getIFile().getParent().getParent()+" "+selectedType);
+								/*ICompilationUnit  cu = selectedType.getCompilationUnit();
+								RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.RENAME_COMPILATION_UNIT);
+								//RefactoringDescriptor descriptor=contribution.createDescriptor();
+								RenameJavaElementDescriptor descriptor = (RenameJavaElementDescriptor)contribution.createDescriptor();
+								descriptor.setProject(cu.getResource().getProject().getName( ));
+								descriptor.setNewName("NewClass"); // new name for a Class
+								descriptor.setJavaElement(cu);
+								RefactoringStatus status = new RefactoringStatus();
+								try {
+								    Refactoring refactoring = descriptor.createRefactoring(status);
+
+								    IProgressMonitor monitor = new NullProgressMonitor();
+								    refactoring.checkInitialConditions(monitor);
+								    refactoring.checkFinalConditions(monitor);
+								    Change change = refactoring.createChange(monitor);
+								    change.perform(monitor);
+
+								} catch (CoreException e) {
+								    // TODO Auto-generated catch block
+								    e.printStackTrace();
+								} catch (Exception e) {
+								    // TODO Auto-generated catch block
+								    e.printStackTrace();
+								}*/
+								//MoveRefactoring ref= new MoveRefactoring();
+								//final MoveResourceChange ref= MoveResourceChange.create(classOb.getITypeRoot().getResource(),classOb.getITypeRoot().getResource().getParent().getParent());
+								/*ps.busyCursorWhile(new IRunnableWithProgress() {
+									public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
+										try {
+											//classOb.getITypeRoot().getResource().move(classOb.getIFile().getParent().getParent().getFullPath(), true, monitor);
+											ref.perform(monitor);
+										} catch (OperationCanceledException e) {
+											// TODO Auto-generated catch block
+											e.printStackTrace();
+										} catch (CoreException e) {
+											// TODO Auto-generated catch block
+											e.printStackTrace();
+										}
+									}
+								});*/
+							}
+							if (annotation.equals("Test")) {
+								isTest=true;
+							}
+						}
+						
+					}
+					/*if((classOb.getITypeRoot().getParent().getElementName().equals(selectedType.getTypeRoot().getParent().getElementName()))&&(!isEntity)&&(!isTest)) {
+						System.out.println(classOb.getName()+" is not Entity "+classOb.getITypeRoot().getParent().getElementName());
+						classesToBeCopied.add(classOb);
+					}*/
+					for(ClassObject cl:chosenClasses) {
+						//classes that depend on one of the chosen for extraction classes
+						if((!chosenClasses.contains(classOb))&&(!isTest)&&!(classOb.containsMethodWithTestAnnotation())){	
+							if(classOb.hasFieldType(cl.getName())) {
+								//System.out.println(classOb.getName());
+							}
+						}
+						//Classes that need to be copied
+						if((!chosenClasses.contains(classOb))&&(cl.hasFieldType(classOb.getName()))&&(!isEntity)&&(!isTest)){	
+							//System.out.println("We need to copy "+classOb.getName());
+							classesToBeCopied.add(classOb);
+						}
+						//Classes that need to be moved
+						if(classesToBeCopied.contains(classOb)) {
+							boolean hasDependency = false;
+							for(ClassObject monolithClass: monolithClasses) {
+								if(monolithClass.hasFieldType(classOb.getName())) {
+									hasDependency = true;
+								}
+							}
+							if(!hasDependency) {
+								classesToBeCopied.remove(classOb);
+								classesToBeMoved.add(classOb);
+							}
+							
+						}
+					}
+				}
+				/*ICompilationUnit  cu = selectedType.getCompilationUnit();
+				RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.RENAME_COMPILATION_UNIT);
+				//RefactoringDescriptor descriptor=contribution.createDescriptor();
+				RenameJavaElementDescriptor descriptor = (RenameJavaElementDescriptor)contribution.createDescriptor();
+				descriptor.setProject(cu.getResource().getProject().getName( ));
+				descriptor.setNewName("NewClass"); // new name for a Class
+				descriptor.setJavaElement(cu);
+				RefactoringStatus status = new RefactoringStatus();
+				try {
+				    Refactoring refactoring = descriptor.createRefactoring(status);
+
+				    IProgressMonitor monitor = new NullProgressMonitor();
+				    refactoring.checkInitialConditions(monitor);
+				    refactoring.checkFinalConditions(monitor);
+				    Change change = refactoring.createChange(monitor);
+				    change.perform(monitor);
+
+				} catch (CoreException e) {
+				    // TODO Auto-generated catch block
+				    e.printStackTrace();
+				} catch (Exception e) {
+				    // TODO Auto-generated catch block
+				    e.printStackTrace();
+				}*/
+				/*ICompilationUnit  cu = selectedType.getCompilationUnit();
+				RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
+				//RefactoringDescriptor descriptor=contribution.createDescriptor();
+				IPackageFragment[] roots = selectedType.getTypeRoot().getJavaProject().getPackageFragments();
+				System.out.println(roots[11].getElementName());
+				MoveDescriptor descriptor = (MoveDescriptor)contribution.createDescriptor();
+				descriptor.setProject(cu.getResource().getProject().getName( ));
+				//descriptor.setDestination(cu.getResource().getParent()); // new name for a Class
+				descriptor.setDestination((IJavaElement)roots[11]);
+				//System.out.println(brFile.getITypeRoot().getResource().getParent().getParent());
+				descriptor.setUpdateReferences(true);
+				ICompilationUnit[] moved = {cu};
+				IFile[] files = {};
+				IFolder[] folders = {};
+				descriptor.setMoveResources(files, folders, moved);
+				RefactoringStatus status = new RefactoringStatus();
+				try {
+				    Refactoring refactoring = descriptor.createRefactoring(status);
+
+				    IProgressMonitor monitor = new NullProgressMonitor();
+				    refactoring.checkInitialConditions(monitor);
+				    refactoring.checkFinalConditions(monitor);
+				    Change change = refactoring.createChange(monitor);
+				    change.perform(monitor);
+
+				} catch (CoreException e) {
+				    // TODO Auto-generated catch block
+				    e.printStackTrace();
+				} catch (Exception e) {
+				    // TODO Auto-generated catch block
+				    e.printStackTrace();
+				}*/
 				final Set<String> classNamesToBeExamined = new LinkedHashSet<String>();
 				for(ClassObject classObject : classObjectsToBeExamined) {
 					if(!classObject.isEnum() && !classObject.isInterface() && !classObject.isGeneratedByParserGenenator())
@@ -806,6 +1005,9 @@ public class MicroserviceExtraction extends ViewPart {
 		} catch (CompilationErrorDetectedException e) {
 			MessageDialog.openInformation(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(), MESSAGE_DIALOG_TITLE,
 					"Compilation errors were detected in the project. Fix the errors before using JDeodorant.");
+		/*} catch (JavaModelException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();*/
 		}
 		return table;		
 	}
