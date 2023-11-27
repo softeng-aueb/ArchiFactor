@@ -21,10 +21,12 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import gr.uom.java.ast.ASTReader;
+import gr.uom.java.ast.Access;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.CompilationErrorDetectedException;
 import gr.uom.java.ast.CompilationUnitCache;
 import gr.uom.java.ast.FieldObject;
+import gr.uom.java.ast.MethodInvocationObject;
 import gr.uom.java.ast.MethodObject;
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.distance.CandidateRefactoring;
@@ -52,9 +54,11 @@ import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.ui.texteditor.ITextEditor;
 import org.eclipse.core.commands.operations.IOperationHistoryListener;
 import org.eclipse.core.commands.operations.OperationHistoryEvent;
+import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
@@ -651,27 +655,64 @@ public class MicroserviceExtraction extends ViewPart {
 									ioe.printStackTrace();
 								}
 							}
-							refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
+							
+							/*refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 									candidate.getSourceClassTypeDeclaration(),
 									extractedFieldFragments, extractedMethods,
-									candidate.getDelegateMethods(), extractedClassName);
+									candidate.getDelegateMethods(), extractedClassName);*/
 						}
 						try {
+							ICompilationUnit  cu = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
+							RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
+							IContainer pack = null;
+							System.out.println(cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource());
+							//RefactoringDescriptor descriptor=contribution.createDescriptor();
+							pack = classesToBeMoved.get(0).getITypeRoot().getParent().getPrimaryElement().getCorrespondingResource().getParent().getParent();
+							System.out.println(pack.getName());
+								//System.out.println(pack.getPrimaryElement().getCorrespondingResource().getParent().getName());
+							/*IPath processFolderPath = cu.getJavaProject().getPackageFragments()[2].getPath().append("Microservice");
+						    IFolder processFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder(processFolderPath.makeRelativeTo(cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getLocation()));
+						    System.out.println(processFolder.getFullPath());
+						    if (!processFolder.exists()) {
+						           processFolder.create(true, true, new NullProgressMonitor());
+						    }*/
+							//IPath processFolderPath = cu.getJavaProject().getPackageFragments()[2].getPath().append("Microservice");
+						    IFolder processFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
+							processFolder.create(true, true, null);
+							cu.getJavaProject().getJavaModel().save(null, true);
+							//IPackageFragment pack2 = cu.getJavaProject().getPackageFragmentRoot(processFolder).createPackageFragment("Microservice", false, null);
+							MoveDescriptor descriptor = (MoveDescriptor)contribution.createDescriptor();
+							descriptor.setProject(cu.getResource().getProject().getName());
+							//descriptor.setDestination(cu.getResource().getParent()); // new name for a Class
+							//descriptor.setDestination((IJavaElement)pack);
+							//System.out.println(brFile.getITypeRoot().getResource().getParent().getParent());
+							IJavaElement pack3 = JavaCore.create(processFolder);
+							descriptor.setDestination(pack3);
+							descriptor.setUpdateReferences(true);
+							ICompilationUnit[] moved = {cu};
+							IFile[] files = {};
+							IFolder[] folders = {};
+							descriptor.setMoveResources(files, folders, moved);
+							RefactoringStatus status = new RefactoringStatus();
+							 refactoring = descriptor.createRefactoring(status);
 							IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
 							JavaUI.openInEditor(sourceJavaElement);
+							MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, applyRefactoringAction);
+							RefactoringWizardOpenOperation op = new RefactoringWizardOpenOperation(wizard); 
+							String titleForFailedChecks = ""; //$NON-NLS-1$ 
+							op.run(getSite().getShell(), titleForFailedChecks); 
+							
 						} catch (PartInitException e) {
 							e.printStackTrace();
 						} catch (JavaModelException e) {
 							e.printStackTrace();
-						}
-						MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, applyRefactoringAction);
-						RefactoringWizardOpenOperation op = new RefactoringWizardOpenOperation(wizard); 
-						try { 
-							String titleForFailedChecks = ""; //$NON-NLS-1$ 
-							op.run(getSite().getShell(), titleForFailedChecks); 
+						} catch (CoreException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
 						} catch(InterruptedException e) {
 							e.printStackTrace();
 						}
+						
 					}
 				}
 			}
@@ -882,7 +923,16 @@ public class MicroserviceExtraction extends ViewPart {
 						//classes that depend on one of the chosen for extraction classes
 						if((!chosenClasses.contains(classOb))&&(!isTest)&&!(classOb.containsMethodWithTestAnnotation())){	
 							if(classOb.hasFieldType(cl.getName())) {
-								//System.out.println(classOb.getName());
+								for(MethodObject method:cl.getMethodList()) {
+									if(method.getAccess().equals(Access.NONE)) {
+										System.out.println("NONE");
+										for(MethodInvocationObject methodInvocation: method.getMethodInvocations()) {
+											if(classOb.containsMethodInvocation(methodInvocation)) {
+												System.out.println(classOb.getName());
+											}
+										}
+									}
+								}
 							}
 						}
 						//Classes that need to be copied
