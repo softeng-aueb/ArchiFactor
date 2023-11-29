@@ -663,6 +663,21 @@ public class MicroserviceExtraction extends ViewPart {
 						}
 						try {
 							ICompilationUnit  cu = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
+							IFolder McFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
+						    if(!McFolder.exists()) {
+						    	McFolder.create(true, true, null);
+						    }
+							for(int j=0;j<classesToBeCopied.size();j++) {
+								ICompilationUnit  cuCopy = (ICompilationUnit)classesToBeCopied.get(j).getITypeRoot().getPrimaryElement();
+								IFolder processFolder2 = cuCopy.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice/"
+								+cuCopy.getCorrespondingResource().getParent().getName());
+								if(!processFolder2.exists()) {
+									processFolder2.create(true, true, null);
+								}
+								IJavaElement parent = JavaCore.create(processFolder2);
+								cuCopy.copy(parent, cuCopy, cuCopy.getElementName(), true, null);
+							}
+							
 							RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
 							IContainer pack = null;
 							System.out.println(cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource());
@@ -677,8 +692,11 @@ public class MicroserviceExtraction extends ViewPart {
 						           processFolder.create(true, true, new NullProgressMonitor());
 						    }*/
 							//IPath processFolderPath = cu.getJavaProject().getPackageFragments()[2].getPath().append("Microservice");
-						    IFolder processFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
-							processFolder.create(true, true, null);
+						    IFolder processFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice/"
+						    +cu.getCorrespondingResource().getParent().getName());
+						    if(!processFolder.exists()) {
+						    	processFolder.create(true, true, null);
+						    }
 							cu.getJavaProject().getJavaModel().save(null, true);
 							//IPackageFragment pack2 = cu.getJavaProject().getPackageFragmentRoot(processFolder).createPackageFragment("Microservice", false, null);
 							MoveDescriptor descriptor = (MoveDescriptor)contribution.createDescriptor();
@@ -700,7 +718,7 @@ public class MicroserviceExtraction extends ViewPart {
 							MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, applyRefactoringAction);
 							RefactoringWizardOpenOperation op = new RefactoringWizardOpenOperation(wizard); 
 							String titleForFailedChecks = ""; //$NON-NLS-1$ 
-							op.run(getSite().getShell(), titleForFailedChecks); 
+							op.run(getSite().getShell(), titleForFailedChecks);
 							
 						} catch (PartInitException e) {
 							e.printStackTrace();
@@ -955,6 +973,18 @@ public class MicroserviceExtraction extends ViewPart {
 							
 						}
 					}
+				}
+				List<ClassObject> ExtraclassesToBeCopied= new ArrayList<ClassObject>();
+				for(ClassObject cl2:classesToBeCopied) {
+					for(ClassObject classOb:classes) {
+						if(cl2.hasFieldType(classOb.getName())&&(!classesToBeCopied.contains(classOb))) {
+							System.out.println(classOb.getName());
+							ExtraclassesToBeCopied.add(classOb);
+						}
+					}
+				}
+				for(ClassObject ob:ExtraclassesToBeCopied) {
+					classesToBeCopied.add(ob);
 				}
 				/*ICompilationUnit  cu = selectedType.getCompilationUnit();
 				RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.RENAME_COMPILATION_UNIT);
