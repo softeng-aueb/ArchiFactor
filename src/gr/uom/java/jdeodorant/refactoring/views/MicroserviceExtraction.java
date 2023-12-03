@@ -39,6 +39,7 @@ import gr.uom.java.distance.MySystem;
 import gr.uom.java.jdeodorant.preferences.PreferenceConstants;
 import gr.uom.java.jdeodorant.refactoring.Activator;
 import gr.uom.java.jdeodorant.refactoring.manipulators.ExtractClassRefactoring;
+import gr.uom.java.jdeodorant.refactoring.manipulators.MoveClassRefactoring;
 import gr.uom.java.jdeodorant.refactoring.views.CodeSmellPackageExplorer.CodeSmellType;
 
 import org.eclipse.swt.widgets.Composite;
@@ -662,8 +663,8 @@ public class MicroserviceExtraction extends ViewPart {
 									candidate.getDelegateMethods(), extractedClassName);*/
 						}
 						try {
-							ICompilationUnit  cu = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
-							IFolder McFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
+							ICompilationUnit  chosenCl = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
+							IFolder McFolder = chosenCl.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
 						    if(!McFolder.exists()) {
 						    	McFolder.create(true, true, null);
 						    }
@@ -677,48 +678,64 @@ public class MicroserviceExtraction extends ViewPart {
 								IJavaElement parent = JavaCore.create(processFolder2);
 								cuCopy.copy(parent, cuCopy, cuCopy.getElementName(), true, null);
 							}
-							
+							List<String> destinationNames = new ArrayList<String>();
+							Map<ICompilationUnit,String> classMap = new HashMap<ICompilationUnit,String>();
+							for(ClassObject ob:classesToBeMoved) {
+								ICompilationUnit  cuTemp = (ICompilationUnit)ob.getITypeRoot().getPrimaryElement();
+								String location= cuTemp.getCorrespondingResource().getParent().getName();
+								classMap.put(cuTemp, location);
+								if(!destinationNames.contains(location)) {
+									destinationNames.add(location);
+								}
+							}
+							for(String s:destinationNames) {
+								List<ICompilationUnit> cus = new ArrayList<ICompilationUnit>();
+								for(ICompilationUnit c:classMap.keySet()) {
+									if(classMap.get(c).equals(s)) {
+										cus.add(c);
+									}
+								}
+								RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
+							    IFolder processFolder = cus.get(0).getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice/"
+							    +s);
+							    if(!processFolder.exists()) {
+							    	processFolder.create(true, true, null);
+							    }
+								MoveDescriptor descriptor = (MoveDescriptor)contribution.createDescriptor();
+								IJavaElement pack = JavaCore.create(processFolder);
+								ICompilationUnit[] moved =new ICompilationUnit[cus.size()];
+								moved = cus.toArray(moved);
+								RefactoringStatus status = new RefactoringStatus();
+								MoveClassRefactoring moveclassRefactoring = new MoveClassRefactoring(descriptor, moved, cus.get(0).getResource().getProject().getName(), pack, true, status);
+								refactoring = moveclassRefactoring.getRefactoring();
+								IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
+								JavaUI.openInEditor(classesToBeCopied.get(0).getITypeRoot().getPrimaryElement());
+								IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
+								page.closeAllEditors(true);
+								MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, applyRefactoringAction);
+								RefactoringWizardOpenOperation op = new RefactoringWizardOpenOperation(wizard); 
+								String titleForFailedChecks = ""; //$NON-NLS-1$ 
+								op.run(getSite().getShell(), titleForFailedChecks);
+							}
+							/*ICompilationUnit  cu = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
 							RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
-							IContainer pack = null;
-							System.out.println(cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource());
-							//RefactoringDescriptor descriptor=contribution.createDescriptor();
-							pack = classesToBeMoved.get(0).getITypeRoot().getParent().getPrimaryElement().getCorrespondingResource().getParent().getParent();
-							System.out.println(pack.getName());
-								//System.out.println(pack.getPrimaryElement().getCorrespondingResource().getParent().getName());
-							/*IPath processFolderPath = cu.getJavaProject().getPackageFragments()[2].getPath().append("Microservice");
-						    IFolder processFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder(processFolderPath.makeRelativeTo(cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getLocation()));
-						    System.out.println(processFolder.getFullPath());
-						    if (!processFolder.exists()) {
-						           processFolder.create(true, true, new NullProgressMonitor());
-						    }*/
-							//IPath processFolderPath = cu.getJavaProject().getPackageFragments()[2].getPath().append("Microservice");
 						    IFolder processFolder = cu.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice/"
 						    +cu.getCorrespondingResource().getParent().getName());
 						    if(!processFolder.exists()) {
 						    	processFolder.create(true, true, null);
 						    }
-							cu.getJavaProject().getJavaModel().save(null, true);
-							//IPackageFragment pack2 = cu.getJavaProject().getPackageFragmentRoot(processFolder).createPackageFragment("Microservice", false, null);
 							MoveDescriptor descriptor = (MoveDescriptor)contribution.createDescriptor();
-							descriptor.setProject(cu.getResource().getProject().getName());
-							//descriptor.setDestination(cu.getResource().getParent()); // new name for a Class
-							//descriptor.setDestination((IJavaElement)pack);
-							//System.out.println(brFile.getITypeRoot().getResource().getParent().getParent());
-							IJavaElement pack3 = JavaCore.create(processFolder);
-							descriptor.setDestination(pack3);
-							descriptor.setUpdateReferences(true);
+							IJavaElement pack = JavaCore.create(processFolder);
 							ICompilationUnit[] moved = {cu};
-							IFile[] files = {};
-							IFolder[] folders = {};
-							descriptor.setMoveResources(files, folders, moved);
 							RefactoringStatus status = new RefactoringStatus();
-							 refactoring = descriptor.createRefactoring(status);
-							IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
-							JavaUI.openInEditor(sourceJavaElement);
+							MoveClassRefactoring moveclassRefactoring = new MoveClassRefactoring(descriptor, moved, cu.getResource().getProject().getName(), pack, true, status);
+							refactoring = moveclassRefactoring.getRefactoring();
+							//IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
+							//JavaUI.openInEditor(sourceJavaElement);
 							MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, applyRefactoringAction);
 							RefactoringWizardOpenOperation op = new RefactoringWizardOpenOperation(wizard); 
 							String titleForFailedChecks = ""; //$NON-NLS-1$ 
-							op.run(getSite().getShell(), titleForFailedChecks);
+							op.run(getSite().getShell(), titleForFailedChecks);*/
 							
 						} catch (PartInitException e) {
 							e.printStackTrace();
@@ -986,30 +1003,9 @@ public class MicroserviceExtraction extends ViewPart {
 				for(ClassObject ob:ExtraclassesToBeCopied) {
 					classesToBeCopied.add(ob);
 				}
-				/*ICompilationUnit  cu = selectedType.getCompilationUnit();
-				RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.RENAME_COMPILATION_UNIT);
-				//RefactoringDescriptor descriptor=contribution.createDescriptor();
-				RenameJavaElementDescriptor descriptor = (RenameJavaElementDescriptor)contribution.createDescriptor();
-				descriptor.setProject(cu.getResource().getProject().getName( ));
-				descriptor.setNewName("NewClass"); // new name for a Class
-				descriptor.setJavaElement(cu);
-				RefactoringStatus status = new RefactoringStatus();
-				try {
-				    Refactoring refactoring = descriptor.createRefactoring(status);
-
-				    IProgressMonitor monitor = new NullProgressMonitor();
-				    refactoring.checkInitialConditions(monitor);
-				    refactoring.checkFinalConditions(monitor);
-				    Change change = refactoring.createChange(monitor);
-				    change.perform(monitor);
-
-				} catch (CoreException e) {
-				    // TODO Auto-generated catch block
-				    e.printStackTrace();
-				} catch (Exception e) {
-				    // TODO Auto-generated catch block
-				    e.printStackTrace();
-				}*/
+				for(ClassObject obj:chosenClasses) {
+					classesToBeMoved.add(obj);
+				}
 				/*ICompilationUnit  cu = selectedType.getCompilationUnit();
 				RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
 				//RefactoringDescriptor descriptor=contribution.createDescriptor();
