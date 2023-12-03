@@ -10,6 +10,7 @@ import java.util.ListIterator;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.jdt.core.ITypeRoot;
 import org.eclipse.jdt.core.dom.AbstractTypeDeclaration;
+import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.EnumDeclaration;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 
@@ -24,7 +25,7 @@ public class ClassObject extends ClassDeclarationObject {
     private boolean _static;
     private boolean _enum;
     private Access access;
-    private List<String> annotations;
+    private List<Annotation> annotations;
     //private TypeDeclaration typeDeclaration;
     private ASTInformation typeDeclaration;
     private IFile iFile;
@@ -36,7 +37,7 @@ public class ClassObject extends ClassDeclarationObject {
 		this._abstract = false;
         this._interface = false;
         this._static = false;
-        this.annotations = new ArrayList<String>();
+        this.annotations = new ArrayList<Annotation>();
         this._enum = false;
         this.access = Access.NONE;
     }
@@ -179,12 +180,38 @@ public class ClassObject extends ClassDeclarationObject {
         return access;
     }
     
-    public void addAnnotation(String annotation) {
+    public void addAnnotation(Annotation annotation) {
     	this.annotations.add(annotation);
     }
     
-    public List<String> getAnnotations() {
+    public List<Annotation> getAnnotations() {
     	return this.annotations;
+    }
+    
+    public boolean isTestClass() {
+    	if(this.containsMethodWithTestAnnotation()) {
+    		return true;
+    	}else {
+    		if (this.annotations.size()>0) {
+	    		for(Annotation ann: this.annotations) {
+	    			if(ann.getTypeName().getFullyQualifiedName().equals("Test")) {
+	    				return true;
+	    			}
+	    		}
+    		}
+    	}
+    	return false;
+    }
+    
+    public boolean isEntity() {
+    	if (this.annotations.size()>0) {
+			for(Annotation ann: this.annotations) {
+				if(ann.getTypeName().getFullyQualifiedName().equals("Entity")) {
+					return true;
+				}
+			}
+    	}
+    	return false;
     }
 
     public void setSuperclass(TypeObject superclass) {

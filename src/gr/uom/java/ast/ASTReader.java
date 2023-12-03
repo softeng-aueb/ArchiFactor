@@ -380,7 +380,7 @@ public class ASTReader {
 		for(IExtendedModifier extendedModifier : extendedModifiers) {
 			if(extendedModifier.isAnnotation()) {
 				Annotation annotation = (Annotation)extendedModifier;
-				classObject.addAnnotation(annotation.getTypeName().getFullyQualifiedName());
+				classObject.addAnnotation(annotation);
 				//System.out.println(annotation.getTypeName().getFullyQualifiedName());
 			}
 		}

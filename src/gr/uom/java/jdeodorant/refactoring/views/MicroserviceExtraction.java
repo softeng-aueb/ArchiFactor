@@ -878,7 +878,6 @@ public class MicroserviceExtraction extends ViewPart {
 				else {
 					classObjectsToBeExamined.addAll(systemObject.getClassObjects());
 				}
-				ClassObject brFile=null;
 				List<ClassObject> classes = new ArrayList<ClassObject>();
 				classes.addAll(systemObject.getClassObjects());
 				//TEMPORARY
@@ -892,41 +891,6 @@ public class MicroserviceExtraction extends ViewPart {
 					}
 				}
 				for(final ClassObject classOb : classes) {
-					/*if (classOb.getName().equals("com.mgiandia.library.loans.domain.Borrower")) {
-						brFile=classOb;
-					}*/
-					boolean isEntity= false;
-					boolean isTest= false;
-					if (classOb.getAnnotations().size()>0) {
-						for (String annotation : classOb.getAnnotations()) {
-							if (annotation.equals("Entity")) {
-								isEntity=true;
-								//ICompilationUnit  cu = (ICompilationUnit)classOb.getIFile();
-								//System.out.println(classOb.getName()+" is Entity "+classOb.getITypeRoot().getResource()+" , "+classOb.getIFile().getParent().getParent()+" "+selectedType);
-								/*ICompilationUnit  cu = selectedType.getCompilationUnit();
-								RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.RENAME_COMPILATION_UNIT);
-								//RefactoringDescriptor descriptor=contribution.createDescriptor();
-								RenameJavaElementDescriptor descriptor = (RenameJavaElementDescriptor)contribution.createDescriptor();
-								descriptor.setProject(cu.getResource().getProject().getName( ));
-								descriptor.setNewName("NewClass"); // new name for a Class
-								descriptor.setJavaElement(cu);
-								RefactoringStatus status = new RefactoringStatus();
-								try {
-								    Refactoring refactoring = descriptor.createRefactoring(status);
-
-								    IProgressMonitor monitor = new NullProgressMonitor();
-								    refactoring.checkInitialConditions(monitor);
-								    refactoring.checkFinalConditions(monitor);
-								    Change change = refactoring.createChange(monitor);
-								    change.perform(monitor);
-
-								} catch (CoreException e) {
-								    // TODO Auto-generated catch block
-								    e.printStackTrace();
-								} catch (Exception e) {
-								    // TODO Auto-generated catch block
-								    e.printStackTrace();
-								}*/
 								//MoveRefactoring ref= new MoveRefactoring();
 								//final MoveResourceChange ref= MoveResourceChange.create(classOb.getITypeRoot().getResource(),classOb.getITypeRoot().getResource().getParent().getParent());
 								/*ps.busyCursorWhile(new IRunnableWithProgress() {
@@ -943,20 +907,14 @@ public class MicroserviceExtraction extends ViewPart {
 										}
 									}
 								});*/
-							}
-							if (annotation.equals("Test")) {
-								isTest=true;
-							}
-						}
-						
-					}
+							
 					/*if((classOb.getITypeRoot().getParent().getElementName().equals(selectedType.getTypeRoot().getParent().getElementName()))&&(!isEntity)&&(!isTest)) {
 						System.out.println(classOb.getName()+" is not Entity "+classOb.getITypeRoot().getParent().getElementName());
 						classesToBeCopied.add(classOb);
 					}*/
 					for(ClassObject cl:chosenClasses) {
 						//classes that depend on one of the chosen for extraction classes
-						if((!chosenClasses.contains(classOb))&&(!isTest)&&!(classOb.containsMethodWithTestAnnotation())){	
+						if((!chosenClasses.contains(classOb))&&(!classOb.isTestClass())){	
 							if(classOb.hasFieldType(cl.getName())) {
 								for(MethodObject method:cl.getMethodList()) {
 									if(method.getAccess().equals(Access.NONE)) {
@@ -971,7 +929,7 @@ public class MicroserviceExtraction extends ViewPart {
 							}
 						}
 						//Classes that need to be copied
-						if((!chosenClasses.contains(classOb))&&(cl.hasFieldType(classOb.getName()))&&(!isEntity)&&(!isTest)){	
+						if((!chosenClasses.contains(classOb))&&(cl.hasFieldType(classOb.getName()))&&(!classOb.isEntity())&&(!classOb.isTestClass())){	
 							//System.out.println("We need to copy "+classOb.getName());
 							classesToBeCopied.add(classOb);
 						}
