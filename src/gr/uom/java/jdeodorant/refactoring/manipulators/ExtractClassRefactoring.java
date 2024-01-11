@@ -239,7 +239,7 @@ public class ExtractClassRefactoring extends Refactoring {
 		Set<VariableDeclaration> modifiedFieldsInNonExtractedMethods = new LinkedHashSet<VariableDeclaration>();
 		Set<VariableDeclaration> accessedFieldsInNonExtractedMethods = new LinkedHashSet<VariableDeclaration>();
 		modifyExtractedFieldAssignmentsInSourceClass(extractedFieldFragments, modifiedFieldsInNonExtractedMethods, accessedFieldsInNonExtractedMethods);
-		modifyExtractedFieldAccessesInSourceClass(extractedFieldFragments, accessedFieldsInNonExtractedMethods);
+		//modifyExtractedFieldAccessesInSourceClass(extractedFieldFragments, accessedFieldsInNonExtractedMethods);
 		createExtractedTypeFieldReferenceInSourceClass();
 		
 		Set<ITypeBinding> typeBindings = new LinkedHashSet<ITypeBinding>();
@@ -277,9 +277,10 @@ public class ExtractClassRefactoring extends Refactoring {
 		Set<MethodDeclaration> methodsToBeRemoved = new LinkedHashSet<MethodDeclaration>();
 		for(MethodDeclaration method : extractedMethods) {
 			if(delegateMethods.contains(method))
-				addDelegationInExtractedMethod(method);
-			else
+				//addDelegationInExtractedMethod(method);
 				methodsToBeRemoved.add(method);
+			//else
+				
 		}
 		if(methodsToBeRemoved.size() > 0)
 			removeSourceMethods(methodsToBeRemoved);

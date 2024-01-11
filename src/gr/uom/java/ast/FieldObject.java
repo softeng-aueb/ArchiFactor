@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.ListIterator;
 
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
@@ -16,7 +17,7 @@ public class FieldObject extends VariableDeclarationObject {
     private List<CommentObject> commentList;
     private boolean _static;
     private Access access;
-    private List<String> annotations;
+    private List<Annotation> annotations;
     private String className;
     //private VariableDeclarationFragment fragment;
     private ASTInformation fragment;
@@ -27,7 +28,7 @@ public class FieldObject extends VariableDeclarationObject {
         this.name = name;
         this._static = false;
         this.access = Access.NONE;
-        this.annotations = new ArrayList<String>(); 
+        this.annotations = new ArrayList<Annotation>(); 
         this.commentList = new ArrayList<CommentObject>();
     }
 
@@ -104,11 +105,11 @@ public class FieldObject extends VariableDeclarationObject {
         return false;
     }
     
-    public void addAnnotation(String annotation) {
+    public void addAnnotation(Annotation annotation) {
     	this.annotations.add(annotation);
     }
     
-    public List<String> getAnnotations() {
+    public List<Annotation> getAnnotations() {
     	return this.annotations;
     }
 

@@ -484,7 +484,7 @@ public class ASTReader {
 			for(IExtendedModifier extendedModifier : extendedModifiers) {
 				if(extendedModifier.isAnnotation()) {
 					Annotation annotation = (Annotation)extendedModifier;
-					fieldObject.addAnnotation(annotation.getTypeName().getFullyQualifiedName());
+					fieldObject.addAnnotation(annotation);
 					//System.out.println(annotation.getTypeName().getFullyQualifiedName());
 				}
 			}

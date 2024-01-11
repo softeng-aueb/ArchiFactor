@@ -61,6 +61,7 @@ import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.ui.JavaUI;
 import org.eclipse.jface.operation.IRunnableWithProgress;
@@ -622,6 +623,8 @@ public class GodClass extends ViewPart {
 									ioe.printStackTrace();
 								}
 							}
+							TypeDeclaration sourceTypeDeclaration = candidate.getSourceClassTypeDeclaration();
+							Set<MethodDeclaration> delegateMethods = candidate.getDelegateMethods();
 							refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 									candidate.getSourceClassTypeDeclaration(),
 									extractedFieldFragments, extractedMethods,
