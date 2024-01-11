@@ -277,10 +277,9 @@ public class ExtractClassRefactoring extends Refactoring {
 		Set<MethodDeclaration> methodsToBeRemoved = new LinkedHashSet<MethodDeclaration>();
 		for(MethodDeclaration method : extractedMethods) {
 			if(delegateMethods.contains(method))
-				//addDelegationInExtractedMethod(method);
+				addDelegationInExtractedMethod(method);
+			else
 				methodsToBeRemoved.add(method);
-			//else
-				
 		}
 		if(methodsToBeRemoved.size() > 0)
 			removeSourceMethods(methodsToBeRemoved);
