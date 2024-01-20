@@ -111,6 +111,12 @@ public class EntityObject {
 		}
 		return methodDeclarations;
 	}
+	
+	public String getIdFieldGetterName() {
+		FieldObject field = getIdField();
+		String nameWithUpperCase = Character.toUpperCase(field.getName().charAt(0)) + field.getName().substring(1);
+		return "get"+nameWithUpperCase;
+	}
 
 	
 	

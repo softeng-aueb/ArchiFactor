@@ -81,13 +81,18 @@ import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.refactoring.*;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.Assignment;
+import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.ExpressionStatement;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MemberValuePair;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
@@ -95,15 +100,20 @@ import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NormalAnnotation;
+import org.eclipse.jdt.core.dom.ParameterizedType;
 import org.eclipse.jdt.core.dom.PrimitiveType;
+import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
+import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.StringLiteral;
 import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.Type;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.TypeLiteral;
 import org.eclipse.jdt.core.dom.VariableDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
@@ -1081,22 +1091,22 @@ public class MicroserviceExtraction extends ViewPart {
 				//Owned Class Service Extraction
 				IFile sourceFile = association.getOwnedClass().getClassObject().getIFile();
 				ICompilationUnit cu = (ICompilationUnit)association.getOwnedClass().getClassObject().getITypeRoot().getPrimaryElement();
-				final List<ExtractClassCandidateRefactoring> extractClassCandidateL = new ArrayList<ExtractClassCandidateRefactoring>();
+				//final List<ExtractClassCandidateRefactoring> extractClassCandidateL = new ArrayList<ExtractClassCandidateRefactoring>();
 				//List<String> list = Arrays.asList( association.getOwnedClass().getClassObject().getName());
-				MySystem system1 = new MySystem(systemObject, true);
-				final DistanceMatrix distanceMatrix1 = new DistanceMatrix(system1);
-				extractClassCandidateL.addAll(distanceMatrix1.getExtractClassCandidateRefactorings(new HashSet<String>(Arrays.asList(association.getOwnedClass().getClassObject().getName())), null));
-		        CandidateRefactoring entry = (CandidateRefactoring)extractClassCandidateL.get(0);
+				//MySystem system1 = new MySystem(systemObject, true);
+				//final DistanceMatrix distanceMatrix1 = new DistanceMatrix(system1);
+				//extractClassCandidateL.addAll(distanceMatrix1.getExtractClassCandidateRefactorings(new HashSet<String>(Arrays.asList(association.getOwnedClass().getClassObject().getName())), null));
+		        //CandidateRefactoring entry = (CandidateRefactoring)extractClassCandidateL.get(0);
 		        //CompilationUnit sourceCompilationUnit = (CompilationUnit)entry.getSourceClassTypeDeclaration().getRoot();
-				TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
+				//TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
 				Set<VariableDeclaration> extractedFieldFragments = new LinkedHashSet<VariableDeclaration>();
 				extractedFieldFragments.add(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()).getVariableDeclaration());
 				final Set<MethodDeclaration> extractedMethods = association.getOwnedClass().getMethodDeclarationsByField(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()));
 				Set<MethodDeclaration> delegateMethods = new LinkedHashSet<MethodDeclaration>();
 				String[] array = association.getOwnerClass().getClassObject().getName().split("\\.");
-				String extractedClassName = array[array.length-1]+"Service";
-				//MIGHT ADD QUERY METHOD
-				changeThisExpressionToIDInMethodInvocations(cu,extractedMethods,association);
+				final String extractedClassName = array[array.length-1]+"Service";
+
+				final Set<String> extractedMethodNamesWithThisExpression = changeThisExpressionToIDInMethodInvocations(cu,extractedMethods,association);
 				ASTParser parser2 = ASTParser.newParser(ASTReader.JLS);
 				parser2.setKind(ASTParser.K_COMPILATION_UNIT);
 				parser2.setSource(cu);
@@ -1105,6 +1115,10 @@ public class MicroserviceExtraction extends ViewPart {
 		        
 		        final Set<MethodDeclaration> newExtractedMethods = new HashSet<MethodDeclaration>();
 				CompilationUnit sourceCompilationUnit = (CompilationUnit) parser2.createAST(null);
+				
+				//createQueryMethod(sourceCompilationUnit);
+				//createFactoryMethod(sourceCompilationUnit);
+				
 				sourceCompilationUnit.accept(new ASTVisitor() {
 				    public boolean visit(MethodDeclaration node) {
 				    	for(MethodDeclaration methodDeclaration:extractedMethods) {
@@ -1115,11 +1129,12 @@ public class MicroserviceExtraction extends ViewPart {
 				    	return true;
 				    }
 				});
+				TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) sourceCompilationUnit.types().get(0);
 				System.out.println(newExtractedMethods);
 				Refactoring refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 						sourceTypeDeclaration,
 						extractedFieldFragments, newExtractedMethods,
-						delegateMethods, extractedClassName);
+						delegateMethods, extractedClassName,true);
 				try {
 					IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
 					JavaUI.openInEditor(sourceJavaElement);
@@ -1144,6 +1159,8 @@ public class MicroserviceExtraction extends ViewPart {
 				}
 				System.out.println(test);
 				
+				extractOwnerServiceClass(association);
+				
 				/*int[] selection = {test.getStartPosition(), test.getLength()};
 				InlineMethodRefactoring refactoring2 = InlineMethodRefactoring.create(sourceCompilationUnit.getTypeRoot(), new RefactoringASTParser(ASTProvider.SHARED_AST_LEVEL).parse(sourceCompilationUnit.getTypeRoot(), true), selection[0], selection[1]);
 				refactoring2.setDeleteSource(true);
@@ -1164,7 +1181,6 @@ public class MicroserviceExtraction extends ViewPart {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}*/
-				
 				
 				//Adding FK to Owner Class
 				ICompilationUnit cuOwner = (ICompilationUnit)association.getOwnerClass().getClassObject().getITypeRoot().getPrimaryElement();
@@ -1251,6 +1267,241 @@ public class MicroserviceExtraction extends ViewPart {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				
+				for(final ClassObject classObject :classes) {
+					ICompilationUnit icu = (ICompilationUnit)classObject.getITypeRoot().getPrimaryElement();
+					//ICompilationUnit icu = (ICompilationUnit)association.getOwnerClass().getClassObject().getITypeRoot().getPrimaryElement();
+					
+					MultiTextEdit sourceMultiTextEdit2 = new MultiTextEdit();
+			        CompilationUnitChange sourceCompilationUnitChange2 = new CompilationUnitChange("", icu);
+			        sourceCompilationUnitChange2.setEdit(sourceMultiTextEdit2);
+			        compilationUnitChanges.put(icu, sourceCompilationUnitChange2);
+					
+					ASTParser parser3 = ASTParser.newParser(ASTReader.JLS);
+					parser3.setKind(ASTParser.K_COMPILATION_UNIT);
+					parser3.setSource(icu);
+			        parser3.setResolveBindings(true);
+			        final CompilationUnit astRoot3 = (CompilationUnit) parser3.createAST(null);
+					astRoot3.recordModifications();
+					final ASTRewrite rewriter3 = ASTRewrite.create(astRoot3.getAST());
+					final String extractedClassFieldName = Character.toLowerCase(extractedClassName.charAt(0)) + extractedClassName.substring(1);
+					
+					
+					List<MethodDeclaration> classMethodDeclarations = new ArrayList<MethodDeclaration>();
+					for(MethodObject methObj:classObject.getMethodList()) {
+						classMethodDeclarations.add(methObj.getMethodDeclaration());
+					}
+					
+					astRoot3.accept(new ASTVisitor() {
+						
+						public boolean visit(final MethodDeclaration md) {
+							md.accept(new ASTVisitor() {
+								//boolean hasMoreThanOneInvocationOfExtractedMethod = false;
+								//boolean hasMoreThanOneInvocationOfExtractedMethod2 = false;
+								public boolean visit(MethodInvocation mi) {
+									for(MethodDeclaration methodDeclaration:newExtractedMethods) {
+										if(mi.getName().toString().equals(methodDeclaration.getName().toString())) {
+											//if(!hasMoreThanOneInvocationOfExtractedMethod) {
+												//hasMoreThanOneInvocationOfExtractedMethod = true;
+												VariableDeclarationFragment fragment = astRoot3.getAST().newVariableDeclarationFragment();
+												fragment.setName(astRoot3.getAST().newSimpleName(extractedClassFieldName));
+												MethodInvocation invocation = astRoot3.getAST().newMethodInvocation();
+												invocation.setName(astRoot3.getAST().newSimpleName("factoryMethod"));
+												invocation.setExpression(astRoot3.getAST().newSimpleName(extractedClassName));
+												//TypeDeclaration type = (TypeDeclaration) methodDeclaration.getParent();
+												
+												addExpressionAsArgumentToInvocation(astRoot3,mi,invocation,association,rewriter3);
+												
+												Type serviceType = astRoot3.getAST().newSimpleType(astRoot3.getAST().newName(extractedClassName));
+												fragment.setInitializer(invocation);
+												VariableDeclarationStatement statement = astRoot3.getAST().newVariableDeclarationStatement(fragment);
+												statement.setType(serviceType);
+												System.out.println(findFirstStatement(mi).getParent());
+												Block block = (Block) findFirstStatement(mi).getParent();
+												ListRewrite listRewrite = rewriter3.getListRewrite(block, Block.STATEMENTS_PROPERTY);
+												listRewrite.insertBefore(statement, findFirstStatement(mi), null);
+											//}
+											for(String name:extractedMethodNamesWithThisExpression) {
+												if(name.equals(mi.getName().toString())) {
+													addExpressionAsArgumentToInvocation(astRoot3,mi,mi,association,rewriter3);
+												}
+											}
+											rewriter3.replace(mi.getExpression(), astRoot3.getAST().newSimpleName(extractedClassFieldName), null);
+										}
+									}
+									if(mi.getName().toString().equals("getBook")) {
+										//if(!hasMoreThanOneInvocationOfExtractedMethod2) {
+											//hasMoreThanOneInvocationOfExtractedMethod2 = true;
+											VariableDeclarationFragment fragment = astRoot3.getAST().newVariableDeclarationFragment();
+											fragment.setName(astRoot3.getAST().newSimpleName("bookService"));
+											MethodInvocation invocation = astRoot3.getAST().newMethodInvocation();
+											invocation.setName(astRoot3.getAST().newSimpleName("factoryMethod"));
+											invocation.setExpression(astRoot3.getAST().newSimpleName("BookService"));
+											ListRewrite listRewrite2 = rewriter3.getListRewrite(invocation, MethodInvocation.ARGUMENTS_PROPERTY);
+											listRewrite2.insertLast(mi, null);
+											
+											Type serviceType = astRoot3.getAST().newSimpleType(astRoot3.getAST().newName("BookService"));
+											fragment.setInitializer(invocation);
+											VariableDeclarationStatement statement = astRoot3.getAST().newVariableDeclarationStatement(fragment);
+											statement.setType(serviceType);
+											Block block = (Block) findFirstStatement(mi).getParent();
+											ListRewrite listRewrite = rewriter3.getListRewrite(block, Block.STATEMENTS_PROPERTY);
+											listRewrite.insertBefore(statement, findFirstStatement(mi), null);
+										//}
+										MethodInvocation newExpression = astRoot3.getAST().newMethodInvocation();
+										newExpression.setExpression(astRoot3.getAST().newSimpleName("bookService"));
+										newExpression.setName(astRoot3.getAST().newSimpleName("queryBook"));
+										rewriter3.replace(mi, newExpression, null);
+									}
+									return true;
+								}
+							});;
+							return true;
+						}
+					});
+					TextEdit edits2;
+					try {
+						edits2 = rewriter3.rewriteAST();
+						icu = (ICompilationUnit)astRoot3.getJavaElement();
+						CompilationUnitChange change = compilationUnitChanges.get(icu);
+						change.getEdit().addChild(edits2);
+						change.addTextEditGroup(new TextEditGroup("Change access of extracted member", new TextEdit[] {edits2}));
+						IProgressMonitor monitor = new NullProgressMonitor();
+						change.perform(monitor);
+					} catch (JavaModelException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					} catch (CoreException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
+					//for(MethodDeclaration md:classMethodDeclarations) {
+						//md.accept(new ASTVisitor() {
+						astRoot3.accept(new ASTVisitor() {
+							boolean hasMoreThanOneInvocationOfExtractedMethod = false;
+							boolean hasMoreThanOneInvocationOfExtractedMethod2 = false;
+							public boolean visit(MethodInvocation node) {
+								for(MethodDeclaration methodDeclaration:newExtractedMethods) {
+									if(node.getName().toString().equals(methodDeclaration.getName().toString())) {
+										//System.out.println(node.toString()+" "+node.getExpression());
+		
+										if(!hasMoreThanOneInvocationOfExtractedMethod) {
+											hasMoreThanOneInvocationOfExtractedMethod = true;
+											TypeDeclaration classDeclaration = (TypeDeclaration) astRoot3.types().get(0);
+											ListRewrite listRewrite = rewriter3.getListRewrite(classDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+											final FieldDeclaration fieldDeclaration3 = astRoot3.getAST().newFieldDeclaration(astRoot3.getAST().newVariableDeclarationFragment());
+											fieldDeclaration3.setType(astRoot3.getAST().newSimpleType(astRoot3.getAST().newName(extractedClassName)));
+											fieldDeclaration3.modifiers().add(astRoot3.getAST().newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+											((VariableDeclarationFragment) fieldDeclaration3.fragments().get(0)).setName(astRoot3.getAST().newSimpleName(extractedClassFieldName));
+											ClassInstanceCreation classInstane = astRoot3.getAST().newClassInstanceCreation();
+											classInstane.setType(astRoot3.getAST().newSimpleType(astRoot3.getAST().newName(extractedClassName)));
+											//variableDeclarationFragment.setInitializer(classInstane);
+											((VariableDeclarationFragment) fieldDeclaration3.fragments().get(0)).setInitializer(classInstane);
+											//fieldDeclaration.fragments().add(variableDeclarationFragment);
+											listRewrite.insertFirst(fieldDeclaration3, null);
+										}
+										
+										
+										Expression exp = node.getExpression();
+										String typeName = null;
+										ITypeBinding typeBinding = node.getExpression().resolveTypeBinding();
+										if (typeBinding != null) {
+										    typeName = typeBinding.getQualifiedName();
+										    //System.out.println(typeName);
+										}
+										if(typeName.equals(association.getOwnedClass().getClassObject().getName())) {
+											MethodInvocation newExpression = astRoot3.getAST().newMethodInvocation();
+											/*if ((exp.toString().contains("this"))) {
+						                    	 FieldAccess newFieldAccess = astRoot.getAST().newFieldAccess();
+						                         newFieldAccess.setExpression(astRoot.getAST().newThisExpression());
+						                         newFieldAccess.setName(astRoot.getAST().newSimpleName(association.getOwnedClass().getIdField().getName()));
+						                         newExpression.setExpression(newFieldAccess);
+						                         newExpression.setName(astRoot.getAST().newSimpleName("getBook"));
+											}else {*/
+												//Expression exp = ast.newExpression();
+												//exp = node.getExpression();
+												//Expression exp2 = (Expression) exp;
+												String getterMethodName = association.getOwnedClass().getIdFieldGetterName();
+												newExpression.setExpression(astRoot3.getAST().newSimpleName(exp.toString()));
+												newExpression.setName(astRoot3.getAST().newSimpleName(getterMethodName));
+											//}
+											
+											ListRewrite listRewrite2 = rewriter3.getListRewrite(node, MethodInvocation.ARGUMENTS_PROPERTY);
+											listRewrite2.insertLast(newExpression, null);
+										}else {
+											ListRewrite listRewrite2 = rewriter3.getListRewrite(node, MethodInvocation.ARGUMENTS_PROPERTY);
+											listRewrite2.insertLast(node.getExpression(), null);
+										}
+										
+										//FieldAccess newFieldAccess = astRoot.getAST().newFieldAccess();
+				                        //newFieldAccess.setExpression(astRoot.getAST().newThisExpression());
+				                        //newFieldAccess.setName();
+				                        rewriter3.replace(node.getExpression(), astRoot3.getAST().newSimpleName(extractedClassFieldName), null);
+										/*node.getParent().accept(new ASTVisitor() {
+											public boolean visit(SimpleName node2) {
+												System.out.println(node2.toString());
+												return true;
+											}
+										});*/
+									}
+									
+									
+								}
+								
+								if(node.getName().toString().equals("getBook")) {
+									System.out.println(classObject.getName()+"  "+node.toString()+" "+node.getExpression());
+									
+									if(!hasMoreThanOneInvocationOfExtractedMethod2) {
+										hasMoreThanOneInvocationOfExtractedMethod2 = true;
+										TypeDeclaration classDeclaration = (TypeDeclaration) astRoot3.types().get(0);
+										ListRewrite listRewrite = rewriter3.getListRewrite(classDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+										final FieldDeclaration fieldDeclaration3 = astRoot3.getAST().newFieldDeclaration(astRoot3.getAST().newVariableDeclarationFragment());
+										fieldDeclaration3.setType(astRoot3.getAST().newSimpleType(astRoot3.getAST().newName("BookService")));
+										fieldDeclaration3.modifiers().add(astRoot3.getAST().newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+										((VariableDeclarationFragment) fieldDeclaration3.fragments().get(0)).setName(astRoot3.getAST().newSimpleName("bookService"));
+										ClassInstanceCreation classInstane = astRoot3.getAST().newClassInstanceCreation();
+										classInstane.setType(astRoot3.getAST().newSimpleType(astRoot3.getAST().newName("BookService")));
+										//variableDeclarationFragment.setInitializer(classInstane);
+										((VariableDeclarationFragment) fieldDeclaration3.fragments().get(0)).setInitializer(classInstane);
+										//fieldDeclaration.fragments().add(variableDeclarationFragment);
+										listRewrite.insertFirst(fieldDeclaration3, null);
+									}
+									MethodInvocation newExpression = astRoot3.getAST().newMethodInvocation();
+									newExpression.setExpression(astRoot3.getAST().newSimpleName("bookService"));
+									newExpression.setName(astRoot3.getAST().newSimpleName("queryBook"));
+									ListRewrite listRewrite2 = rewriter3.getListRewrite(newExpression, MethodInvocation.ARGUMENTS_PROPERTY);
+									listRewrite2.insertLast(node, null);
+									rewriter3.replace(node, newExpression, null);
+									
+								}
+								
+								return true;
+							}
+						});
+						/*TextEdit edits2;
+						try {
+							edits2 = rewriter3.rewriteAST();
+							icu = (ICompilationUnit)astRoot3.getJavaElement();
+							CompilationUnitChange change = compilationUnitChanges.get(icu);
+							change.getEdit().addChild(edits2);
+							change.addTextEditGroup(new TextEditGroup("Change access of extracted member", new TextEdit[] {edits2}));
+							IProgressMonitor monitor = new NullProgressMonitor();
+							change.perform(monitor);
+						} catch (JavaModelException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						} catch (CoreException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}*/
+					}
+				//}
+				
+				
+				
+				
+				/**/
 				
 		        
 		        /*for (SimpleName simpleName : simpleNames) {
@@ -1667,27 +1918,51 @@ public class MicroserviceExtraction extends ViewPart {
 		}
 	}
 	
-	public void extractOwnedServiceClass(AssociationObject association,SystemObject systemObject) {
-		IFile sourceFile = association.getOwnedClass().getClassObject().getIFile();
-		ICompilationUnit cu = (ICompilationUnit)association.getOwnedClass().getClassObject().getITypeRoot().getPrimaryElement();
-		final List<ExtractClassCandidateRefactoring> extractClassCandidateL = new ArrayList<ExtractClassCandidateRefactoring>();
+	public void extractOwnerServiceClass(AssociationObject association) {
+		IFile sourceFile = association.getOwnerClass().getClassObject().getIFile();
+		ICompilationUnit cu = (ICompilationUnit)association.getOwnerClass().getClassObject().getITypeRoot().getPrimaryElement();
+		//final List<ExtractClassCandidateRefactoring> extractClassCandidateL = new ArrayList<ExtractClassCandidateRefactoring>();
 		//List<String> list = Arrays.asList( association.getOwnedClass().getClassObject().getName());
-		MySystem system1 = new MySystem(systemObject, true);
-		final DistanceMatrix distanceMatrix1 = new DistanceMatrix(system1);
-		extractClassCandidateL.addAll(distanceMatrix1.getExtractClassCandidateRefactorings(new HashSet<String>(Arrays.asList(association.getOwnedClass().getClassObject().getName())), null));
-        CandidateRefactoring entry = (CandidateRefactoring)extractClassCandidateL.get(0);
-        CompilationUnit sourceCompilationUnit = (CompilationUnit)entry.getSourceClassTypeDeclaration().getRoot();
-		TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
+		//MySystem system1 = new MySystem(systemObject, true);
+		//final DistanceMatrix distanceMatrix1 = new DistanceMatrix(system1);
+		//extractClassCandidateL.addAll(distanceMatrix1.getExtractClassCandidateRefactorings(new HashSet<String>(Arrays.asList(association.getOwnedClass().getClassObject().getName())), null));
+        //CandidateRefactoring entry = (CandidateRefactoring)extractClassCandidateL.get(0);
+        //CompilationUnit sourceCompilationUnit = (CompilationUnit)entry.getSourceClassTypeDeclaration().getRoot();
+		//TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
 		Set<VariableDeclaration> extractedFieldFragments = new LinkedHashSet<VariableDeclaration>();
-		extractedFieldFragments.add(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()).getVariableDeclaration());
-		Set<MethodDeclaration> extractedMethods = association.getOwnedClass().getMethodDeclarationsByField(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()));
+		//extractedFieldFragments.add(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getVariableDeclaration());
+		//final Set<MethodDeclaration> extractedMethods = association.getOwnerClass().getMethodDeclarationsByField(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()));
 		Set<MethodDeclaration> delegateMethods = new LinkedHashSet<MethodDeclaration>();
-		String[] arr = association.getOwnerClass().getClassObject().getName().split("\\.");
-		String extractedClassName = arr[arr.length-1]+"Service";
+		String[] arr = association.getOwnedClass().getClassObject().getName().split("\\.");
+		final String className = arr[arr.length-1];
+		String extractedClassName = className+"Service";
+		
+		ASTParser parser = ASTParser.newParser(ASTReader.JLS);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(cu);
+        parser.setResolveBindings(true);
+        
+        final Set<MethodDeclaration> extractedMethods = new HashSet<MethodDeclaration>();
+        
+        final Set<MethodDeclaration> newExtractedMethods = new HashSet<MethodDeclaration>();
+		CompilationUnit sourceCompilationUnit = (CompilationUnit) parser.createAST(null);
+		sourceCompilationUnit.accept(new ASTVisitor() {
+		    public boolean visit(MethodDeclaration node) {
+		    	for(MethodDeclaration methodDeclaration:extractedMethods) {
+		    		if((methodDeclaration.getName().toString().equals(node.getName().toString()))&&(!methodDeclaration.getName().toString().equals("get"+className)
+		    				&&(!methodDeclaration.getName().toString().equals("set"+className)))) {
+		    			newExtractedMethods.add(node);
+		    		}
+		    	}
+		    	return true;
+		    }
+		});
+		TypeDeclaration sourceTypeDeclaration = (TypeDeclaration) sourceCompilationUnit.types().get(0);
+		
 		Refactoring refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 				sourceTypeDeclaration,
-				extractedFieldFragments, extractedMethods,
-				delegateMethods, extractedClassName);
+				extractedFieldFragments, newExtractedMethods,
+				delegateMethods, extractedClassName,false);
 		try {
 			IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
 			JavaUI.openInEditor(sourceJavaElement);
@@ -1706,7 +1981,7 @@ public class MicroserviceExtraction extends ViewPart {
 		}
 	}
 	
-	public void changeThisExpressionToIDInMethodInvocations(ICompilationUnit cu,Set<MethodDeclaration>extractedMethods,final AssociationObject association) {
+	public Set<String> changeThisExpressionToIDInMethodInvocations(ICompilationUnit cu,Set<MethodDeclaration>extractedMethods,final AssociationObject association) {
 		//ASTParser parser = ASTParser.newParser(ASTReader.JLS);
 		//parser.setKind(ASTParser.K_COMPILATION_UNIT);
 		//parser.setSource(cu);
@@ -1714,9 +1989,10 @@ public class MicroserviceExtraction extends ViewPart {
         //Set<MethodDeclaration> extractedMethods = association.getOwnedClass().getMethodDeclarationsByField(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()));
         //final CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
         //final ASTRewrite rewriter = ASTRewrite.create(astRoot.getAST());
+		final Set<String> methodNames = new HashSet<String>();
         MethodDeclaration[] methodDeclarations = extractedMethods.toArray(new MethodDeclaration[extractedMethods.size()]);
         for(int i=0;i<methodDeclarations.length;i++) {
-        	MethodDeclaration methodDeclaration = methodDeclarations[i];
+        	final MethodDeclaration methodDeclaration = methodDeclarations[i];
 	        System.out.println(methodDeclarations[i].getName());
 	        final AST ast = methodDeclarations[i].getAST();
 	        final ASTRewrite rewrite = ASTRewrite.create(ast);
@@ -1727,6 +2003,7 @@ public class MicroserviceExtraction extends ViewPart {
 	                List<Expression> arguments = node.arguments();
 	                for (Expression argument : arguments) {
 	                    if (argument instanceof ThisExpression) {
+	                    	 methodNames.add(methodDeclaration.getName().toString());
 	                    	 FieldAccess newFieldAccess = ast.newFieldAccess();
 	                         newFieldAccess.setExpression(ast.newThisExpression());
 	                         newFieldAccess.setName(ast.newSimpleName(association.getOwnedClass().getIdField().getName()));
@@ -1754,6 +2031,7 @@ public class MicroserviceExtraction extends ViewPart {
 				e.printStackTrace();
 			}
         }
+        return methodNames;
 	}
 	
 	
@@ -1820,10 +2098,161 @@ public class MicroserviceExtraction extends ViewPart {
 			CompilationUnitChange change = compilationUnitChanges.get(sourceICompilationUnit);
 			change.getEdit().addChild(edits);
 			change.addTextEditGroup(new TextEditGroup("Change access of extracted member", new TextEdit[] {edits}));
-			cu.save(null, true);
+			//cu.save(null, true);
 		} catch (JavaModelException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}
+	}
+	
+	
+	
+	public void createFactoryMethod(CompilationUnit astRoot) {
+		
+		ASTRewrite rewriter = ASTRewrite.create(astRoot.getAST());
+		
+		FieldDeclaration entityManagerDecl = astRoot.getAST().newFieldDeclaration(astRoot.getAST().newVariableDeclarationFragment());
+		entityManagerDecl.setType(astRoot.getAST().newSimpleType(astRoot.getAST().newName("EntityManager")));
+		entityManagerDecl.modifiers().add(astRoot.getAST().newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+		((VariableDeclarationFragment) entityManagerDecl.fragments().get(0)).setName(astRoot.getAST().newSimpleName("em"));
+		NormalAnnotation annotation = astRoot.getAST().newNormalAnnotation();
+		annotation.setTypeName(astRoot.getAST().newSimpleName("Inject"));
+		ListRewrite modifiers = rewriter.getListRewrite(entityManagerDecl, FieldDeclaration.MODIFIERS2_PROPERTY);
+		modifiers.insertFirst(annotation, null);
+		
+		
+		MethodDeclaration factoryMethod  = astRoot.getAST().newMethodDeclaration();
+		factoryMethod.setName(astRoot.getAST().newSimpleName("factoryMethod"));
+		Type returnType = astRoot.getAST().newSimpleType(astRoot.getAST().newName("ItemService"));
+		factoryMethod.setReturnType2(returnType);
+		factoryMethod.modifiers().add(astRoot.getAST().newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
+		factoryMethod.modifiers().add(astRoot.getAST().newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
+		
+		SingleVariableDeclaration svd = astRoot.getAST().newSingleVariableDeclaration();
+		svd.setName(astRoot.getAST().newSimpleName("bookno"));
+		svd.setType(astRoot.getAST().newSimpleType(astRoot.getAST().newName("Integer")));
+		
+		VariableDeclarationStatement vds = astRoot.getAST().newVariableDeclarationStatement(astRoot.getAST().newVariableDeclarationFragment());
+		vds.setType(astRoot.getAST().newSimpleType(astRoot.getAST().newName("ItemService")));
+		//vds.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.NONE));
+		
+		VariableDeclarationFragment fragment = astRoot.getAST().newVariableDeclarationFragment();
+		fragment.setName(astRoot.getAST().newSimpleName("itemService"));
+
+		ClassInstanceCreation classInstanceCreation = astRoot.getAST().newClassInstanceCreation();
+		classInstanceCreation.setType(astRoot.getAST().newSimpleType(astRoot.getAST().newName("ItemService")));
+
+		fragment.setInitializer(classInstanceCreation);
+		vds.fragments().add(fragment);
+		vds.fragments().remove(0);
+		
+		factoryMethod.parameters().add(svd);
+		
+		
+		Assignment assignment = astRoot.getAST().newAssignment();
+		FieldAccess fieldAccess = astRoot.getAST().newFieldAccess();
+		fieldAccess.setExpression(astRoot.getAST().newSimpleName("itemService"));
+		fieldAccess.setName(astRoot.getAST().newSimpleName("items"));
+		
+		
+		
+		MethodInvocation createQuery = astRoot.getAST().newMethodInvocation();
+	    createQuery.setExpression(astRoot.getAST().newSimpleName("em"));
+	    createQuery.setName(astRoot.getAST().newSimpleName("createQuery"));
+	    StringLiteral query = astRoot.getAST().newStringLiteral();
+	    query.setLiteralValue("select i from Item i where i.bookno = :bookno");
+	    createQuery.arguments().add(query);
+	    TypeLiteral typeLiteral = astRoot.getAST().newTypeLiteral();
+	    typeLiteral.setType(astRoot.getAST().newSimpleType(astRoot.getAST().newSimpleName("Item")));
+	    createQuery.arguments().add(typeLiteral);
+	    MethodInvocation setParameter = astRoot.getAST().newMethodInvocation();
+	    setParameter.setExpression(createQuery);
+	    setParameter.setName(astRoot.getAST().newSimpleName("setParameter"));
+	    StringLiteral parameterName = astRoot.getAST().newStringLiteral();
+	    parameterName.setLiteralValue("bookno");
+	    setParameter.arguments().add(parameterName);
+	    SimpleName ownedClassId = astRoot.getAST().newSimpleName("bookno");
+	    setParameter.arguments().add(ownedClassId);
+	    MethodInvocation getResultList = astRoot.getAST().newMethodInvocation();
+	    getResultList.setExpression(setParameter);
+	    getResultList.setName(astRoot.getAST().newSimpleName("getResultList"));
+	    
+	    ClassInstanceCreation classInstanceCreation2 = astRoot.getAST().newClassInstanceCreation();
+	    Type returnType2 = astRoot.getAST().newSimpleType(astRoot.getAST().newName("HashSet"));
+	    ParameterizedType parameterizedType2 = astRoot.getAST().newParameterizedType(returnType2);
+	    parameterizedType2.typeArguments().add(astRoot.getAST().newSimpleType(astRoot.getAST().newName("Item")));
+	    returnType2 = parameterizedType2;
+	    classInstanceCreation2.setType(returnType2);
+	    classInstanceCreation2.arguments().add(getResultList);
+		
+		
+		
+		assignment.setRightHandSide(classInstanceCreation2);
+		assignment.setLeftHandSide(fieldAccess);
+
+		
+		Block block = astRoot.getAST().newBlock();
+		block.statements().add(vds);
+		ExpressionStatement expressionStatement = astRoot.getAST().newExpressionStatement(assignment);
+		block.statements().add(expressionStatement);
+	    ReturnStatement returnStatement = astRoot.getAST().newReturnStatement();
+	    returnStatement.setExpression(astRoot.getAST().newSimpleName("itemService"));
+	    block.statements().add(returnStatement);
+	    
+	    factoryMethod.setBody(block);
+	    TypeDeclaration typeDeclaration = (TypeDeclaration) astRoot.types().get(0);
+	    //typeDeclaration.bodyDeclarations().add(queryMethod);
+	    
+	    ListRewrite listRewrite = rewriter.getListRewrite(typeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+	    listRewrite.insertFirst(entityManagerDecl, null);
+	    listRewrite.insertLast(factoryMethod, null);
+	    
+	    ICompilationUnit cu = (ICompilationUnit)astRoot.getJavaElement();
+	    TextEdit edits;
+		try {
+			edits = rewriter.rewriteAST();
+			Document document = new Document(cu.getSource());
+			edits.apply(document);
+			cu.getBuffer().setContents(document.get());
+			cu.save(null, true);
+			cu.commitWorkingCopy(true, null);
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (BadLocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	public void addExpressionAsArgumentToInvocation(CompilationUnit astRoot,MethodInvocation originalMI,MethodInvocation newMI,AssociationObject association,ASTRewrite rewriter) {
+		Expression exp = originalMI.getExpression();
+		String typeName = null;
+		ITypeBinding typeBinding = originalMI.getExpression().resolveTypeBinding();
+		if (typeBinding != null) {
+		    typeName = typeBinding.getQualifiedName();
+		    //System.out.println(typeName);
+		}
+		if(typeName.equals(association.getOwnedClass().getClassObject().getName())) {
+			String getterMethodName = association.getOwnedClass().getIdFieldGetterName();
+			MethodInvocation newExpression = astRoot.getAST().newMethodInvocation();
+			newExpression.setExpression(astRoot.getAST().newSimpleName(exp.toString()));
+			newExpression.setName(astRoot.getAST().newSimpleName(getterMethodName));
+
+			ListRewrite listRewrite2 = rewriter.getListRewrite(newMI, MethodInvocation.ARGUMENTS_PROPERTY);
+			listRewrite2.insertLast(newExpression, null);
+		}else {
+			ListRewrite listRewrite2 = rewriter.getListRewrite(newMI, MethodInvocation.ARGUMENTS_PROPERTY);
+			listRewrite2.insertLast(originalMI.getExpression(), null);
+		}
+	}
+	
+	public ASTNode findFirstStatement(ASTNode node) {
+		if(node instanceof Statement) {
+			return node;
+		}else {
+			return findFirstStatement(node.getParent());
 		}
 	}
 	
