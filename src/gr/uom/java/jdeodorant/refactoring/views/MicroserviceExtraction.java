@@ -1159,7 +1159,7 @@ public class MicroserviceExtraction extends ViewPart {
 				}
 				System.out.println(test);
 				
-				extractOwnerServiceClass(association);
+				
 				
 				/*int[] selection = {test.getStartPosition(), test.getLength()};
 				InlineMethodRefactoring refactoring2 = InlineMethodRefactoring.create(sourceCompilationUnit.getTypeRoot(), new RefactoringASTParser(ASTProvider.SHARED_AST_LEVEL).parse(sourceCompilationUnit.getTypeRoot(), true), selection[0], selection[1]);
@@ -1234,6 +1234,8 @@ public class MicroserviceExtraction extends ViewPart {
 				            rewriter.getListRewrite(newFieldDeclaration, FieldDeclaration.MODIFIERS2_PROPERTY).insertFirst(annotation, null);
 
 				            // Replace the old FieldDeclaration node with the new one
+				            //TypeDeclaration typeDeclaration = (TypeDeclaration) astRoot.types().get(0);
+				            //ListRewrite listRewriteTypeDecl = rewriter.getListRewrite(typeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
 				            rewriter.replace(node, newFieldDeclaration, null);
 				        }
 				        return true;
@@ -1267,6 +1269,8 @@ public class MicroserviceExtraction extends ViewPart {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				
+				extractOwnerServiceClass(association);
 				
 				for(final ClassObject classObject :classes) {
 					ICompilationUnit icu = (ICompilationUnit)classObject.getITypeRoot().getPrimaryElement();
@@ -1930,8 +1934,8 @@ public class MicroserviceExtraction extends ViewPart {
         //CompilationUnit sourceCompilationUnit = (CompilationUnit)entry.getSourceClassTypeDeclaration().getRoot();
 		//TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
 		Set<VariableDeclaration> extractedFieldFragments = new LinkedHashSet<VariableDeclaration>();
-		//extractedFieldFragments.add(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getVariableDeclaration());
-		//final Set<MethodDeclaration> extractedMethods = association.getOwnerClass().getMethodDeclarationsByField(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()));
+		extractedFieldFragments.add(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getVariableDeclaration());
+		final Set<MethodDeclaration> extractedMethods = association.getOwnerClass().getMethodDeclarationsByField(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()));
 		Set<MethodDeclaration> delegateMethods = new LinkedHashSet<MethodDeclaration>();
 		String[] arr = association.getOwnedClass().getClassObject().getName().split("\\.");
 		final String className = arr[arr.length-1];
@@ -1942,7 +1946,7 @@ public class MicroserviceExtraction extends ViewPart {
 		parser.setSource(cu);
         parser.setResolveBindings(true);
         
-        final Set<MethodDeclaration> extractedMethods = new HashSet<MethodDeclaration>();
+        //final Set<MethodDeclaration> extractedMethods = new HashSet<MethodDeclaration>();
         
         final Set<MethodDeclaration> newExtractedMethods = new HashSet<MethodDeclaration>();
 		CompilationUnit sourceCompilationUnit = (CompilationUnit) parser.createAST(null);
