@@ -1,11 +1,15 @@
 package gr.uom.java.ast.delegation;
 
-import gr.uom.java.ast.*;
-
-import javax.swing.tree.DefaultMutableTreeNode;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.ArrayList;
+
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.TreeNode;
+
+import gr.uom.java.ast.MethodInvocationObject;
+import gr.uom.java.ast.MethodObject;
+import gr.uom.java.ast.SystemObject;
 
 
 public class DelegationTree {
@@ -48,9 +52,9 @@ public class DelegationTree {
         return false;
     }
 
-    private boolean existsNode(Enumeration<DefaultMutableTreeNode> children, MethodObject mo) {
+    private boolean existsNode(Enumeration<TreeNode> children, MethodObject mo) {
         while(children.hasMoreElements()) {
-            DefaultMutableTreeNode child = children.nextElement();
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) children.nextElement();
             MethodObject childMethodObject = (MethodObject)child.getUserObject();
             if(childMethodObject.equals(mo))
                 return true;

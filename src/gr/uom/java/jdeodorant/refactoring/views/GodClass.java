@@ -628,7 +628,7 @@ public class GodClass extends ViewPart {
 							refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 									candidate.getSourceClassTypeDeclaration(),
 									extractedFieldFragments, extractedMethods,
-									candidate.getDelegateMethods(), extractedClassName);
+									candidate.getDelegateMethods(), extractedClassName, false);
 						}
 						try {
 							IJavaElement sourceJavaElement = JavaCore.create(sourceFile);

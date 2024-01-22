@@ -41,7 +41,7 @@ public class ExtractClassRefactoringDescriptor extends RefactoringDescriptor {
 	public Refactoring createRefactoring(RefactoringStatus status)
 			throws CoreException {
 		Refactoring refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit, sourceTypeDeclaration,
-				extractedFieldFragments, extractedMethods, delegateMethods, extractedTypeName);
+				extractedFieldFragments, extractedMethods, delegateMethods, extractedTypeName, false);
 		RefactoringStatus refStatus = new RefactoringStatus();
 		status.merge(refStatus);
 		return refactoring;
