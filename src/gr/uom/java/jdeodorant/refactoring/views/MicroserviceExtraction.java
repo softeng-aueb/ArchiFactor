@@ -1099,6 +1099,30 @@ public class MicroserviceExtraction extends ViewPart {
 		        //CandidateRefactoring entry = (CandidateRefactoring)extractClassCandidateL.get(0);
 		        //CompilationUnit sourceCompilationUnit = (CompilationUnit)entry.getSourceClassTypeDeclaration().getRoot();
 				//TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
+				
+				FieldObject fielsObj = association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject());
+				System.out.println(fielsObj.getType().toString()+" "+fielsObj.getName());
+				String fieldName = fielsObj.getName();
+				boolean isSet;
+				String fieldType;
+				if(fielsObj.getType().getGenericType()!=null){
+					String[] fullFieldName = fielsObj.getType().getGenericType().toString().split("\\.");
+					fieldType = fullFieldName[fullFieldName.length-1];
+					fieldType = fieldType.substring(0, fieldType.length() - 1);
+					isSet = true;
+				}else {
+					String[] fullFieldName = fielsObj.getType().toString().split("\\.");
+					fieldType = fullFieldName[fullFieldName.length-1];
+					isSet = false;
+				}
+				String[] typeName = association.getOwnedClass().getIdField().getType().toString().split("\\.");
+		        final String FKtype=typeName[typeName.length-1];
+		        
+		        org.eclipse.jdt.core.dom.Annotation joinColumnAnnotation = association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getAnnotations().get(1);
+	            String s = new StringBuilder().append('"').toString();
+	            String[] arr = joinColumnAnnotation.toString().split(s);
+		        final String FKfieldName = arr[1];
+				
 				Set<VariableDeclaration> extractedFieldFragments = new LinkedHashSet<VariableDeclaration>();
 				extractedFieldFragments.add(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()).getVariableDeclaration());
 				final Set<MethodDeclaration> extractedMethods = association.getOwnedClass().getMethodDeclarationsByField(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()));
@@ -1134,7 +1158,7 @@ public class MicroserviceExtraction extends ViewPart {
 				Refactoring refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 						sourceTypeDeclaration,
 						extractedFieldFragments, newExtractedMethods,
-						delegateMethods, extractedClassName,true);
+						delegateMethods, extractedClassName,isSet,fieldName,fieldType,FKfieldName,FKtype);
 				try {
 					IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
 					JavaUI.openInEditor(sourceJavaElement);
@@ -1194,13 +1218,7 @@ public class MicroserviceExtraction extends ViewPart {
 		        sourceCompilationUnitChange.setEdit(sourceMultiTextEdit);
 		        compilationUnitChanges.put(cuOwner, sourceCompilationUnitChange);
 		        
-		        String[] typeName = association.getOwnedClass().getIdField().getType().toString().split("\\.");
-		        final String FKtype=typeName[typeName.length-1];
 		        
-		        org.eclipse.jdt.core.dom.Annotation joinColumnAnnotation = association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getAnnotations().get(1);
-	            String s = new StringBuilder().append('"').toString();
-	            String[] arr = joinColumnAnnotation.toString().split(s);
-		        final String FKfieldName = arr[1];
 		        
 		        FieldObject fieldObject = association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject());
 		        final FieldDeclaration fieldDeclaration = (FieldDeclaration)fieldObject.getVariableDeclaration().getParent();
@@ -1270,7 +1288,7 @@ public class MicroserviceExtraction extends ViewPart {
 					e.printStackTrace();
 				}
 				
-				extractOwnerServiceClass(association);
+				extractOwnerServiceClass(association,FKfieldName,FKtype);
 				
 				for(final ClassObject classObject :classes) {
 					ICompilationUnit icu = (ICompilationUnit)classObject.getITypeRoot().getPrimaryElement();
@@ -1922,7 +1940,7 @@ public class MicroserviceExtraction extends ViewPart {
 		}
 	}
 	
-	public void extractOwnerServiceClass(AssociationObject association) {
+	public void extractOwnerServiceClass(AssociationObject association,String FKfieldName, String FKtype) {
 		IFile sourceFile = association.getOwnerClass().getClassObject().getIFile();
 		ICompilationUnit cu = (ICompilationUnit)association.getOwnerClass().getClassObject().getITypeRoot().getPrimaryElement();
 		//final List<ExtractClassCandidateRefactoring> extractClassCandidateL = new ArrayList<ExtractClassCandidateRefactoring>();
@@ -1933,6 +1951,22 @@ public class MicroserviceExtraction extends ViewPart {
         //CandidateRefactoring entry = (CandidateRefactoring)extractClassCandidateL.get(0);
         //CompilationUnit sourceCompilationUnit = (CompilationUnit)entry.getSourceClassTypeDeclaration().getRoot();
 		//TypeDeclaration sourceTypeDeclaration = (TypeDeclaration)association.getOwnedClass().getClassObject().getAbstractTypeDeclaration();
+		
+		FieldObject fielsObj = association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject());
+		String fieldName = fielsObj.getName();
+		boolean isSet;
+		String fieldType;
+		if(fielsObj.getType().getGenericType()!=null){
+			String[] fullFieldName = fielsObj.getType().getGenericType().toString().split("\\.");
+			fieldType = fullFieldName[fullFieldName.length-1];
+			fieldType = fieldType.substring(0, fieldType.length() - 1);
+			isSet = true;
+		}else {
+			String[] fullFieldName = fielsObj.getType().toString().split("\\.");
+			fieldType = fullFieldName[fullFieldName.length-1];
+			isSet = false;
+		}
+		
 		Set<VariableDeclaration> extractedFieldFragments = new LinkedHashSet<VariableDeclaration>();
 		extractedFieldFragments.add(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getVariableDeclaration());
 		final Set<MethodDeclaration> extractedMethods = association.getOwnerClass().getMethodDeclarationsByField(association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()));
@@ -1966,7 +2000,7 @@ public class MicroserviceExtraction extends ViewPart {
 		Refactoring refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 				sourceTypeDeclaration,
 				extractedFieldFragments, newExtractedMethods,
-				delegateMethods, extractedClassName,false);
+				delegateMethods, extractedClassName,isSet,fieldName,fieldType,FKfieldName,FKtype);
 		try {
 			IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
 			JavaUI.openInEditor(sourceJavaElement);
