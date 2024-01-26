@@ -259,6 +259,43 @@ public class BreakAssociationRefactoring {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	    MultiTextEdit sourceMultiTextEdit = new MultiTextEdit();
+        CompilationUnitChange sourceCompilationUnitChange = new CompilationUnitChange("", cu);
+        sourceCompilationUnitChange.setEdit(sourceMultiTextEdit);
+        compilationUnitChanges.put(cu, sourceCompilationUnitChange);
+        
+	    FieldObject fieldObject = association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject());
+	    final FieldDeclaration fieldDeclaration = (FieldDeclaration)fieldObject.getVariableDeclaration().getParent();
+	    parser2.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser2.setSource(cu);
+        parser2.setResolveBindings(true);
+	    sourceCompilationUnit = (CompilationUnit) parser2.createAST(null);
+	    final ASTRewrite rewriter = ASTRewrite.create(sourceCompilationUnit.getAST());
+	    sourceCompilationUnit.accept(new ASTVisitor() {
+		    public boolean visit(FieldDeclaration node) {
+		        // Find the FieldDeclaration node that you want to replace
+		        if (node.toString().equals(fieldDeclaration.toString())) {
+		        	rewriter.remove(node, null);
+		        }
+		        return true;
+		    }
+	    });
+	    TextEdit edits;
+		try {
+			edits = rewriter.rewriteAST();
+			ICompilationUnit sourceICompilationUnit = (ICompilationUnit)sourceCompilationUnit.getJavaElement();
+			CompilationUnitChange change = compilationUnitChanges.get(sourceICompilationUnit);
+			change.getEdit().addChild(edits);
+			change.addTextEditGroup(new TextEditGroup("Change access of extracted member", new TextEdit[] {edits}));
+			//IProgressMonitor monitor = new NullProgressMonitor();
+			change.perform(monitor);
+		} catch (JavaModelException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (CoreException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	    return newExtractedMethods;
 	    
 	}

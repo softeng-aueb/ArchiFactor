@@ -639,7 +639,7 @@ public class MicroserviceExtraction extends ViewPart {
 
 		applyRefactoringAction = new Action() {
 			public void run() {
-				IStructuredSelection selection = (IStructuredSelection)treeViewer.getSelection();
+				/*IStructuredSelection selection = (IStructuredSelection)treeViewer.getSelection();
 				if(selection != null && selection.getFirstElement() instanceof CandidateRefactoring) {
 					CandidateRefactoring entry = (CandidateRefactoring)selection.getFirstElement();
 					if(entry.getSourceClassTypeDeclaration() != null) {
@@ -710,18 +710,18 @@ public class MicroserviceExtraction extends ViewPart {
 								} catch (IOException ioe) {
 									ioe.printStackTrace();
 								}
-							}
+							}*/
 							
 							/*refactoring = new ExtractClassRefactoring(sourceFile, sourceCompilationUnit,
 									candidate.getSourceClassTypeDeclaration(),
 									extractedFieldFragments, extractedMethods,
 									candidate.getDelegateMethods(), extractedClassName);*/
-						}
+						//}
 						try {
 							//Add public access modifier to methods whose class will be extracted to microservice
-							for(MethodObject methodObject:methodsAccessChange.keySet()) {
+							/*for(MethodObject methodObject:methodsAccessChange.keySet()) {
 								addPublicAccesModifier(methodObject);
-							}
+							}*/
 							//Creating the microservice package
 							ICompilationUnit  chosenCl = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
 							IFolder McFolder = chosenCl.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
@@ -744,6 +744,9 @@ public class MicroserviceExtraction extends ViewPart {
 							for(ClassObject ob:classesToBeMoved) {
 								ICompilationUnit  cuTemp = (ICompilationUnit)ob.getITypeRoot().getPrimaryElement();
 								String location= cuTemp.getCorrespondingResource().getParent().getName();
+								if(ob.getName().contains("Service")) {
+									location = "service";
+								}
 								classMap.put(cuTemp, location);
 								if(!destinationNames.contains(location)) {
 									destinationNames.add(location);
@@ -768,8 +771,8 @@ public class MicroserviceExtraction extends ViewPart {
 								moved = cus.toArray(moved);
 								RefactoringStatus status = new RefactoringStatus();
 								MoveClassRefactoring moveclassRefactoring = new MoveClassRefactoring(descriptor, moved, cus.get(0).getResource().getProject().getName(), pack, true, status);
-								refactoring = moveclassRefactoring.getRefactoring();
-								IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
+								Refactoring refactoring = moveclassRefactoring.getRefactoring();
+								//IJavaElement sourceJavaElement = JavaCore.create(sourceFile);
 								JavaUI.openInEditor(classesToBeCopied.get(0).getITypeRoot().getPrimaryElement());
 								IWorkbenchPage page = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getActivePage();
 								page.closeAllEditors(true);
@@ -813,8 +816,8 @@ public class MicroserviceExtraction extends ViewPart {
 							e.printStackTrace();
 						}
 						
-					}
-				}
+					//}
+				//}
 			}
 		};
 		applyRefactoringAction.setToolTipText("Apply Refactoring");
@@ -1054,6 +1057,11 @@ public class MicroserviceExtraction extends ViewPart {
 				for(ClassObject obj:chosenClasses) {
 					classesToBeMoved.add(obj);
 				}
+				for(ClassObject obj:classesToBeMoved) {
+					if(monolithClasses.contains(obj)) {
+						monolithClasses.remove(obj);
+					}
+				}
 				//Creating AssociationObjects
 				associationObjects = new ArrayList<AssociationObject>();
 				for(EntityObject entityObject1: entityClasses) {
@@ -1096,20 +1104,21 @@ public class MicroserviceExtraction extends ViewPart {
 				systemObject = ASTReader.getSystemObject();
 				List<ClassObject> newClasses = new ArrayList<ClassObject>();
 				newClasses.addAll(systemObject.getClassObjects());
+				
 				System.out.println(newClasses.size()==classes.size());
-				for(ClassObject classOb:newClasses) {
-					if((!classOb.isTestClass())&&(!classesToBeMoved.contains(classOb))&&(!classesToBeCopied.contains(classOb))) {
-						for(ClassObject obj:classesToBeMoved) {
-							if(checkDependencyBetweenClasses(obj,classOb)) {
-								System.out.println(classOb.getName());
-							}
-						}
-						for(ClassObject obj:classesToBeCopied) {
-							if(checkDependencyBetweenClasses(obj,classOb)) {
-								System.out.println(classOb.getName());
-							}
-						}
-					}
+				boolean flag = true;
+				int i = 0;
+				while(flag&&i<2){
+					flag = AddRestOfClassesToBeMovedAndCopied(newClasses);
+					i++;
+				}
+				
+				System.out.println("END");
+				for(ClassObject obj:classesToBeMoved) {
+					System.out.println("MOVE   "+obj.getName());
+				}
+				for(ClassObject obj:classesToBeCopied) {
+					System.out.println("COPY   "+obj.getName());
 				}
 				/**/
 				
@@ -1462,6 +1471,7 @@ public class MicroserviceExtraction extends ViewPart {
 		            edits.apply(document);
 		            cu.getBuffer().setContents(document.get());
 		            cu.save(null, true);
+		            //cu.commitWorkingCopy(true, null);
 				}
 				for (Object o : astRoot.imports()) {
 			        ImportDeclaration importDeclaration = (ImportDeclaration) o;
@@ -1482,6 +1492,7 @@ public class MicroserviceExtraction extends ViewPart {
 			            edits.apply(document);
 			            cu.getBuffer().setContents(document.get());
 			            cu.save(null, true);
+			            //cu.commitWorkingCopy(true, null);
 			        }
 			    }
 			} catch (CoreException e) {
@@ -1532,49 +1543,114 @@ public class MicroserviceExtraction extends ViewPart {
 	public boolean checkDependencyBetweenClasses(ClassObject classObject1,ClassObject classObject2) {
 		ICompilationUnit cu1 = (ICompilationUnit)classObject1.getITypeRoot().getPrimaryElement();
 		ICompilationUnit cu2 = (ICompilationUnit)classObject2.getITypeRoot().getPrimaryElement();
-		if(cu1.getParent().equals(cu2.getParent())) {
-			if(classObject1.hasFieldType(classObject2.getName())) {
-				return true;
-			}else {
-				return false;
-			}
-		}else {
-			boolean hasPackageImport = false;
-			
-			ASTParser parser = ASTParser.newParser(ASTReader.JLS);
-			parser.setKind(ASTParser.K_COMPILATION_UNIT);
-			parser.setSource(cu2);
-	        parser.setResolveBindings(true);
-	        CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
-	        
-	        String[] classNameArray = classObject1.getName().split("\\.");
-			StringBuilder newstring = new StringBuilder();
-			for(int i=0;i<classNameArray.length-1;i++) {
-				newstring.append(classNameArray[i]);
-				newstring.append(".");
-			}
-			String packageName = newstring.toString()+"*";
-			for(Object o:astRoot.imports()) {
-				ImportDeclaration importDeclaration = (ImportDeclaration) o;
-				//System.out.println(importDeclaration.getName());
-				//System.out.println(importDeclaration.getName()+"    "+classObject2.getName());
-				if(importDeclaration.getName().toString().equals(classObject1.getName())) {
-					return true;
-				}else if(importDeclaration.getName().toString().equals(packageName)) {
-					hasPackageImport = true;
-				}
-			}
-			if(hasPackageImport) {
+		if(cu1.getParent().getParent().equals(cu2.getParent().getParent())) {
+			if(cu1.getParent().equals(cu2.getParent())) {
 				if(classObject1.hasFieldType(classObject2.getName())) {
 					return true;
 				}else {
-					return false;
+					if(findClassNameInsideClass(cu1,classObject2.getName())) {
+						return true;
+					}else {
+						return false;
+					}
 				}
 			}else {
-				return false;
+				boolean hasPackageImport = false;
+				
+				ASTParser parser = ASTParser.newParser(ASTReader.JLS);
+				parser.setKind(ASTParser.K_COMPILATION_UNIT);
+				parser.setSource(cu2);
+		        parser.setResolveBindings(true);
+		        CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
+		        
+		        String[] classNameArray = classObject1.getName().split("\\.");
+				StringBuilder newstring = new StringBuilder();
+				for(int i=0;i<classNameArray.length-1;i++) {
+					newstring.append(classNameArray[i]);
+					newstring.append(".");
+				}
+				String packageName = newstring.toString()+"*";
+				for(Object o:astRoot.imports()) {
+					ImportDeclaration importDeclaration = (ImportDeclaration) o;
+					//System.out.println(importDeclaration.getName());
+					//System.out.println(importDeclaration.getName()+"    "+classObject2.getName());
+					if(importDeclaration.getName().toString().equals(classObject1.getName())) {
+						return true;
+					}else if(importDeclaration.getName().toString().equals(packageName)) {
+						hasPackageImport = true;
+					}
+				}
+				if(hasPackageImport) {
+					if(classObject1.hasFieldType(classObject2.getName())) {
+						return true;
+					}else {
+						return false;
+					}
+				}else {
+					return false;
+				}
+			}
+		}
+		return false;
+	}
+	
+	public boolean findClassNameInsideClass(ICompilationUnit cu,String fullClassName) {
+		String[] classNameArray = fullClassName.split("\\.");
+		final String className = classNameArray[classNameArray.length-1];
+		ASTParser parser = ASTParser.newParser(ASTReader.JLS);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(cu);
+		parser.setResolveBindings(true);
+		CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
+		final Set<SimpleName> names = new HashSet<SimpleName>();
+		astRoot.accept(new ASTVisitor(){
+			public boolean visit(SimpleName node) {
+				if(node.toString().equals(className)) {
+					names.add(node);
+				}
+				return true;
+			}
+		});
+		if(names.size()>0) {
+			return true;
+		}else {
+			return false;
+		}
+	}
+	
+	public boolean AddRestOfClassesToBeMovedAndCopied(List<ClassObject> newClasses) {
+		Set<ClassObject> RestOfClassesToBeMoved = new HashSet<ClassObject>();
+		Set<ClassObject> RestOfClassesToBeCopied = new HashSet<ClassObject>();
+		boolean addedClass = false;
+		for(ClassObject classOb:newClasses) {
+			if((!classOb.isTestClass())&&(!classesToBeMoved.contains(classOb))&&(!classesToBeCopied.contains(classOb))&&
+					(!RestOfClassesToBeMoved.contains(classOb))&&(!RestOfClassesToBeCopied.contains(classOb))&&(!monolithClasses.contains(classOb))) {
+				boolean hasDependenctWithMonoloith = false;
+				for(ClassObject monolithClass:monolithClasses) {
+					if(checkDependencyBetweenClasses(monolithClass,classOb)) {
+						hasDependenctWithMonoloith = true;
+					}
+				}
+				for(ClassObject obj:classesToBeMoved) {
+					if((checkDependencyBetweenClasses(obj,classOb)||checkDependencyBetweenClasses(classOb,obj))&&!hasDependenctWithMonoloith) {
+						//System.out.println(classOb.getName());
+						RestOfClassesToBeMoved.add(classOb);
+						addedClass = true;
+					}
+				}
+				for(ClassObject obj:classesToBeCopied) {
+					if((checkDependencyBetweenClasses(obj,classOb)||checkDependencyBetweenClasses(classOb,obj))&&!hasDependenctWithMonoloith) {
+						//System.out.println(classOb.getName());
+						RestOfClassesToBeCopied.add(classOb);
+						addedClass = true;
+					}
+				}
 			}
 		}
 		
+		classesToBeMoved.addAll(RestOfClassesToBeMoved);
+		classesToBeCopied.addAll(RestOfClassesToBeCopied);
+		return addedClass;
 	}
 	
 	
