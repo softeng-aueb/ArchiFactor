@@ -52,6 +52,7 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.swt.widgets.TreeItem;
@@ -67,6 +68,8 @@ import org.eclipse.core.commands.operations.OperationHistoryEvent;
 import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -128,9 +131,11 @@ import org.eclipse.jface.text.Position;
 import org.eclipse.jface.text.source.Annotation;
 import org.eclipse.jface.text.source.AnnotationModel;
 import org.eclipse.jface.viewers.*;
+import org.eclipse.jface.window.Window;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.jface.action.*;
+import org.eclipse.jface.dialogs.InputDialog;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CheckConditionsOperation;
@@ -148,6 +153,7 @@ import org.eclipse.jdt.internal.corext.refactoring.util.RefactoringASTParser;
 import org.eclipse.jdt.internal.ui.javaeditor.ASTProvider;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import org.eclipse.ui.*;
+import org.eclipse.ui.dialogs.ContainerSelectionDialog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -188,6 +194,9 @@ public class MicroserviceExtraction extends ViewPart {
 	private IPackageFragment selectedPackageFragment;
 	private ICompilationUnit selectedCompilationUnit;
 	private IType selectedType;
+	//
+	private String relativePathOfMCFolder;
+	private String microserviceName = "microservice";
 	//classes of microservice to be extracted
 	List<ClassObject> chosenClasses;
 	List<ClassObject> monolithClasses;
@@ -724,7 +733,8 @@ public class MicroserviceExtraction extends ViewPart {
 							}*/
 							//Creating the microservice package
 							ICompilationUnit  chosenCl = (ICompilationUnit)classesToBeMoved.get(0).getITypeRoot().getPrimaryElement();
-							IFolder McFolder = chosenCl.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
+							IFolder McFolder = classesToBeMoved.get(0).getITypeRoot().getCorrespondingResource().getProject().getFolder(relativePathOfMCFolder+"/"+microserviceName);
+							//IFolder McFolder = chosenCl.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice");
 						    if(!McFolder.exists()) {
 						    	McFolder.create(true, true, null);
 						    }
@@ -752,6 +762,7 @@ public class MicroserviceExtraction extends ViewPart {
 									destinationNames.add(location);
 								}
 							}
+							//Moving classes per package
 							for(String s:destinationNames) {
 								List<ICompilationUnit> cus = new ArrayList<ICompilationUnit>();
 								for(ICompilationUnit c:classMap.keySet()) {
@@ -760,8 +771,7 @@ public class MicroserviceExtraction extends ViewPart {
 									}
 								}
 								RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
-							    IFolder processFolder = cus.get(0).getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice/"
-							    +s);
+							    IFolder processFolder = cus.get(0).getJavaProject().getCorrespondingResource().getProject().getFolder(relativePathOfMCFolder+"/"+microserviceName+"/"+s);
 							    if(!processFolder.exists()) {
 							    	processFolder.create(true, true, null);
 							    }
@@ -948,6 +958,33 @@ public class MicroserviceExtraction extends ViewPart {
 				}
 				List<ClassObject> classes = new ArrayList<ClassObject>();
 				classes.addAll(systemObject.getClassObjects());
+				
+				Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
+				ContainerSelectionDialog dialog = new ContainerSelectionDialog(shell, ResourcesPlugin.getWorkspace().getRoot(), false, "Select the folder that the microservice will be located");
+				dialog.showClosedProjects(false);
+				dialog.open();
+				Object[] result = dialog.getResult();
+				if (result != null && result.length > 0) {
+				    IPath path = (IPath) result[0];
+				    System.out.println(path);
+				    IResource resource = ResourcesPlugin.getWorkspace().getRoot().findMember(path);
+				    relativePathOfMCFolder = resource.getProjectRelativePath().toString();
+				    System.out.println(resource.getProjectRelativePath());
+				    if (resource instanceof IContainer) {
+				        IContainer container = (IContainer) resource;
+				        // Do something with the selected folder
+				    }
+				}
+				
+				shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
+		        InputDialog inputDialog = new InputDialog(shell, "Input Dialog", "Enter the name of the microservice folder:", "", null);
+		        int input = inputDialog.open();
+		        if (input == Window.OK) {
+		            String name = inputDialog.getValue();
+		            microserviceName = name;
+		            System.out.println("The name chosen is: " + name);
+		        }
+				
 				//TEMPORARY
 				chosenClasses = new ArrayList<ClassObject>();
 				monolithClasses = new ArrayList<ClassObject>();
@@ -1428,7 +1465,7 @@ public class MicroserviceExtraction extends ViewPart {
 		ICompilationUnit  cuCopy = (ICompilationUnit)classObject.getITypeRoot().getPrimaryElement();
 		IFolder processFolder2;
 		try {
-			processFolder2 = cuCopy.getJavaProject().getPackageFragments()[2].getCorrespondingResource().getProject().getFolder("/src/main/java/com/mgiandia/Microservice/"
+			processFolder2 = classObject.getITypeRoot().getCorrespondingResource().getProject().getFolder(relativePathOfMCFolder+"/"+microserviceName+"/"
 			+cuCopy.getCorrespondingResource().getParent().getName());
 			if(!processFolder2.exists()) {
 				processFolder2.create(true, true, null);
@@ -1453,14 +1490,24 @@ public class MicroserviceExtraction extends ViewPart {
         parser.setResolveBindings(true);
 		CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
 		astRoot.recordModifications();
+		
+		String[] arr = toCopy.getName().split("\\.");
+		String[] folderNameArray = relativePathOfMCFolder.split("/");
+		String folderName = folderNameArray[folderNameArray.length-1];
+		for(int i=0;i<arr.length-1;i++) {
+			if(arr[i].equals(folderName)) {
+				arr[i+1] = microserviceName;
+				break;
+			}
+		}
 		//System.out.println(astRoot.imports());
 		ASTRewrite rewriter = ASTRewrite.create(astRoot.getAST());
 			try {
 				if(toMove.getITypeRoot().getParent().equals(toCopy.getITypeRoot().getParent())&&(toMove.hasFieldType(toCopy.getName())||toCopy.hasFieldType(toMove.getName()))) {
 					ListRewrite listRewrite = rewriter.getListRewrite(astRoot, CompilationUnit.IMPORTS_PROPERTY);
 					ImportDeclaration newImport = astRoot.getAST().newImportDeclaration();
-					String[] arr = toCopy.getName().split("\\.");
-					newImport.setName(astRoot.getAST().newName(new String[] {arr[0], arr[1], "Microservice", arr[3], arr[4]}));
+					
+					newImport.setName(astRoot.getAST().newName(arr));
 					listRewrite.insertFirst(newImport, null);
 		            ImportRewrite importRewrite = CodeStyleConfiguration.createImportRewrite(astRoot, true);
 		            TextEdit importEdits;
@@ -1479,10 +1526,9 @@ public class MicroserviceExtraction extends ViewPart {
 			        if (importDeclaration.getName().getFullyQualifiedName().equals(toCopy.getName())) {
 			        	System.out.println(toMove.getName()+"  "+toCopy.getName());
 			        	ListRewrite listRewrite = rewriter.getListRewrite(astRoot, CompilationUnit.IMPORTS_PROPERTY);
-			        	String[] arr = toCopy.getName().split("\\.");
 			        	//System.out.println("hello                        "+arr.length);
 			        	ImportDeclaration id = astRoot.getAST().newImportDeclaration();
-			        	id.setName(astRoot.getAST().newName(new String[] {arr[0], arr[1], "Microservice", arr[3], arr[4]}));
+			        	id.setName(astRoot.getAST().newName(arr));
 			            listRewrite.replace(importDeclaration,id, null);
 			            ImportRewrite importRewrite = CodeStyleConfiguration.createImportRewrite(astRoot, true);
 			            TextEdit importEdits = importRewrite.rewriteImports(null);
