@@ -122,6 +122,8 @@ import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.core.manipulation.CodeStyleConfiguration;
+import org.eclipse.jdt.ui.JavaElementContentProvider;
+import org.eclipse.jdt.ui.JavaElementLabelProvider;
 import org.eclipse.jdt.ui.JavaUI;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.preference.IPreferenceStore;
@@ -153,6 +155,7 @@ import org.eclipse.jdt.internal.corext.refactoring.util.RefactoringASTParser;
 import org.eclipse.jdt.internal.ui.javaeditor.ASTProvider;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import org.eclipse.ui.*;
+import org.eclipse.ui.dialogs.CheckedTreeSelectionDialog;
 import org.eclipse.ui.dialogs.ContainerSelectionDialog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
@@ -984,14 +987,37 @@ public class MicroserviceExtraction extends ViewPart {
 		            microserviceName = name;
 		            System.out.println("The name chosen is: " + name);
 		        }
-				
+
+		        
+		        chosenClasses = new ArrayList<ClassObject>();
+		        CheckedTreeSelectionDialog dialogPickClasses = new CheckedTreeSelectionDialog(shell, new JavaElementLabelProvider(), new JavaElementContentProvider());
+		        dialogPickClasses.setInput(classes.get(0).getITypeRoot().getJavaProject());
+		        dialogPickClasses.setInitialSelections(new Object[] { classes.get(0).getITypeRoot().getJavaProject() });
+		        dialogPickClasses.setTitle("Select Java Elements");
+		        dialogPickClasses.setMessage("Select the Java elements to include:");
+		        dialogPickClasses.open();
+		        Object[] resultClasses = dialogPickClasses.getResult();
+		        if (resultClasses != null) {
+		            for (Object obj : resultClasses) {
+		                if (obj instanceof IJavaElement) {
+		                	System.out.println(((IJavaElement)obj).getPrimaryElement().getElementName());
+		                	ICompilationUnit cu = (ICompilationUnit) ((IJavaElement)obj).getPrimaryElement();
+		                	Set<ClassObject> classObs = systemObject.getClassObjects(cu);
+		                	for(ClassObject classOb:classObs) {
+		                		System.out.println(classOb.getName()+"    "+classes.contains(classOb));
+		                		chosenClasses.add(classOb);
+		                	}
+		                }
+		            }
+		        }
+
 				//TEMPORARY
-				chosenClasses = new ArrayList<ClassObject>();
 				monolithClasses = new ArrayList<ClassObject>();
 				for(final ClassObject classOb : classes) {
 					if((classOb.getName().equals("com.mgiandia.library.domain.Book"))||(classOb.getName().equals("com.mgiandia.library.domain.Author"))||(classOb.getName().equals("com.mgiandia.library.domain.Publisher"))) {
-						chosenClasses.add(classOb);
-					}else if((classOb.getITypeRoot().getParent().getElementName().equals(selectedType.getTypeRoot().getParent().getElementName()))&&(!classOb.containsMethodWithTestAnnotation())) {
+						//chosenClasses.add(classOb);
+					}else if((classOb.getITypeRoot().getParent().getElementName().equals(selectedType.getTypeRoot().getParent().getElementName()))&&(!classOb.containsMethodWithTestAnnotation())
+							&&(!chosenClasses.contains(classOb))) {
 						monolithClasses.add(classOb);
 					}
 				}
