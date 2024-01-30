@@ -16,6 +16,7 @@ import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
@@ -27,6 +28,7 @@ import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
+import org.eclipse.jdt.core.dom.IBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MemberValuePair;
@@ -47,11 +49,16 @@ import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
+import org.eclipse.jdt.core.refactoring.IJavaRefactorings;
+import org.eclipse.jdt.core.refactoring.descriptors.RenameJavaElementDescriptor;
 import org.eclipse.jdt.ui.JavaUI;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.Refactoring;
+import org.eclipse.ltk.core.refactoring.RefactoringContribution;
+import org.eclipse.ltk.core.refactoring.RefactoringCore;
+import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import org.eclipse.text.edits.MultiTextEdit;
 import org.eclipse.text.edits.TextEdit;
@@ -143,6 +150,8 @@ public class BreakAssociationRefactoring {
 		extractOwnerServiceClass();
 		
 		updateReferences(newExtractedMethods,extractedMethodNamesWithThisExpression);
+		
+		renameGetterSetterMethodsOfOwnerClass();
 		
 		IJavaProject project = cu.getJavaProject();
 		return project;
@@ -693,6 +702,62 @@ public class BreakAssociationRefactoring {
 	        ListRewrite ImportlistRewrite = rewriter.getListRewrite(astRoot, CompilationUnit.IMPORTS_PROPERTY);
 	        ImportlistRewrite.insertLast(id, null);
 		}
+	}
+	
+	public void renameGetterSetterMethodsOfOwnerClass() {
+		ICompilationUnit unit = (ICompilationUnit)association.getOwnerClass().getClassObject().getITypeRoot().getPrimaryElement();
+		String[] array2 = association.getOwnedClass().getClassObject().getName().split("\\.");
+        final String className = array2[array2.length-1];
+        final String FKfieldNameMethodName = Character.toUpperCase(FKfieldName.charAt(0)) + FKfieldName.substring(1);
+		
+		ASTParser parser = ASTParser.newParser(ASTReader.JLS);
+		parser.setKind(ASTParser.K_COMPILATION_UNIT);
+		parser.setSource(unit);
+        parser.setResolveBindings(true);
+        
+        //final Set<MethodDeclaration> extractedMethods = new HashSet<MethodDeclaration>();
+        
+		CompilationUnit sourceCompilationUnit = (CompilationUnit) parser.createAST(null);
+		sourceCompilationUnit.accept(new ASTVisitor() {
+		    public boolean visit(MethodDeclaration node) {
+		    	if(node.getName().toString().equals("get"+className)){
+		    		renameMethodsOfOwnerClass(node,"get"+FKfieldNameMethodName);
+		    	}else if(node.getName().toString().equals("set"+className)) {
+		    		renameMethodsOfOwnerClass(node,"set"+FKfieldNameMethodName);
+		    	}
+		    	return true;
+		    }
+		});
+	}
+	
+	public void renameMethodsOfOwnerClass(MethodDeclaration methodDeclaration,String newName){
+		ICompilationUnit unit = (ICompilationUnit)association.getOwnerClass().getClassObject().getITypeRoot().getPrimaryElement();
+		IBinding binding = methodDeclaration.resolveBinding();
+		IMethod method = (IMethod) binding.getJavaElement();
+		
+		RefactoringContribution contribution = RefactoringCore.getRefactoringContribution(IJavaRefactorings.RENAME_METHOD);
+        RenameJavaElementDescriptor descriptor = (RenameJavaElementDescriptor) contribution.createDescriptor();
+        descriptor.setProject(unit.getResource().getProject().getName( ));
+        descriptor.setNewName(newName); // new name for a Class
+        descriptor.setJavaElement(method);
+        descriptor.setUpdateReferences(true);
+        RefactoringStatus status = new RefactoringStatus();
+        try {
+            Refactoring refactoring = descriptor.createRefactoring(status);
+
+            IProgressMonitor monitor = new NullProgressMonitor();
+            refactoring.checkInitialConditions(monitor);
+            refactoring.checkFinalConditions(monitor);
+            Change change = refactoring.createChange(monitor);
+            change.perform(monitor);
+
+        } catch (CoreException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 	}
 	
 }

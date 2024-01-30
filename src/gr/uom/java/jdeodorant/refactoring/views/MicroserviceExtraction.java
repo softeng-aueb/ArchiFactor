@@ -993,8 +993,8 @@ public class MicroserviceExtraction extends ViewPart {
 		        CheckedTreeSelectionDialog dialogPickClasses = new CheckedTreeSelectionDialog(shell, new JavaElementLabelProvider(), new JavaElementContentProvider());
 		        dialogPickClasses.setInput(classes.get(0).getITypeRoot().getJavaProject());
 		        dialogPickClasses.setInitialSelections(new Object[] { classes.get(0).getITypeRoot().getJavaProject() });
-		        dialogPickClasses.setTitle("Select Java Elements");
-		        dialogPickClasses.setMessage("Select the Java elements to include:");
+		        dialogPickClasses.setTitle("Select Domain classes for Microservice extraction");
+		        dialogPickClasses.setMessage("Select the Domain class/classes you want to extract into the Microservice:");
 		        dialogPickClasses.open();
 		        Object[] resultClasses = dialogPickClasses.getResult();
 		        if (resultClasses != null) {
@@ -1603,11 +1603,36 @@ public class MicroserviceExtraction extends ViewPart {
 			AssociationObject association = new AssociationObject("ManyToOne-OneToMany",entityObject2,entityObject1,false);
 			return association;
 		}else if(annotation.getTypeName().getFullyQualifiedName().equals("ManyToMany")) {
-			AssociationObject association = new AssociationObject("ManyToMany",entityObject1,entityObject2,false);
-			return association;
+			boolean entityObject1IsOwner = false;
+			for(org.eclipse.jdt.core.dom.Annotation ann:fieldObject.getAnnotations()) {
+				String name = ann.getTypeName().getFullyQualifiedName();
+				if(name.equals("JoinTable")) {
+					entityObject1IsOwner = true;
+				}
+			}
+			if(entityObject1IsOwner) {
+				AssociationObject association = new AssociationObject("ManyToMany",entityObject1,entityObject2,false);
+				return association;
+			}else {
+				AssociationObject association = new AssociationObject("ManyToMany",entityObject2,entityObject1,false);
+				return association;
+			}
+			
 		}else {
-			AssociationObject association = new AssociationObject("OneToOne",entityObject1,entityObject2,false);
-			return association;
+			boolean entityObject1IsOwner = false;
+			for(org.eclipse.jdt.core.dom.Annotation ann:fieldObject.getAnnotations()) {
+				String name = ann.getTypeName().getFullyQualifiedName();
+				if(name.equals("JoinColumn")) {
+					entityObject1IsOwner = true;
+				}
+			}
+			if(entityObject1IsOwner) {
+				AssociationObject association = new AssociationObject("OneToOne",entityObject1,entityObject2,false);
+				return association;
+			}else {
+				AssociationObject association = new AssociationObject("OneToOne",entityObject2,entityObject1,false);
+				return association;
+			}
 		}
 	}
 	

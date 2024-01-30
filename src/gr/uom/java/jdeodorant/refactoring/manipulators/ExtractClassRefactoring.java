@@ -652,6 +652,11 @@ public class ExtractClassRefactoring extends Refactoring {
         }
         TypeDeclaration extractedClassTypeDeclaration = extractedClassAST.newTypeDeclaration();
         SimpleName extractedClassName = extractedClassAST.newSimpleName(extractedTypeName);
+        //
+        Annotation requestScopedAnnotation = extractedClassAST.newMarkerAnnotation();
+        requestScopedAnnotation.setTypeName(extractedClassAST.newName("RequestScoped"));
+        extractedClassTypeDeclaration.modifiers().add(requestScopedAnnotation);
+        //
         extractedClassRewriter.set(extractedClassTypeDeclaration, TypeDeclaration.NAME_PROPERTY, extractedClassName, null);
         ListRewrite extractedClassModifiersRewrite = extractedClassRewriter.getListRewrite(extractedClassTypeDeclaration, TypeDeclaration.MODIFIERS2_PROPERTY);
         extractedClassModifiersRewrite.insertLast(extractedClassAST.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD), null);
@@ -1028,9 +1033,12 @@ public class ExtractClassRefactoring extends Refactoring {
         ImportDeclaration id2 = extractedClassCompilationUnit.getAST().newImportDeclaration();
         id2.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "persistence", "EntityManager" }));
         //extractedClassCompilationUnit.imports().add(id2);
+        ImportDeclaration id3 = extractedClassCompilationUnit.getAST().newImportDeclaration();
+        id3.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta","enterprise","context","RequestScoped" }));
         ListRewrite ImportlistRewrite = extractedClassRewriter.getListRewrite(extractedClassCompilationUnit, CompilationUnit.IMPORTS_PROPERTY);
         ImportlistRewrite.insertLast(id1, null);
         ImportlistRewrite.insertLast(id2, null);
+        ImportlistRewrite.insertLast(id3, null);
         FieldDeclaration entityManagerDecl = extractedClassCompilationUnit.getAST().newFieldDeclaration(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
 		entityManagerDecl.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
 		entityManagerDecl.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
