@@ -1028,7 +1028,7 @@ public class ExtractClassRefactoring extends Refactoring {
         
         
         ImportDeclaration id1 = extractedClassCompilationUnit.getAST().newImportDeclaration();
-        id1.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "inject", "Inject" }));
+        id1.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "enterprise", "inject", "spi", "CDI" }));
         //extractedClassCompilationUnit.imports().add(id1);
         ImportDeclaration id2 = extractedClassCompilationUnit.getAST().newImportDeclaration();
         id2.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "persistence", "EntityManager" }));
@@ -1039,7 +1039,7 @@ public class ExtractClassRefactoring extends Refactoring {
         ImportlistRewrite.insertLast(id1, null);
         ImportlistRewrite.insertLast(id2, null);
         ImportlistRewrite.insertLast(id3, null);
-        FieldDeclaration entityManagerDecl = extractedClassCompilationUnit.getAST().newFieldDeclaration(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
+        /*FieldDeclaration entityManagerDecl = extractedClassCompilationUnit.getAST().newFieldDeclaration(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
 		entityManagerDecl.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
 		entityManagerDecl.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
 		entityManagerDecl.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
@@ -1047,7 +1047,7 @@ public class ExtractClassRefactoring extends Refactoring {
 		NormalAnnotation annotation = extractedClassCompilationUnit.getAST().newNormalAnnotation();
 		annotation.setTypeName(extractedClassCompilationUnit.getAST().newSimpleName("Inject"));
 		ListRewrite modifiers = extractedClassRewriter.getListRewrite(entityManagerDecl, FieldDeclaration.MODIFIERS2_PROPERTY);
-		modifiers.insertFirst(annotation, null);
+		modifiers.insertFirst(annotation, null);*/
 		
 		if(fragmentIsSet) {
 			MethodDeclaration factoryMethod  = extractedClassCompilationUnit.getAST().newMethodDeclaration();
@@ -1083,6 +1083,24 @@ public class ExtractClassRefactoring extends Refactoring {
 			fieldAccess.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
 			fieldAccess.setName(extractedClassCompilationUnit.getAST().newSimpleName(fieldName));
 			
+			
+			MethodInvocation currentMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			currentMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("current"));
+			currentMethodInvocation.setExpression(extractedClassCompilationUnit.getAST().newName("CDI"));
+			MethodInvocation selectMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			selectMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("select"));
+			selectMethodInvocation.setExpression(currentMethodInvocation);
+			TypeLiteral typeLiteralEm = extractedClassCompilationUnit.getAST().newTypeLiteral();
+			typeLiteralEm.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName("EntityManager")));
+			selectMethodInvocation.arguments().add(typeLiteralEm);
+			MethodInvocation getMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			getMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("get"));
+			getMethodInvocation.setExpression(selectMethodInvocation);
+			VariableDeclarationFragment emDeclarationFragment = extractedClassCompilationUnit.getAST().newVariableDeclarationFragment();
+			emDeclarationFragment.setName(extractedClassCompilationUnit.getAST().newSimpleName("em"));
+			emDeclarationFragment.setInitializer(getMethodInvocation);
+			VariableDeclarationStatement emDeclarationStatement = extractedClassCompilationUnit.getAST().newVariableDeclarationStatement(emDeclarationFragment);
+			emDeclarationStatement.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
 			
 			
 			MethodInvocation createQuery = extractedClassCompilationUnit.getAST().newMethodInvocation();
@@ -1122,6 +1140,7 @@ public class ExtractClassRefactoring extends Refactoring {
 			
 			Block block = extractedClassCompilationUnit.getAST().newBlock();
 			block.statements().add(vds);
+			block.statements().add(emDeclarationStatement);
 			ExpressionStatement expressionStatement = extractedClassCompilationUnit.getAST().newExpressionStatement(assignment);
 			block.statements().add(expressionStatement);
 		    ReturnStatement returnStatement = extractedClassCompilationUnit.getAST().newReturnStatement();
@@ -1133,7 +1152,7 @@ public class ExtractClassRefactoring extends Refactoring {
 		    //typeDeclaration.bodyDeclarations().add(queryMethod);
 		    
 		    ListRewrite listRewrite = extractedClassRewriter.getListRewrite(extractedClassTypeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
-		    listRewrite.insertFirst(entityManagerDecl, null);
+		    //listRewrite.insertFirst(entityManagerDecl, null);
 		    listRewrite.insertLast(factoryMethod, null);
 		}else {
 			
@@ -1171,6 +1190,24 @@ public class ExtractClassRefactoring extends Refactoring {
 			fieldAccess.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
 			fieldAccess.setName(extractedClassCompilationUnit.getAST().newSimpleName(fieldName));
 			
+			MethodInvocation currentMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			currentMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("current"));
+			currentMethodInvocation.setExpression(extractedClassCompilationUnit.getAST().newName("CDI"));
+			MethodInvocation selectMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			selectMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("select"));
+			selectMethodInvocation.setExpression(currentMethodInvocation);
+			TypeLiteral typeLiteralEm = extractedClassCompilationUnit.getAST().newTypeLiteral();
+			typeLiteralEm.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName("EntityManager")));
+			selectMethodInvocation.arguments().add(typeLiteralEm);
+			MethodInvocation getMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			getMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("get"));
+			getMethodInvocation.setExpression(selectMethodInvocation);
+			VariableDeclarationFragment emDeclarationFragment = extractedClassCompilationUnit.getAST().newVariableDeclarationFragment();
+			emDeclarationFragment.setName(extractedClassCompilationUnit.getAST().newSimpleName("em"));
+			emDeclarationFragment.setInitializer(getMethodInvocation);
+			VariableDeclarationStatement emDeclarationStatement = extractedClassCompilationUnit.getAST().newVariableDeclarationStatement(emDeclarationFragment);
+			emDeclarationStatement.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
+			
 			
 			MethodInvocation methodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
 			methodInvocation.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("em"));
@@ -1187,6 +1224,7 @@ public class ExtractClassRefactoring extends Refactoring {
 			
 			Block block = extractedClassCompilationUnit.getAST().newBlock();
 			block.statements().add(vds);
+			block.statements().add(emDeclarationStatement);
 			ExpressionStatement expressionStatement = extractedClassCompilationUnit.getAST().newExpressionStatement(assignment);
 			block.statements().add(expressionStatement);
 		    ReturnStatement returnStatement = extractedClassCompilationUnit.getAST().newReturnStatement();
@@ -1210,7 +1248,7 @@ public class ExtractClassRefactoring extends Refactoring {
 			
 			
 			ListRewrite listRewrite = extractedClassRewriter.getListRewrite(extractedClassTypeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
-		    listRewrite.insertFirst(entityManagerDecl, null);
+		    //listRewrite.insertFirst(entityManagerDecl, null);
 		    listRewrite.insertLast(factoryMethod, null);
 		    listRewrite.insertLast(getterMethod, null);
 		}
