@@ -142,10 +142,15 @@ public class ExtractClassRefactoring extends Refactoring {
 	private Map<MethodDeclaration, Set<VariableDeclaration>> extractedClassConstructorParameterMap;
 	private Set<VariableDeclaration> extractedFieldsWithThisExpressionInTheirInitializer;
 	private Set<IMethodBinding> staticallyImportedMethods;
-	private boolean fragmentIsSet; 
+	private boolean fragmentIsSet;
+	private String fieldName;
+	private String fieldType;
+	private String FKfieldName;
+	private String FKtype;
 	
 	public ExtractClassRefactoring(IFile sourceFile, CompilationUnit sourceCompilationUnit, TypeDeclaration sourceTypeDeclaration,
-			Set<VariableDeclaration> extractedFieldFragments, Set<MethodDeclaration> extractedMethods, Set<MethodDeclaration> delegateMethods, String extractedTypeName,boolean fragmentIsSet) {
+			Set<VariableDeclaration> extractedFieldFragments, Set<MethodDeclaration> extractedMethods, Set<MethodDeclaration> delegateMethods, String extractedTypeName,boolean fragmentIsSet,
+			String fieldName,String fieldType,String FKfieldName, String FKtype) {
 		this.sourceFile = sourceFile;
 		this.sourceCompilationUnit = sourceCompilationUnit;
 		this.sourceTypeDeclaration = sourceTypeDeclaration;
@@ -179,6 +184,10 @@ public class ExtractClassRefactoring extends Refactoring {
 		this.extractedFieldsWithThisExpressionInTheirInitializer = new LinkedHashSet<VariableDeclaration>();
 		this.staticallyImportedMethods = new LinkedHashSet<IMethodBinding>();
 		this.fragmentIsSet = fragmentIsSet;
+		this.fieldName = fieldName;
+		this.fieldType = fieldType;
+		this.FKfieldName = FKfieldName;
+		this.FKtype = FKtype;
 		for(MethodDeclaration extractedMethod : extractedMethods) {
 			additionalArgumentsAddedToExtractedMethods.put(extractedMethod, new LinkedHashSet<PlainVariable>());
 			additionalParametersAddedToExtractedMethods.put(extractedMethod, new LinkedHashSet<SingleVariableDeclaration>());
@@ -643,6 +652,11 @@ public class ExtractClassRefactoring extends Refactoring {
         }
         TypeDeclaration extractedClassTypeDeclaration = extractedClassAST.newTypeDeclaration();
         SimpleName extractedClassName = extractedClassAST.newSimpleName(extractedTypeName);
+        //
+        Annotation requestScopedAnnotation = extractedClassAST.newMarkerAnnotation();
+        requestScopedAnnotation.setTypeName(extractedClassAST.newName("RequestScoped"));
+        extractedClassTypeDeclaration.modifiers().add(requestScopedAnnotation);
+        //
         extractedClassRewriter.set(extractedClassTypeDeclaration, TypeDeclaration.NAME_PROPERTY, extractedClassName, null);
         ListRewrite extractedClassModifiersRewrite = extractedClassRewriter.getListRewrite(extractedClassTypeDeclaration, TypeDeclaration.MODIFIERS2_PROPERTY);
         extractedClassModifiersRewrite.insertLast(extractedClassAST.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD), null);
@@ -1010,17 +1024,22 @@ public class ExtractClassRefactoring extends Refactoring {
         extractedClassTypesRewrite.insertLast(extractedClassTypeDeclaration, null);
         
         //CREATING FACTORY METHOD IN EXTRACTED CLASS
+        String extractedClassFieldName = Character.toLowerCase(extractedTypeName.charAt(0)) + extractedTypeName.substring(1);
+        
         
         ImportDeclaration id1 = extractedClassCompilationUnit.getAST().newImportDeclaration();
-        id1.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "inject", "Inject" }));
+        id1.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "enterprise", "inject", "spi", "CDI" }));
         //extractedClassCompilationUnit.imports().add(id1);
         ImportDeclaration id2 = extractedClassCompilationUnit.getAST().newImportDeclaration();
         id2.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta", "persistence", "EntityManager" }));
         //extractedClassCompilationUnit.imports().add(id2);
+        ImportDeclaration id3 = extractedClassCompilationUnit.getAST().newImportDeclaration();
+        id3.setName(extractedClassCompilationUnit.getAST().newName(new String[] { "jakarta","enterprise","context","RequestScoped" }));
         ListRewrite ImportlistRewrite = extractedClassRewriter.getListRewrite(extractedClassCompilationUnit, CompilationUnit.IMPORTS_PROPERTY);
         ImportlistRewrite.insertLast(id1, null);
         ImportlistRewrite.insertLast(id2, null);
-        FieldDeclaration entityManagerDecl = extractedClassCompilationUnit.getAST().newFieldDeclaration(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
+        ImportlistRewrite.insertLast(id3, null);
+        /*FieldDeclaration entityManagerDecl = extractedClassCompilationUnit.getAST().newFieldDeclaration(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
 		entityManagerDecl.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
 		entityManagerDecl.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
 		entityManagerDecl.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
@@ -1028,29 +1047,29 @@ public class ExtractClassRefactoring extends Refactoring {
 		NormalAnnotation annotation = extractedClassCompilationUnit.getAST().newNormalAnnotation();
 		annotation.setTypeName(extractedClassCompilationUnit.getAST().newSimpleName("Inject"));
 		ListRewrite modifiers = extractedClassRewriter.getListRewrite(entityManagerDecl, FieldDeclaration.MODIFIERS2_PROPERTY);
-		modifiers.insertFirst(annotation, null);
+		modifiers.insertFirst(annotation, null);*/
 		
 		if(fragmentIsSet) {
 			MethodDeclaration factoryMethod  = extractedClassCompilationUnit.getAST().newMethodDeclaration();
 			factoryMethod.setName(extractedClassCompilationUnit.getAST().newSimpleName("factoryMethod"));
-			Type returnType = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("ItemService"));
+			Type returnType = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(extractedTypeName));
 			factoryMethod.setReturnType2(returnType);
 			factoryMethod.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 			factoryMethod.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
 			
 			SingleVariableDeclaration svd = extractedClassCompilationUnit.getAST().newSingleVariableDeclaration();
-			svd.setName(extractedClassCompilationUnit.getAST().newSimpleName("bookno"));
-			svd.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("Integer")));
+			svd.setName(extractedClassCompilationUnit.getAST().newSimpleName(FKfieldName));
+			svd.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(FKtype)));
 			
 			VariableDeclarationStatement vds = extractedClassCompilationUnit.getAST().newVariableDeclarationStatement(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
-			vds.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("ItemService")));
+			vds.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(extractedTypeName)));
 			//vds.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.NONE));
 			
 			VariableDeclarationFragment fragment = extractedClassCompilationUnit.getAST().newVariableDeclarationFragment();
-			fragment.setName(extractedClassCompilationUnit.getAST().newSimpleName("itemService"));
+			fragment.setName(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
 	
 			ClassInstanceCreation classInstanceCreation = extractedClassCompilationUnit.getAST().newClassInstanceCreation();
-			classInstanceCreation.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("ItemService")));
+			classInstanceCreation.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(extractedTypeName)));
 	
 			fragment.setInitializer(classInstanceCreation);
 			vds.fragments().add(fragment);
@@ -1061,27 +1080,45 @@ public class ExtractClassRefactoring extends Refactoring {
 			
 			Assignment assignment = extractedClassCompilationUnit.getAST().newAssignment();
 			FieldAccess fieldAccess = extractedClassCompilationUnit.getAST().newFieldAccess();
-			fieldAccess.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("itemService"));
-			fieldAccess.setName(extractedClassCompilationUnit.getAST().newSimpleName("items"));
+			fieldAccess.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
+			fieldAccess.setName(extractedClassCompilationUnit.getAST().newSimpleName(fieldName));
 			
+			
+			MethodInvocation currentMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			currentMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("current"));
+			currentMethodInvocation.setExpression(extractedClassCompilationUnit.getAST().newName("CDI"));
+			MethodInvocation selectMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			selectMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("select"));
+			selectMethodInvocation.setExpression(currentMethodInvocation);
+			TypeLiteral typeLiteralEm = extractedClassCompilationUnit.getAST().newTypeLiteral();
+			typeLiteralEm.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName("EntityManager")));
+			selectMethodInvocation.arguments().add(typeLiteralEm);
+			MethodInvocation getMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			getMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("get"));
+			getMethodInvocation.setExpression(selectMethodInvocation);
+			VariableDeclarationFragment emDeclarationFragment = extractedClassCompilationUnit.getAST().newVariableDeclarationFragment();
+			emDeclarationFragment.setName(extractedClassCompilationUnit.getAST().newSimpleName("em"));
+			emDeclarationFragment.setInitializer(getMethodInvocation);
+			VariableDeclarationStatement emDeclarationStatement = extractedClassCompilationUnit.getAST().newVariableDeclarationStatement(emDeclarationFragment);
+			emDeclarationStatement.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
 			
 			
 			MethodInvocation createQuery = extractedClassCompilationUnit.getAST().newMethodInvocation();
 		    createQuery.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("em"));
 		    createQuery.setName(extractedClassCompilationUnit.getAST().newSimpleName("createQuery"));
 		    StringLiteral query = extractedClassCompilationUnit.getAST().newStringLiteral();
-		    query.setLiteralValue("select i from Item i where i.bookno = :bookno");
+		    query.setLiteralValue("select i from "+fieldType+" i where i."+FKfieldName+" = :"+FKfieldName);
 		    createQuery.arguments().add(query);
 		    TypeLiteral typeLiteral = extractedClassCompilationUnit.getAST().newTypeLiteral();
-		    typeLiteral.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName("Item")));
+		    typeLiteral.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName(fieldType)));
 		    createQuery.arguments().add(typeLiteral);
 		    MethodInvocation setParameter = extractedClassCompilationUnit.getAST().newMethodInvocation();
 		    setParameter.setExpression(createQuery);
 		    setParameter.setName(extractedClassCompilationUnit.getAST().newSimpleName("setParameter"));
 		    StringLiteral parameterName = extractedClassCompilationUnit.getAST().newStringLiteral();
-		    parameterName.setLiteralValue("bookno");
+		    parameterName.setLiteralValue(FKfieldName);
 		    setParameter.arguments().add(parameterName);
-		    SimpleName ownedClassId = extractedClassCompilationUnit.getAST().newSimpleName("bookno");
+		    SimpleName ownedClassId = extractedClassCompilationUnit.getAST().newSimpleName(FKfieldName);
 		    setParameter.arguments().add(ownedClassId);
 		    MethodInvocation getResultList = extractedClassCompilationUnit.getAST().newMethodInvocation();
 		    getResultList.setExpression(setParameter);
@@ -1090,7 +1127,7 @@ public class ExtractClassRefactoring extends Refactoring {
 		    ClassInstanceCreation classInstanceCreation2 = extractedClassCompilationUnit.getAST().newClassInstanceCreation();
 		    Type returnType2 = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("HashSet"));
 		    ParameterizedType parameterizedType2 = extractedClassCompilationUnit.getAST().newParameterizedType(returnType2);
-		    parameterizedType2.typeArguments().add(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("Item")));
+		    parameterizedType2.typeArguments().add(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(fieldType)));
 		    returnType2 = parameterizedType2;
 		    classInstanceCreation2.setType(returnType2);
 		    classInstanceCreation2.arguments().add(getResultList);
@@ -1103,10 +1140,11 @@ public class ExtractClassRefactoring extends Refactoring {
 			
 			Block block = extractedClassCompilationUnit.getAST().newBlock();
 			block.statements().add(vds);
+			block.statements().add(emDeclarationStatement);
 			ExpressionStatement expressionStatement = extractedClassCompilationUnit.getAST().newExpressionStatement(assignment);
 			block.statements().add(expressionStatement);
 		    ReturnStatement returnStatement = extractedClassCompilationUnit.getAST().newReturnStatement();
-		    returnStatement.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("itemService"));
+		    returnStatement.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
 		    block.statements().add(returnStatement);
 		    
 		    factoryMethod.setBody(block);
@@ -1114,31 +1152,31 @@ public class ExtractClassRefactoring extends Refactoring {
 		    //typeDeclaration.bodyDeclarations().add(queryMethod);
 		    
 		    ListRewrite listRewrite = extractedClassRewriter.getListRewrite(extractedClassTypeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
-		    listRewrite.insertFirst(entityManagerDecl, null);
+		    //listRewrite.insertFirst(entityManagerDecl, null);
 		    listRewrite.insertLast(factoryMethod, null);
 		}else {
 			
 			
 			MethodDeclaration factoryMethod  = extractedClassCompilationUnit.getAST().newMethodDeclaration();
 			factoryMethod.setName(extractedClassCompilationUnit.getAST().newSimpleName("factoryMethod"));
-			Type returnType = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("BookService"));
+			Type returnType = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(extractedTypeName));
 			factoryMethod.setReturnType2(returnType);
 			factoryMethod.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 			factoryMethod.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
 			
 			SingleVariableDeclaration svd = extractedClassCompilationUnit.getAST().newSingleVariableDeclaration();
-			svd.setName(extractedClassCompilationUnit.getAST().newSimpleName("bookno"));
-			svd.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("Integer")));
+			svd.setName(extractedClassCompilationUnit.getAST().newSimpleName(FKfieldName));
+			svd.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(FKtype)));
 			
 			VariableDeclarationStatement vds = extractedClassCompilationUnit.getAST().newVariableDeclarationStatement(extractedClassCompilationUnit.getAST().newVariableDeclarationFragment());
-			vds.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("BookService")));
+			vds.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(extractedTypeName)));
 			//vds.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.NONE));
 			
 			VariableDeclarationFragment fragment = extractedClassCompilationUnit.getAST().newVariableDeclarationFragment();
-			fragment.setName(extractedClassCompilationUnit.getAST().newSimpleName("bookService"));
+			fragment.setName(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
 	
 			ClassInstanceCreation classInstanceCreation = extractedClassCompilationUnit.getAST().newClassInstanceCreation();
-			classInstanceCreation.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("BookService")));
+			classInstanceCreation.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(extractedTypeName)));
 	
 			fragment.setInitializer(classInstanceCreation);
 			vds.fragments().add(fragment);
@@ -1149,8 +1187,26 @@ public class ExtractClassRefactoring extends Refactoring {
 			
 			Assignment assignment = extractedClassCompilationUnit.getAST().newAssignment();
 			FieldAccess fieldAccess = extractedClassCompilationUnit.getAST().newFieldAccess();
-			fieldAccess.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("bookService"));
-			fieldAccess.setName(extractedClassCompilationUnit.getAST().newSimpleName("book"));
+			fieldAccess.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
+			fieldAccess.setName(extractedClassCompilationUnit.getAST().newSimpleName(fieldName));
+			
+			MethodInvocation currentMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			currentMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("current"));
+			currentMethodInvocation.setExpression(extractedClassCompilationUnit.getAST().newName("CDI"));
+			MethodInvocation selectMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			selectMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("select"));
+			selectMethodInvocation.setExpression(currentMethodInvocation);
+			TypeLiteral typeLiteralEm = extractedClassCompilationUnit.getAST().newTypeLiteral();
+			typeLiteralEm.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName("EntityManager")));
+			selectMethodInvocation.arguments().add(typeLiteralEm);
+			MethodInvocation getMethodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
+			getMethodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("get"));
+			getMethodInvocation.setExpression(selectMethodInvocation);
+			VariableDeclarationFragment emDeclarationFragment = extractedClassCompilationUnit.getAST().newVariableDeclarationFragment();
+			emDeclarationFragment.setName(extractedClassCompilationUnit.getAST().newSimpleName("em"));
+			emDeclarationFragment.setInitializer(getMethodInvocation);
+			VariableDeclarationStatement emDeclarationStatement = extractedClassCompilationUnit.getAST().newVariableDeclarationStatement(emDeclarationFragment);
+			emDeclarationStatement.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("EntityManager")));
 			
 			
 			MethodInvocation methodInvocation = extractedClassCompilationUnit.getAST().newMethodInvocation();
@@ -1158,40 +1214,41 @@ public class ExtractClassRefactoring extends Refactoring {
 			methodInvocation.setName(extractedClassCompilationUnit.getAST().newSimpleName("find"));
 
 			TypeLiteral typeLiteral = extractedClassCompilationUnit.getAST().newTypeLiteral();
-		    typeLiteral.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName("Book")));
+		    typeLiteral.setType(extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newSimpleName(fieldType)));
 		    methodInvocation.arguments().add(typeLiteral);
 
-			methodInvocation.arguments().add(extractedClassCompilationUnit.getAST().newSimpleName("bookno"));
+			methodInvocation.arguments().add(extractedClassCompilationUnit.getAST().newSimpleName(FKfieldName));
 			
 			assignment.setRightHandSide(methodInvocation);
 			assignment.setLeftHandSide(fieldAccess);
 			
 			Block block = extractedClassCompilationUnit.getAST().newBlock();
 			block.statements().add(vds);
+			block.statements().add(emDeclarationStatement);
 			ExpressionStatement expressionStatement = extractedClassCompilationUnit.getAST().newExpressionStatement(assignment);
 			block.statements().add(expressionStatement);
 		    ReturnStatement returnStatement = extractedClassCompilationUnit.getAST().newReturnStatement();
-		    returnStatement.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("bookService"));
+		    returnStatement.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(extractedClassFieldName));
 		    block.statements().add(returnStatement);
 		    
 		    factoryMethod.setBody(block);
 		    
 		    
 		    MethodDeclaration getterMethod  = extractedClassCompilationUnit.getAST().newMethodDeclaration();
-		    getterMethod.setName(extractedClassCompilationUnit.getAST().newSimpleName("queryBook"));
-			Type returnType2 = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName("Book"));
+		    getterMethod.setName(extractedClassCompilationUnit.getAST().newSimpleName("query"+fieldType));
+			Type returnType2 = extractedClassCompilationUnit.getAST().newSimpleType(extractedClassCompilationUnit.getAST().newName(fieldType));
 			getterMethod.setReturnType2(returnType2);
 			getterMethod.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 			//getterMethod.modifiers().add(extractedClassCompilationUnit.getAST().newModifier(Modifier.ModifierKeyword.STATIC_KEYWORD));
 			ReturnStatement returnStatement2 = extractedClassCompilationUnit.getAST().newReturnStatement();
-		    returnStatement2.setExpression(extractedClassCompilationUnit.getAST().newSimpleName("book"));
+		    returnStatement2.setExpression(extractedClassCompilationUnit.getAST().newSimpleName(fieldName));
 		    Block block2 = extractedClassCompilationUnit.getAST().newBlock();
 		    block2.statements().add(returnStatement2);
 		    getterMethod.setBody(block2);
 			
 			
 			ListRewrite listRewrite = extractedClassRewriter.getListRewrite(extractedClassTypeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
-		    listRewrite.insertFirst(entityManagerDecl, null);
+		    //listRewrite.insertFirst(entityManagerDecl, null);
 		    listRewrite.insertLast(factoryMethod, null);
 		    listRewrite.insertLast(getterMethod, null);
 		}
