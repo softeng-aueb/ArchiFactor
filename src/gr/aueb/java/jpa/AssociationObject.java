@@ -1,4 +1,4 @@
-package gr.uom.java.ast;
+package gr.aueb.java.jpa;
 
 public class AssociationObject {
 

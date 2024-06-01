@@ -1,4 +1,4 @@
-package gr.uom.java.ast;
+package gr.aueb.java.jpa;
 
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -6,6 +6,10 @@ import java.util.Set;
 
 import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
+
+import gr.uom.java.ast.ClassObject;
+import gr.uom.java.ast.FieldObject;
+import gr.uom.java.ast.MethodObject;
 
 public class EntityObject {
 	
@@ -116,6 +120,12 @@ public class EntityObject {
 		FieldObject field = getIdField();
 		String nameWithUpperCase = Character.toUpperCase(field.getName().charAt(0)) + field.getName().substring(1);
 		return "get"+nameWithUpperCase;
+	}
+
+
+	@Override
+	public String toString() {
+		return "EntityObject [classObject=" + classObject.getName() + "]";
 	}
 
 	
