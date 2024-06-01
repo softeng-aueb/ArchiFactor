@@ -274,6 +274,7 @@ public abstract class DivideAndConquerMatcher {
 		return preconditionExaminer.isTemplateMethodApplicable();
 	}
 
+
 	public List<PDGExpressionGap> getRefactorableExpressionGaps() {
 		return preconditionExaminer.getRefactorableExpressionGaps();
 	}

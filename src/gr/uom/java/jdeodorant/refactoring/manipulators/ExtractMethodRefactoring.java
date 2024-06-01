@@ -324,6 +324,7 @@ public class ExtractMethodRefactoring extends ExtractMethodFragmentRefactoring {
 			}
 			typeParameterRewrite.insertLast(typeParameter, null);
 		}
+
 		ListRewrite thrownExceptionRewrite = sourceRewriter.getListRewrite(newMethodDeclaration, MethodDeclaration.THROWN_EXCEPTION_TYPES_PROPERTY);
 		for(ITypeBinding thrownExceptionType : exceptionTypesThatShouldBeThrownByExtractedMethod) {
 			thrownExceptionRewrite.insertLast(RefactoringUtility.generateTypeFromTypeBinding(thrownExceptionType, ast, sourceRewriter), null);

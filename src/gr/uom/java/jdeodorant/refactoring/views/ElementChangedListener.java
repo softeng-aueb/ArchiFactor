@@ -41,7 +41,10 @@ public class ElementChangedListener implements IElementChangedListener {
 				CompilationUnitCache.getInstance().compilationUnitAdded(compilationUnit);
 			}
 			else if(delta.getKind() == IJavaElementDelta.REMOVED) {
-				CompilationUnitCache.getInstance().compilationUnitRemoved(compilationUnit);
+				// FIXME: remove if clause, when bug resolved
+				if(compilationUnit.exists()) {
+					CompilationUnitCache.getInstance().compilationUnitRemoved(compilationUnit);
+				}
 			}
 			else if(delta.getKind() == IJavaElementDelta.CHANGED) {
 				if((delta.getFlags() & IJavaElementDelta.F_FINE_GRAINED) != 0 ||
