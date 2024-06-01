@@ -73,7 +73,7 @@
       </category>
       <view
             category="gr.uom.java.jdeodorant"
-            class="gr.uom.java.jdeodorant.refactoring.views.MicroserviceExtraction"
+            class="gr.aueb.java.archifactor.refactoring.views.MicroserviceExtraction"
             icon="icons/repair.png"
             id="gr.uom.java.jdeodorant.views.MicroserviceExtraction"
             name="Microservice Extraction">

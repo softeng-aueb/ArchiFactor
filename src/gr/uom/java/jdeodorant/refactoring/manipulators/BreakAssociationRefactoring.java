@@ -65,8 +65,8 @@ import org.eclipse.text.edits.TextEdit;
 import org.eclipse.text.edits.TextEditGroup;
 import org.eclipse.ui.PartInitException;
 
+import gr.aueb.java.jpa.AssociationObject;
 import gr.uom.java.ast.ASTReader;
-import gr.uom.java.ast.AssociationObject;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodObject;

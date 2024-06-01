@@ -1,4 +1,4 @@
-package gr.uom.java.jdeodorant.refactoring.views;
+package gr.aueb.java.archifactor.refactoring.views;
 
 
 import java.io.BufferedWriter;
@@ -22,13 +22,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import gr.aueb.java.jpa.AssociationObject;
+import gr.aueb.java.jpa.EntityObject;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.Access;
-import gr.uom.java.ast.AssociationObject;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.CompilationErrorDetectedException;
 import gr.uom.java.ast.CompilationUnitCache;
-import gr.uom.java.ast.EntityObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodInvocationObject;
 import gr.uom.java.ast.MethodObject;
@@ -45,6 +45,13 @@ import gr.uom.java.jdeodorant.refactoring.Activator;
 import gr.uom.java.jdeodorant.refactoring.manipulators.BreakAssociationRefactoring;
 import gr.uom.java.jdeodorant.refactoring.manipulators.ExtractClassRefactoring;
 import gr.uom.java.jdeodorant.refactoring.manipulators.MoveClassRefactoring;
+import gr.uom.java.jdeodorant.refactoring.views.CodeSmellPackageExplorer;
+import gr.uom.java.jdeodorant.refactoring.views.CodeSmellVisualization;
+import gr.uom.java.jdeodorant.refactoring.views.CodeSmellVisualizationDataSingleton;
+import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
+import gr.uom.java.jdeodorant.refactoring.views.MyComboBoxCellEditor;
+import gr.uom.java.jdeodorant.refactoring.views.MyRefactoringWizard;
+import gr.uom.java.jdeodorant.refactoring.views.SliceAnnotation;
 import gr.uom.java.jdeodorant.refactoring.views.CodeSmellPackageExplorer.CodeSmellType;
 
 import org.eclipse.swt.widgets.Composite;
@@ -907,6 +914,9 @@ public class MicroserviceExtraction extends ViewPart {
 		getSite().getWorkbenchWindow().getSelectionService().removeSelectionListener(selectionListener);
 	}
 
+	
+	
+	
 	private ExtractClassCandidateGroup[] getTable() {
 		ExtractClassCandidateGroup[] table = null;
 		try {
@@ -932,16 +942,7 @@ public class MicroserviceExtraction extends ViewPart {
 				});
 			}
 			SystemObject systemObject = ASTReader.getSystemObject();
-			/*while(systemObject.getClassListIterator().hasNext()) {
-				ClassObject classOb = systemObject.getClassListIterator().next().getClassObject();
-				if (classOb.getAnnotations().size()>0) {
-					for (String annotation : classOb.getAnnotations()) {
-						if (annotation.equals("Entity")) {
-							System.out.println(classOb.getName()+" is Entity");
-						}
-					}
-				}
-			}*/
+			
 			if(systemObject != null) {
 				Set<ClassObject> classObjectsToBeExamined = new LinkedHashSet<ClassObject>();
 				if(selectedPackageFragmentRoot != null) {
@@ -980,13 +981,7 @@ public class MicroserviceExtraction extends ViewPart {
 				}
 				
 				shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
-		        InputDialog inputDialog = new InputDialog(shell, "Input Dialog", "Enter the name of the microservice folder:", "", null);
-		        int input = inputDialog.open();
-		        if (input == Window.OK) {
-		            String name = inputDialog.getValue();
-		            microserviceName = name;
-		            System.out.println("The name chosen is: " + name);
-		        }
+		        inputDestinationPackage(shell);
 
 		        
 		        chosenClasses = new ArrayList<ClassObject>();
@@ -1022,27 +1017,7 @@ public class MicroserviceExtraction extends ViewPart {
 					}
 				}
 				for(final ClassObject classOb : classes) {
-								//MoveRefactoring ref= new MoveRefactoring();
-								//final MoveResourceChange ref= MoveResourceChange.create(classOb.getITypeRoot().getResource(),classOb.getITypeRoot().getResource().getParent().getParent());
-								/*ps.busyCursorWhile(new IRunnableWithProgress() {
-									public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
-										try {
-											//classOb.getITypeRoot().getResource().move(classOb.getIFile().getParent().getParent().getFullPath(), true, monitor);
-											ref.perform(monitor);
-										} catch (OperationCanceledException e) {
-											// TODO Auto-generated catch block
-											e.printStackTrace();
-										} catch (CoreException e) {
-											// TODO Auto-generated catch block
-											e.printStackTrace();
-										}
-									}
-								});*/
 							
-					/*if((classOb.getITypeRoot().getParent().getElementName().equals(selectedType.getTypeRoot().getParent().getElementName()))&&(!isEntity)&&(!isTest)) {
-						System.out.println(classOb.getName()+" is not Entity "+classOb.getITypeRoot().getParent().getElementName());
-						classesToBeCopied.add(classOb);
-					}*/
 					//Adding Methods and their class with none as access and are used by a class that is not in the chosen classes to be extracted
 					if(!classOb.isTestClass()&&(!chosenClasses.contains(classOb))) {
 						for(MethodObject method:classOb.getMethodList()) {
@@ -1334,6 +1309,20 @@ public class MicroserviceExtraction extends ViewPart {
 			e.printStackTrace();*/
 		}
 		return table;		
+	}
+
+	/**
+	 * Receive from user input the destination package for extracted microservice
+	 * @param shell
+	 */
+	private void inputDestinationPackage(Shell shell) {
+		InputDialog inputDialog = new InputDialog(shell, "Input Dialog", "Enter the name of the microservice folder:", "", null);
+		int input = inputDialog.open();
+		if (input == Window.OK) {
+		    String name = inputDialog.getValue();
+		    microserviceName = name;
+		    System.out.println("The name chosen is: " + name);
+		}
 	}
 
 	private ExtractClassCandidateGroup getParentCandidateGroup(String sourceClass) {

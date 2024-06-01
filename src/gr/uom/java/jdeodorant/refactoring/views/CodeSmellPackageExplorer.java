@@ -59,7 +59,8 @@ public class CodeSmellPackageExplorer extends ViewPart {
 	private boolean ctrlPressed= false;
 	public static double SCALE_FACTOR=1;
 	private PackageMapDiagram diagram;
-	protected static CodeSmellType CODE_SMELL_TYPE;
+	// FIXME: use separate class for microservice extraction
+	public static CodeSmellType CODE_SMELL_TYPE;
 
 	@Override
 	public void createPartControl(Composite parent) {
@@ -267,7 +268,7 @@ public class CodeSmellPackageExplorer extends ViewPart {
 		//Tooltips.install(diagram.getControl(), informationProvider, informationControlCreators, false);
 	}
 
-	protected enum CodeSmellType{
+	public enum CodeSmellType{
 		FEATURE_ENVY, GOD_CLASS, MICROSERVICE_EXTRACTION;
 	}
 }
