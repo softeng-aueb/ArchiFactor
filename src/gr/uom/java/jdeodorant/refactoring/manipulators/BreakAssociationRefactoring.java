@@ -199,6 +199,7 @@ public class BreakAssociationRefactoring {
 				edits.apply(document);
 				cu.getBuffer().setContents(document.get());
 				cu.save(null, true);
+				// FIXME: the following is not an allowed operation in this context
 				cu.commitWorkingCopy(true, null);
 			} catch (JavaModelException e) {
 				// TODO Auto-generated catch block
