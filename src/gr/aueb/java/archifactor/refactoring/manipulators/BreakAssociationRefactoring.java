@@ -1,4 +1,4 @@
-package gr.uom.java.jdeodorant.refactoring.manipulators;
+package gr.aueb.java.archifactor.refactoring.manipulators;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -70,6 +70,7 @@ import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodObject;
+import gr.uom.java.jdeodorant.refactoring.manipulators.ExtractAttributeSlice;
 import gr.uom.java.jdeodorant.refactoring.views.MyRefactoringWizard;
 
 public class BreakAssociationRefactoring {

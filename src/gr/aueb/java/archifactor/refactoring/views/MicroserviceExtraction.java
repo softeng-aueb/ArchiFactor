@@ -57,6 +57,7 @@ import org.eclipse.jdt.core.refactoring.descriptors.MoveDescriptor;
 import org.eclipse.jdt.ui.JavaElementContentProvider;
 import org.eclipse.jdt.ui.JavaElementLabelProvider;
 import org.eclipse.jdt.ui.JavaUI;
+import org.eclipse.jdt.ui.StandardJavaElementContentProvider;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.dialogs.InputDialog;
@@ -122,6 +123,7 @@ import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.ui.texteditor.ITextEditor;
 
+import gr.aueb.java.archifactor.refactoring.manipulators.BreakAssociationRefactoring;
 import gr.aueb.java.jpa.AssociationObject;
 import gr.aueb.java.jpa.EntityObject;
 import gr.uom.java.ast.ASTReader;
@@ -142,7 +144,6 @@ import gr.uom.java.distance.ExtractedConcept;
 import gr.uom.java.distance.MySystem;
 import gr.uom.java.jdeodorant.preferences.PreferenceConstants;
 import gr.uom.java.jdeodorant.refactoring.Activator;
-import gr.uom.java.jdeodorant.refactoring.manipulators.BreakAssociationRefactoring;
 import gr.uom.java.jdeodorant.refactoring.manipulators.MoveClassRefactoring;
 import gr.uom.java.jdeodorant.refactoring.views.CodeSmellPackageExplorer;
 import gr.uom.java.jdeodorant.refactoring.views.CodeSmellPackageExplorer.CodeSmellType;
@@ -852,7 +853,7 @@ public class MicroserviceExtraction extends ViewPart {
 				});
 			}
 			SystemObject systemObject = ASTReader.getSystemObject();
-			RefactoringActionContext.getInstance().initialize(activeProject);
+			RefactoringContext.getInstance().initialize(activeProject);
 
 			if (systemObject != null) {
 				Set<ClassObject> classObjectsToBeExamined = new LinkedHashSet<ClassObject>();
@@ -873,29 +874,32 @@ public class MicroserviceExtraction extends ViewPart {
 				Shell shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
 				
 				
+				// show file selector for destination root package
 				IResource destinationPackageRoot = selectDestinationPackageRoot(shell);
 				
 				if (destinationPackageRoot != null) {
 					relativePathOfMCFolder = destinationPackageRoot.getProjectRelativePath().toString();
 					System.out.println(destinationPackageRoot.getProjectRelativePath());
-//					if (resource instanceof IContainer) {
-//						IContainer container2 = (IContainer) resource;
-//						// Do something with the selected folder
-//					}
 				}
 
+				// show input for destination package name
 				shell = PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell();
 				microserviceName = inputDestinationPackageName(shell);
 
+				List<IPackageFragment> rootPackages = RefactoringContext.getInstance().getRootPackages();
+				// select domain classes to be extracted
+				// FIXME: should be characterized by JPA annotations
 				chosenClasses = new ArrayList<ClassObject>();
 				CheckedTreeSelectionDialog dialogPickClasses = new CheckedTreeSelectionDialog(shell,
-						new JavaElementLabelProvider(), new JavaElementContentProvider());
-				dialogPickClasses.setInput(classes.get(0).getITypeRoot().getJavaProject());
-				dialogPickClasses.setInitialSelections(new Object[] { classes.get(0).getITypeRoot().getJavaProject() });
+						new JavaElementLabelProvider(), new DomainClassesContentProvider());
+				dialogPickClasses.setInput(RefactoringContext.getInstance().getTargetProject());
+
+				dialogPickClasses.setInitialSelections(rootPackages.toArray());
 				dialogPickClasses.setTitle("Select Domain classes for Microservice extraction");
 				dialogPickClasses
 						.setMessage("Select the Domain class/classes you want to extract into the Microservice:");
 				dialogPickClasses.open();
+				
 				Object[] resultClasses = dialogPickClasses.getResult();
 				if (resultClasses != null) {
 					for (Object obj : resultClasses) {
@@ -1237,7 +1241,7 @@ public class MicroserviceExtraction extends ViewPart {
 	}
 
 	private IResource selectDestinationPackageRoot(Shell shell) {
-		RefactoringActionContext refactoringContext = RefactoringActionContext.getInstance();
+		RefactoringContext refactoringContext = RefactoringContext.getInstance();
 		
 		// FIXME: would not work for non maven projects
 		IContainer mvnSourceFolder = refactoringContext.getMavenSourceFolder();
