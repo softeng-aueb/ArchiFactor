@@ -26,11 +26,9 @@ import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
@@ -54,10 +52,8 @@ import org.eclipse.jdt.core.manipulation.CodeStyleConfiguration;
 import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
 import org.eclipse.jdt.core.refactoring.IJavaRefactorings;
 import org.eclipse.jdt.core.refactoring.descriptors.MoveDescriptor;
-import org.eclipse.jdt.ui.JavaElementContentProvider;
 import org.eclipse.jdt.ui.JavaElementLabelProvider;
 import org.eclipse.jdt.ui.JavaUI;
-import org.eclipse.jdt.ui.StandardJavaElementContentProvider;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.dialogs.InputDialog;
@@ -124,8 +120,10 @@ import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.ui.texteditor.ITextEditor;
 
 import gr.aueb.java.archifactor.refactoring.manipulators.BreakAssociationRefactoring;
+import gr.aueb.java.archifactor.util.JpaModelUtil;
 import gr.aueb.java.jpa.AssociationObject;
 import gr.aueb.java.jpa.EntityObject;
+import gr.aueb.java.jpa.JpaModel;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.Access;
 import gr.uom.java.ast.ClassObject;
@@ -952,7 +950,7 @@ public class MicroserviceExtraction extends ViewPart {
 						}
 					}
 					// Creating EntityObjects
-					if (classOb.isEntity()) {
+					if (JpaModel.isEntity(classOb)) {
 						EntityObject entityObject = new EntityObject(classOb);
 						Iterator iter = classOb.getFieldIterator();
 						while (iter.hasNext()) {
@@ -979,7 +977,7 @@ public class MicroserviceExtraction extends ViewPart {
 					for (ClassObject cl : chosenClasses) {
 						// Classes that need to be copied
 						if ((!chosenClasses.contains(classOb)) && (cl.hasFieldType(classOb.getName()))
-								&& (!classOb.isEntity()) && (!classOb.isTestClass())) {
+								&& (!JpaModel.isEntity(classOb)) && (!classOb.isTestClass())) {
 							// System.out.println("We need to copy "+classOb.getName());
 							classesToBeCopied.add(classOb);
 						}

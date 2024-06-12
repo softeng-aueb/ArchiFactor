@@ -18,6 +18,7 @@ import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.JavaModelException;
 
+import gr.aueb.java.archifactor.util.JavaModelUtil;
 import gr.aueb.java.util.Pair;
 
 public class RefactoringContext {
@@ -28,6 +29,7 @@ public class RefactoringContext {
 //	private IContainer rootPackage;
 	private List<IPackageFragment> rootPackages;
 	private IContainer mavenSourceFolder;
+	private IPackageFragmentRoot srcPackageFragmentRoot;
 
 	public static RefactoringContext getInstance() {
 		if (context == null) {
@@ -48,24 +50,16 @@ public class RefactoringContext {
 		return null;
 	}
 
-	private boolean hasContent(IJavaElement packageFragment) {
-		try {
-			return ((IPackageFragment) packageFragment).getChildren().length > 0;
-		} catch (JavaModelException e) {
-			return false;
-		}
-	}
-
 	private List<IPackageFragment> resolveRootPackage() {
 
-		IPackageFragmentRoot srcFolder;
 		try {
-			srcFolder = findSrcFolderRoot();
-			if (srcFolder == null) {
+			srcPackageFragmentRoot = findSrcFolderRoot();
+			
+			if (srcPackageFragmentRoot == null) {
 				return null;
 			}
 
-			IJavaElement[] packages = srcFolder.getChildren();
+			IJavaElement[] packages = srcPackageFragmentRoot.getChildren();
 
 			Optional<Pair<Integer, List<PackagePathPair>>> minLengthPackageEntry = findMinLengthPackages(packages);
 
@@ -99,7 +93,7 @@ public class RefactoringContext {
 		
 		Stream<IJavaElement> pkgStream = Arrays.asList(packages).stream();
 		Optional<Pair<Integer, List<PackagePathPair>>> minLengthPackageEntry = pkgStream
-				.filter(p -> p.getElementType() == IJavaElement.PACKAGE_FRAGMENT).filter(p -> hasContent(p))
+				.filter(p -> p.getElementType() == IJavaElement.PACKAGE_FRAGMENT).filter(p -> JavaModelUtil.hasContent(p))
 				// keep non empty packages (contain Java files)
 				.map(p -> (IPackageFragment) p).map(p -> new PackagePathPair(p, p.getPath()))
 				// group packages by path segment length
@@ -145,5 +139,9 @@ public class RefactoringContext {
 
 	public IJavaProject getTargetProject() {
 		return targetProject;
+	}
+	
+	public IPackageFragmentRoot getSrcPackageFragmentRoot() {
+		return srcPackageFragmentRoot;
 	}
 }

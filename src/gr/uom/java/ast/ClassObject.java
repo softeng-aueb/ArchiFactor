@@ -203,16 +203,6 @@ public class ClassObject extends ClassDeclarationObject {
     	return false;
     }
     
-    public boolean isEntity() {
-    	if (this.annotations.size()>0) {
-			for(Annotation ann: this.annotations) {
-				if(ann.getTypeName().getFullyQualifiedName().equals("Entity")) {
-					return true;
-				}
-			}
-    	}
-    	return false;
-    }
 
     public void setSuperclass(TypeObject superclass) {
 		this.superclass = superclass;
