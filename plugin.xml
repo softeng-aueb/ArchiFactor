@@ -3,6 +3,22 @@
 <plugin>
 
    <extension
+         point="org.eclipse.ui.commands">
+      <command
+            id="gr.aueb.java.ddd.aggregatesIdentification.openView"
+            name="Open Aggregations Identification View">
+      </command>
+   </extension>
+   
+   <extension
+         point="org.eclipse.ui.handlers">
+      <handler
+            commandId="gr.aueb.java.ddd.aggregatesIdentification.openView"
+            class="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationHandler">
+      </handler>
+   </extension>
+
+   <extension
          point="org.eclipse.ui.actionSets">
       <actionSet
             label="BadSmells"
@@ -63,8 +79,21 @@
                menubarPath="BadSmellsMenu/sampleGroup"
                id="gr.uom.java.jdeodorant.actions.DuplicatedCode">
          </action>
+         <!-- New Action for Aggregations Identification -->
+         <action
+               label="Aggregations Identification"
+               icon="icons/repair.png"
+               class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
+               tooltip="Aggregations Identification"
+               menubarPath="BadSmellsMenu/sampleGroup"
+               id="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentification">
+               <command
+                   commandId="gr.aueb.java.ddd.aggregatesIdentification.openView"
+                   style="push"/>
+         </action>
       </actionSet>
    </extension>
+   
    <extension
          point="org.eclipse.ui.views">
       <category
@@ -127,7 +156,16 @@
             id="gr.uom.java.jdeodorant.views.CodeSmellPackageExplorer"
             name="Code Smell Package Explorer">
       </view>
+      <!-- Register new Aggregations Identification view -->
+      <view
+            category="gr.uom.java.jdeodorant"
+            class="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView"
+            icon="icons/repair.png"
+            id="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView"
+            name="Aggregations Identification">
+      </view>
    </extension>
+   
    <extension
          point="org.eclipse.ui.perspectiveExtensions">
       <perspectiveExtension
@@ -185,6 +223,7 @@
          </view>
       </perspectiveExtension>
    </extension>
+   
    <extension
          point="org.eclipse.ui.preferencePages">
       <page
@@ -193,12 +232,14 @@
             name="JDeodorant">
       </page>
    </extension>
+   
    <extension
          point="org.eclipse.core.runtime.preferences">
       <initializer
             class="gr.uom.java.jdeodorant.preferences.PreferenceInitializer">
       </initializer>
    </extension>
+   
    <extension
          point="org.eclipse.ui.editors.markerAnnotationSpecification">
       <specification
@@ -252,6 +293,7 @@
             verticalRulerPreferenceValue="false">
       </specification>
    </extension>
+   
    <extension
          point="org.eclipse.ui.popupMenus">
       <objectContribution

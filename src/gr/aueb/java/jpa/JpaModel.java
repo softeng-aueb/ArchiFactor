@@ -1,5 +1,6 @@
 package gr.aueb.java.jpa;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -52,4 +53,8 @@ public class JpaModel {
 		}
 		return false;
 	}
+	
+    public List<EntityObject> getEntities() {
+        return new ArrayList<EntityObject>(entities);
+    }
 }
