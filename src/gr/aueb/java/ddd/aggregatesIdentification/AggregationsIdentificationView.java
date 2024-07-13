@@ -18,30 +18,20 @@ public class AggregationsIdentificationView extends ViewPart {
     public void createPartControl(Composite parent) {
         text = new Text(parent, SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL);
         try {
-			displayCallGraph();
-		} catch (JavaModelException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+            CallGraphBuilder builder = new CallGraphBuilder();
+            Map<String, List<String>> callGraph = builder.buildCallGraph();
+            displayCallGraph(callGraph);
+        } catch (JavaModelException e) {
+            e.printStackTrace();
+        }
     }
 
-    private void displayCallGraph() throws JavaModelException {
-        CallGraphBuilder builder = new CallGraphBuilder();
-        Map<String, List<String>> callGraph = builder.buildCallGraph();
-        StringBuilder callGraphText = new StringBuilder();
-
-        if (callGraph.isEmpty()) {
-            callGraphText.append("No endpoints found.");
-        } else {
-            for (Map.Entry<String, List<String>> entry : callGraph.entrySet()) {
-                callGraphText.append(entry.getKey()).append(":\n");
-                for (String methodCall : entry.getValue()) {
-                    callGraphText.append("  -> ").append(methodCall).append("\n");
-                }
-            }
+    public void displayCallGraph(Map<String, List<String>> callGraph) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, List<String>> entry : callGraph.entrySet()) {
+            sb.append("Method: ").append(entry.getKey()).append(", Endpoints: ").append(entry.getValue()).append("\n");
         }
-
-        text.setText(callGraphText.toString());
+        text.setText(sb.toString());
     }
 
     @Override
