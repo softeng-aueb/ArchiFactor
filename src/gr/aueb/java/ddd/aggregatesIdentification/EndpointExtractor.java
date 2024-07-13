@@ -3,89 +3,45 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.dom.*;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 public class EndpointExtractor {
 
-    @SuppressWarnings("deprecation")
-	public Map<String, List<String>> extractEndpoints(ICompilationUnit[] compilationUnits) {
-        Map<String, List<String>> endpoints = new HashMap<>();
+    public Map<String, List<String>> extractEndpoints(ICompilationUnit[] compilationUnits) {
+        final Map<String, List<String>> callGraph = new HashMap<String, List<String>>();
 
-        for (ICompilationUnit cu : compilationUnits) {
-            ASTParser parser = ASTParser.newParser(AST.JLS16);
-            parser.setKind(ASTParser.K_COMPILATION_UNIT);
-            parser.setSource(cu);
-            parser.setResolveBindings(true);
-
-            CompilationUnit compilationUnit = (CompilationUnit) parser.createAST(null);
-            compilationUnit.accept(new ASTVisitor() {
+        for (ICompilationUnit unit : compilationUnits) {
+            CompilationUnit parse = parse(unit);
+            parse.accept(new ASTVisitor() {
                 @Override
-                public boolean visit(TypeDeclaration node) {
-                    for (MethodDeclaration method : node.getMethods()) {
-                        if (isRestController(method)) {
-                            List<String> endpointList = extractEndpointsFromMethod(method);
-                            if (endpointList != null) {
-                                endpoints.put(method.getName().toString(), endpointList);
+                public boolean visit(MethodDeclaration methodDeclaration) {
+                    List<String> endpoints = new ArrayList<String>();
+                    for (Object modifier : methodDeclaration.modifiers()) {
+                        if (modifier instanceof Annotation) {
+                            String annotation = ((Annotation) modifier).getTypeName().getFullyQualifiedName();
+                            if (annotation.contains("Mapping")) {
+                                endpoints.add(annotation);
                             }
                         }
                     }
-                    return super.visit(node);
+                    callGraph.put(methodDeclaration.getName().toString(), endpoints);
+                    return super.visit(methodDeclaration);
                 }
             });
         }
 
-        return endpoints;
+        return callGraph;
     }
 
-    @SuppressWarnings("unchecked")
-	private boolean isRestController(MethodDeclaration method) {
-        for (IExtendedModifier modifier : (List<IExtendedModifier>) method.modifiers()) {
-            if (modifier.isAnnotation()) {
-                Annotation annotation = (Annotation) modifier;
-                if (annotation.getTypeName().getFullyQualifiedName().startsWith("RequestMapping")
-                        || annotation.getTypeName().getFullyQualifiedName().startsWith("GetMapping")
-                        || annotation.getTypeName().getFullyQualifiedName().startsWith("PostMapping")
-                        || annotation.getTypeName().getFullyQualifiedName().startsWith("PutMapping")
-                        || annotation.getTypeName().getFullyQualifiedName().startsWith("DeleteMapping")) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    @SuppressWarnings("unchecked")
-	private List<String> extractEndpointsFromMethod(MethodDeclaration method) {
-        List<String> endpoints = new ArrayList<>();
-        for (IExtendedModifier modifier : (List<IExtendedModifier>) method.modifiers()) {
-            if (modifier.isAnnotation()) {
-                Annotation annotation = (Annotation) modifier;
-                String annotationName = annotation.getTypeName().getFullyQualifiedName();
-                if (annotationName.startsWith("RequestMapping")
-                        || annotationName.startsWith("GetMapping")
-                        || annotationName.startsWith("PostMapping")
-                        || annotationName.startsWith("PutMapping")
-                        || annotationName.startsWith("DeleteMapping")) {
-                    endpoints.add(annotationName + extractAnnotationValue(annotation));
-                }
-            }
-        }
-        return endpoints;
-    }
-
-    @SuppressWarnings("unchecked")
-	private String extractAnnotationValue(Annotation annotation) {
-        if (annotation instanceof NormalAnnotation) {
-            NormalAnnotation normalAnnotation = (NormalAnnotation) annotation;
-            for (MemberValuePair pair : (List<MemberValuePair>) normalAnnotation.values()) {
-                if (pair.getName().toString().equals("value")) {
-                    return pair.getValue().toString();
-                }
-            }
-        }
-        return "";
+    private CompilationUnit parse(ICompilationUnit unit) {
+        @SuppressWarnings("deprecation")
+		ASTParser parser = ASTParser.newParser(AST.JLS_Latest);
+        parser.setKind(ASTParser.K_COMPILATION_UNIT);
+        parser.setSource(unit);
+        parser.setResolveBindings(true);
+        return (CompilationUnit) parser.createAST(null);
     }
 }
