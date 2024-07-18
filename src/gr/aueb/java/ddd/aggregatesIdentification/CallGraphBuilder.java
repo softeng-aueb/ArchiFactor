@@ -8,6 +8,8 @@ import java.util.*;
 
 public class CallGraphBuilder {
 
+    private String projectPackagePrefix;
+
     public Map<String, List<String>> buildCallGraph() throws JavaModelException {
         final Map<String, List<String>> callGraph = new HashMap<String, List<String>>();
         List<ICompilationUnit> compilationUnits = new ArrayList<ICompilationUnit>();
@@ -21,6 +23,10 @@ public class CallGraphBuilder {
 
             // Get all package fragments in the project
             IPackageFragment[] packageFragments = javaProject.getPackageFragments();
+
+            // Determine the project package prefix dynamically
+            projectPackagePrefix = determineProjectPackagePrefix(packageFragments);
+            System.out.println("Project Package Prefix: " + projectPackagePrefix); // Debugging log
 
             // Iterate through each package fragment
             for (IPackageFragment packageFragment : packageFragments) {
@@ -68,6 +74,31 @@ public class CallGraphBuilder {
         return callGraph;
     }
 
+    private String determineProjectPackagePrefix(IPackageFragment[] packageFragments) throws JavaModelException {
+        List<String> packageNames = new ArrayList<String>();
+        for (IPackageFragment packageFragment : packageFragments) {
+            if (packageFragment.getKind() == IPackageFragmentRoot.K_SOURCE) {
+                packageNames.add(packageFragment.getElementName());
+            }
+        }
+        return commonPrefix(packageNames);
+    }
+
+    private String commonPrefix(List<String> strings) {
+        if (strings.isEmpty()) return "";
+        strings.removeAll(Arrays.asList("", null));
+        String prefix = strings.get(0);
+        for (String s : strings) {
+            while (!s.startsWith(prefix)) {
+                prefix = prefix.substring(0, prefix.length() - 1);
+                if (prefix.isEmpty()) {
+                    return "";
+                }
+            }
+        }
+        return prefix;
+    }
+
     private void findMethodCalls(final String parentMethod, MethodDeclaration method, final List<String> callList, final HashSet<Object> hashSet) {
         method.accept(new ASTVisitor() {
             @Override
@@ -77,35 +108,38 @@ public class CallGraphBuilder {
                 if (methodBinding != null) {
                     ITypeBinding declaringClass = methodBinding.getDeclaringClass();
                     if (declaringClass != null) {
-                        final String fullyQualifiedMethodName = declaringClass.getName() + "." + calledMethod;
-                        System.out.println("Resolved call: " + parentMethod + " -> " + fullyQualifiedMethodName); // Debugging log
-                        if (!hashSet.contains(fullyQualifiedMethodName)) {
-                            hashSet.add(fullyQualifiedMethodName);
-                            callList.add(parentMethod + " -> " + fullyQualifiedMethodName);
+                        String fullyQualifiedClassName = declaringClass.getQualifiedName();
+                        if (fullyQualifiedClassName != null && fullyQualifiedClassName.startsWith(projectPackagePrefix)) {
+                            final String fullyQualifiedMethodName = fullyQualifiedClassName + "." + calledMethod;
+                            System.out.println("Resolved call: " + parentMethod + " -> " + fullyQualifiedMethodName); // Debugging log
+                            if (!hashSet.contains(fullyQualifiedMethodName)) {
+                                hashSet.add(fullyQualifiedMethodName);
+                                callList.add(fullyQualifiedMethodName);
 
-                            final IMethod method = (IMethod) methodBinding.getJavaElement();
-                            if (method != null) {
-                                ICompilationUnit cu = method.getCompilationUnit();
-                                if (cu != null) {
-                                    @SuppressWarnings("deprecation")
-                                    ASTParser parser = ASTParser.newParser(AST.JLS8);
-                                    parser.setKind(ASTParser.K_COMPILATION_UNIT);
-                                    parser.setSource(cu);
-                                    parser.setResolveBindings(true); // Enable bindings resolution
-                                    CompilationUnit unit = (CompilationUnit) parser.createAST(null);
-                                    unit.accept(new ASTVisitor() {
-                                        @Override
-                                        public boolean visit(TypeDeclaration type) {
-                                            if (type.getName().getIdentifier().equals(method.getDeclaringType().getElementName())) {
-                                                for (MethodDeclaration md : type.getMethods()) {
-                                                    if (md.getName().getIdentifier().equals(calledMethod)) {
-                                                        findMethodCalls(fullyQualifiedMethodName, md, callList, hashSet);
+                                final IMethod method = (IMethod) methodBinding.getJavaElement();
+                                if (method != null) {
+                                    ICompilationUnit cu = method.getCompilationUnit();
+                                    if (cu != null) {
+                                        @SuppressWarnings("deprecation")
+                                        ASTParser parser = ASTParser.newParser(AST.JLS8);
+                                        parser.setKind(ASTParser.K_COMPILATION_UNIT);
+                                        parser.setSource(cu);
+                                        parser.setResolveBindings(true); // Enable bindings resolution
+                                        CompilationUnit unit = (CompilationUnit) parser.createAST(null);
+                                        unit.accept(new ASTVisitor() {
+                                            @Override
+                                            public boolean visit(TypeDeclaration type) {
+                                                if (type.getName().getIdentifier().equals(method.getDeclaringType().getElementName())) {
+                                                    for (MethodDeclaration md : type.getMethods()) {
+                                                        if (md.getName().getIdentifier().equals(calledMethod)) {
+                                                            findMethodCalls(fullyQualifiedMethodName, md, callList, hashSet);
+                                                        }
                                                     }
                                                 }
+                                                return super.visit(type);
                                             }
-                                            return super.visit(type);
-                                        }
-                                    });
+                                        });
+                                    }
                                 }
                             }
                         }
