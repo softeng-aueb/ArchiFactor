@@ -4,12 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CallGraphNode {
-    private String methodName;
-    private List<CallGraphNode> calledMethods;
+    String methodName;
+    List<CallGraphNode> calledMethods;
 
     public CallGraphNode(String methodName) {
         this.methodName = methodName;
         this.calledMethods = new ArrayList<CallGraphNode>();
+    }
+
+    public void addCalledMethod(CallGraphNode node) {
+        this.calledMethods.add(node);
     }
 
     public String getMethodName() {
@@ -18,9 +22,5 @@ public class CallGraphNode {
 
     public List<CallGraphNode> getCalledMethods() {
         return calledMethods;
-    }
-
-    public void addCalledMethod(CallGraphNode calledMethod) {
-        this.calledMethods.add(calledMethod);
     }
 }

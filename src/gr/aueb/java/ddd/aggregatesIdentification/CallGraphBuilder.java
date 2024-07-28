@@ -1,6 +1,5 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
-import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.*;
 import org.eclipse.jdt.core.dom.*;
 
@@ -8,23 +7,24 @@ import java.util.*;
 
 public class CallGraphBuilder {
 
-    private String projectPackagePrefix;
+    private final IJavaProject javaProject;
+    private final String projectPackagePrefix;
+
+    public CallGraphBuilder(IJavaProject javaProject) throws JavaModelException {
+        this.javaProject = javaProject;
+        this.projectPackagePrefix = determineProjectPackagePrefix(javaProject.getPackageFragments());
+    }
 
     public List<CallGraph> buildCallGraphs() throws JavaModelException {
         final List<CallGraph> callGraphs = new ArrayList<CallGraph>();
         List<ICompilationUnit> compilationUnits = new ArrayList<ICompilationUnit>();
 
-        IJavaProject[] javaProjects = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProjects();
+        IPackageFragment[] packageFragments = javaProject.getPackageFragments();
 
-        for (IJavaProject javaProject : javaProjects) {
-            IPackageFragment[] packageFragments = javaProject.getPackageFragments();
-            projectPackagePrefix = determineProjectPackagePrefix(packageFragments);
-
-            for (IPackageFragment packageFragment : packageFragments) {
-                if (packageFragment.getKind() == IPackageFragmentRoot.K_SOURCE) {
-                    for (ICompilationUnit unit : packageFragment.getCompilationUnits()) {
-                        compilationUnits.add(unit);
-                    }
+        for (IPackageFragment packageFragment : packageFragments) {
+            if (packageFragment.getKind() == IPackageFragmentRoot.K_SOURCE) {
+                for (ICompilationUnit unit : packageFragment.getCompilationUnits()) {
+                    compilationUnits.add(unit);
                 }
             }
         }
@@ -47,7 +47,7 @@ public class CallGraphBuilder {
                                 String methodName = node.getName().getIdentifier() + "." + method.getName().getIdentifier();
                                 CallGraphNode rootNode = new CallGraphNode(methodName);
                                 callGraph.addNode(rootNode);
-                                findMethodCalls(rootNode, method, new HashSet<Object>());
+                                findMethodCalls(rootNode, method, new HashSet<String>());
                                 callGraphs.add(callGraph);
                             }
                         }
@@ -60,16 +60,16 @@ public class CallGraphBuilder {
         return callGraphs;
     }
 
-    private void findMethodCalls(final CallGraphNode parentNode, MethodDeclaration method, final HashSet<Object> hashSet) {
+    private void findMethodCalls(final CallGraphNode parentNode, MethodDeclaration method, final Set<String> visitedMethods) {
         method.accept(new ASTVisitor() {
             @Override
             public boolean visit(final MethodInvocation methodInvocation) {
                 IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
                 if (methodBinding != null) {
                     ITypeBinding declaringClass = methodBinding.getDeclaringClass();
-                    if (declaringClass != null) {
+                    if (declaringClass != null && declaringClass.getQualifiedName().startsWith(projectPackagePrefix)) {
                         String fullyQualifiedMethodName = declaringClass.getQualifiedName() + "." + methodInvocation.getName().getIdentifier();
-                        if (fullyQualifiedMethodName.startsWith(projectPackagePrefix) && hashSet.add(fullyQualifiedMethodName)) {
+                        if (visitedMethods.add(fullyQualifiedMethodName)) {
                             final CallGraphNode calledNode = new CallGraphNode(fullyQualifiedMethodName);
                             parentNode.addCalledMethod(calledNode);
                             final IMethod method = (IMethod) methodBinding.getJavaElement();
@@ -88,7 +88,7 @@ public class CallGraphBuilder {
                                             if (type.getName().getIdentifier().equals(method.getDeclaringType().getElementName())) {
                                                 for (MethodDeclaration md : type.getMethods()) {
                                                     if (md.getName().getIdentifier().equals(methodInvocation.getName().getIdentifier())) {
-                                                        findMethodCalls(calledNode, md, hashSet);
+                                                        findMethodCalls(calledNode, md, visitedMethods);
                                                     }
                                                 }
                                             }
@@ -110,7 +110,7 @@ public class CallGraphBuilder {
             if (modifier instanceof Annotation) {
                 Annotation annotation = (Annotation) modifier;
                 String annotationName = annotation.getTypeName().getFullyQualifiedName();
-                if (annotationName.equals("RestController") || annotationName.equals("Controller")) {
+                if (annotationName.equals("RestController") || annotationName.equals("Controller") || annotationName.equals("Path")) {
                     return true;
                 }
             }
@@ -125,7 +125,7 @@ public class CallGraphBuilder {
                 String annotationName = annotation.getTypeName().getFullyQualifiedName();
                 if (annotationName.equals("GetMapping") || annotationName.equals("PostMapping") ||
                         annotationName.equals("PutMapping") || annotationName.equals("DeleteMapping") ||
-                        annotationName.equals("RequestMapping")) {
+                        annotationName.equals("RequestMapping") || annotationName.equals("Path")) {
                     return true;
                 }
             }
