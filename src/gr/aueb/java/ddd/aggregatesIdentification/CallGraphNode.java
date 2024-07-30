@@ -5,11 +5,13 @@ import java.util.List;
 
 public class CallGraphNode {
     String methodName;
+    private boolean isEntityMethod;
     List<CallGraphNode> calledMethods;
 
     public CallGraphNode(String methodName) {
         this.methodName = methodName;
         this.calledMethods = new ArrayList<CallGraphNode>();
+        this.isEntityMethod = false;
     }
 
     public void addCalledMethod(CallGraphNode node) {
@@ -22,5 +24,13 @@ public class CallGraphNode {
 
     public List<CallGraphNode> getCalledMethods() {
         return calledMethods;
+    }
+    
+    public boolean isEntityMethod() {
+        return isEntityMethod;
+    }
+
+    public void setEntityMethod(boolean isEntityMethod) {
+        this.isEntityMethod = isEntityMethod;
     }
 }

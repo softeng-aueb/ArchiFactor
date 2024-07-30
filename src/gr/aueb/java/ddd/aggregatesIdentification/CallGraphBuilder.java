@@ -71,6 +71,7 @@ public class CallGraphBuilder {
                         String fullyQualifiedMethodName = declaringClass.getQualifiedName() + "." + methodInvocation.getName().getIdentifier();
                         if (visitedMethods.add(fullyQualifiedMethodName)) {
                             final CallGraphNode calledNode = new CallGraphNode(fullyQualifiedMethodName);
+                            calledNode.setEntityMethod(isEntityMethod(declaringClass, javaProject));
                             parentNode.addCalledMethod(calledNode);
                             final IMethod method = (IMethod) methodBinding.getJavaElement();
                             if (method != null) {
@@ -118,6 +119,42 @@ public class CallGraphBuilder {
         return false;
     }
 
+    private boolean isEntityMethod(ITypeBinding declaringClass, IJavaProject javaProject) {
+        try {
+            IType type = javaProject.findType(declaringClass.getQualifiedName());
+            if (type != null) {
+                ICompilationUnit cu = type.getCompilationUnit();
+                @SuppressWarnings("deprecation")
+				ASTParser parser = ASTParser.newParser(AST.JLS8);
+                parser.setKind(ASTParser.K_COMPILATION_UNIT);
+                parser.setSource(cu);
+                parser.setResolveBindings(true);
+                CompilationUnit unit = (CompilationUnit) parser.createAST(null);
+                final boolean[] isEntity = {false};
+                unit.accept(new ASTVisitor() {
+                    @Override
+                    public boolean visit(TypeDeclaration node) {
+                        for (Object modifier : node.modifiers()) {
+                            if (modifier instanceof Annotation) {
+                                Annotation annotation = (Annotation) modifier;
+                                String annotationName = annotation.getTypeName().getFullyQualifiedName();
+                                if (annotationName.equals("Entity")) {
+                                    isEntity[0] = true;
+                                    return false;
+                                }
+                            }
+                        }
+                        return super.visit(node);
+                    }
+                });
+                return isEntity[0];
+            }
+        } catch (JavaModelException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
     private boolean hasMappingAnnotation(MethodDeclaration method) {
         for (Object modifier : method.modifiers()) {
             if (modifier instanceof Annotation) {

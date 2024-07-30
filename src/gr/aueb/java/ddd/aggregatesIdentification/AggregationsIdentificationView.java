@@ -84,7 +84,11 @@ public class AggregationsIdentificationView extends ViewPart {
 
     private void appendCalls(StringBuilder sb, CallGraphNode node, String indent) {
         for (CallGraphNode calledMethod : node.getCalledMethods()) {
-            sb.append(indent).append(calledMethod.getMethodName()).append("\n");
+            sb.append(indent).append(calledMethod.getMethodName());
+            if(calledMethod.isEntityMethod()) {
+            	sb.append(" [Entity method]");
+            }
+            sb.append("\n");
             appendCalls(sb, calledMethod, indent + "  ");
         }
     }
