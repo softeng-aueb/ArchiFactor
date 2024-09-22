@@ -3,15 +3,21 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 import org.eclipse.jdt.core.*;
 import org.eclipse.jdt.core.dom.*;
 
+import gr.uom.java.ast.ClassObject;
+import gr.uom.java.ast.MethodObject;
+import gr.uom.java.ast.SystemObject;
+
 import java.util.*;
 
 public class CallGraphBuilder {
 
     private final IJavaProject javaProject;
+    private final SystemObject systemObject;
     private final String projectPackagePrefix;
 
-    public CallGraphBuilder(IJavaProject javaProject) throws JavaModelException {
+    public CallGraphBuilder(IJavaProject javaProject, SystemObject systemObject) throws JavaModelException {
         this.javaProject = javaProject;
+        this.systemObject = systemObject;
         this.projectPackagePrefix = determineProjectPackagePrefix(javaProject.getPackageFragments());
     }
 
@@ -60,7 +66,7 @@ public class CallGraphBuilder {
         return callGraphs;
     }
 
-    private void findMethodCalls(final CallGraphNode parentNode, MethodDeclaration method, final Set<String> visitedMethods) {
+    private void findMethodCalls(final CallGraphNode parentNode, final MethodDeclaration method, final Set<String> visitedMethods) {
         method.accept(new ASTVisitor() {
             @Override
             public boolean visit(final MethodInvocation methodInvocation) {
@@ -68,13 +74,18 @@ public class CallGraphBuilder {
                 if (methodBinding != null) {
                     ITypeBinding declaringClass = methodBinding.getDeclaringClass();
                     if (declaringClass != null && declaringClass.getQualifiedName().startsWith(projectPackagePrefix)) {
-                        String fullyQualifiedMethodName = declaringClass.getQualifiedName() + "." + methodInvocation.getName().getIdentifier();
-                        if (visitedMethods.add(fullyQualifiedMethodName)) {
-                            final CallGraphNode calledNode = new CallGraphNode(fullyQualifiedMethodName);
+                    	String fullClassName = declaringClass.getQualifiedName();
+                        String fulldMethodName = fullClassName + "." + methodInvocation.getName().getIdentifier();
+                        if (visitedMethods.add(fulldMethodName)) {
+                            final CallGraphNode calledNode = new CallGraphNode(fulldMethodName);
                             calledNode.setEntityMethod(isEntityMethod(declaringClass, javaProject));
-                            parentNode.addCalledMethod(calledNode);
                             final IMethod method = (IMethod) methodBinding.getJavaElement();
                             if (method != null) {
+	                            ClassObject classObjectOfMethod = systemObject.getClassObject(fullClassName);
+	                            MethodObject methodObject = (MethodObject) systemObject.getMethodObject(method);
+	                            calledNode.setClassObject(classObjectOfMethod);
+	                            calledNode.setMethodObject(methodObject);
+	                            parentNode.addCalledMethod(calledNode);
                                 ICompilationUnit cu = method.getCompilationUnit();
                                 if (cu != null) {
                                     @SuppressWarnings("deprecation")
@@ -194,4 +205,8 @@ public class CallGraphBuilder {
         }
         return prefix;
     }
+
+	public SystemObject getSystemObject() {
+		return systemObject;
+	}
 }

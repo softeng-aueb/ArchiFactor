@@ -1,5 +1,8 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
+import gr.aueb.java.ddd.aggregatesIdentification.SystemObjectProvider;
+import gr.uom.java.ast.SystemObject;
+
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
@@ -63,7 +66,8 @@ public class AggregationsIdentificationView extends ViewPart {
         String selectedProject = projectComboViewer.getCombo().getText();
         try {
             IJavaProject javaProject = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProject(selectedProject);
-            List<CallGraph> callGraphs = new CallGraphBuilder(javaProject).buildCallGraphs();
+			SystemObject sysObj = SystemObjectProvider.getSystemObject(javaProject);
+            List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
             displayCallGraphs(callGraphs);
         } catch (Exception e) {
             e.printStackTrace();
