@@ -61,6 +61,11 @@ public abstract class ClassDeclarationObject {
 		return commentList.listIterator();
 	}
 
+	
+	public List<CommentObject> getCommentList() {
+		return commentList;
+	}
+	
 	public int getNumberOfMethods() {
 		return methodList.size();
 	}

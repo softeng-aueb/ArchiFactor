@@ -92,6 +92,10 @@ public class ConstructorObject implements AbstractMethodDeclaration {
 		return commentList.listIterator();
 	}
 
+	public List<CommentObject> getCommentList() {
+		return commentList;
+	}
+	
 	public boolean addParameter(ParameterObject parameter) {
 		return parameterList.add(parameter);
 	}

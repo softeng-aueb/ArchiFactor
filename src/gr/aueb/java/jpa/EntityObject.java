@@ -1,6 +1,7 @@
 package gr.aueb.java.jpa;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -18,18 +19,30 @@ public class EntityObject {
 	private FieldObject idField; 
 	
 	
-	public EntityObject(ClassObject classObject, Set<FieldObject> associatedObjects) {
-		this.classObject = classObject;
-		this.associatedObjects = associatedObjects;
-	}
-	
-	
 	public EntityObject(ClassObject classObject) {
 		this.classObject = classObject;
 		this.associatedObjects = new HashSet<FieldObject>();
+		initialize();
 	}
 
 
+	private void initialize() {
+		Iterator<FieldObject> iter = classObject.getFieldIterator();
+		while (iter.hasNext()) {
+			FieldObject fieldObject = (FieldObject) iter.next();
+			for (Annotation ann : fieldObject.getAnnotations()) {
+				String name = ann.getTypeName().getFullyQualifiedName();
+				if ((name.equals("OneToMany") || (name.equals("ManyToOne")) || (name.equals("OneToOne"))
+						|| (name.equals("ManyToMany")))) {
+					addAssociatedObject(fieldObject);
+					
+				}
+				if (name.equals("Id")) {
+					setIdField(fieldObject);
+				}
+			}
+		}
+	}
 
 	public ClassObject getClassObject() {
 		return classObject;

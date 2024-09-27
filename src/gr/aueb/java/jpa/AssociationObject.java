@@ -9,10 +9,10 @@ public class AssociationObject {
 	boolean isBidirectional;
 	
 	
-	public AssociationObject(String type, EntityObject ownerClass, EntityObject ownedClass, boolean isBidirectional) {
+	public AssociationObject(String type, EntityObject ownerClass, EntityObject nonOwnerClass, boolean isBidirectional) {
 		this.type = type;
 		this.ownerClass = ownerClass;
-		this.ownedClass = ownedClass;
+		this.ownedClass = nonOwnerClass;
 		this.isBidirectional = isBidirectional;
 	}
 

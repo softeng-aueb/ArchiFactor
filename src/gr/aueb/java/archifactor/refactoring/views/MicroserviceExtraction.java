@@ -120,7 +120,6 @@ import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.ui.texteditor.ITextEditor;
 
 import gr.aueb.java.archifactor.refactoring.manipulators.BreakAssociationRefactoring;
-import gr.aueb.java.archifactor.util.JpaModelUtil;
 import gr.aueb.java.jpa.AssociationObject;
 import gr.aueb.java.jpa.EntityObject;
 import gr.aueb.java.jpa.JpaModel;
@@ -852,6 +851,9 @@ public class MicroserviceExtraction extends ViewPart {
 			}
 			SystemObject systemObject = ASTReader.getSystemObject();
 			RefactoringContext.getInstance().initialize(activeProject);
+			JpaModel jpaModel = new JpaModel();
+			jpaModel.initialize(systemObject);
+			entityClasses = new ArrayList<EntityObject>(jpaModel.getEntities());
 
 			if (systemObject != null) {
 				Set<ClassObject> classObjectsToBeExamined = new LinkedHashSet<ClassObject>();
@@ -892,7 +894,7 @@ public class MicroserviceExtraction extends ViewPart {
 						new JavaElementLabelProvider(), new DomainClassesContentProvider());
 				dialogPickClasses.setInput(RefactoringContext.getInstance().getTargetProject());
 
-				dialogPickClasses.setInitialSelections(rootPackages.toArray());
+				//dialogPickClasses.setInitialSelections(rootPackages.toArray());
 				dialogPickClasses.setTitle("Select Domain classes for Microservice extraction");
 				dialogPickClasses
 						.setMessage("Select the Domain class/classes you want to extract into the Microservice:");
@@ -949,29 +951,7 @@ public class MicroserviceExtraction extends ViewPart {
 							}
 						}
 					}
-					// Creating EntityObjects
-					if (JpaModel.isEntity(classOb)) {
-						EntityObject entityObject = new EntityObject(classOb);
-						Iterator iter = classOb.getFieldIterator();
-						while (iter.hasNext()) {
-							FieldObject fieldObject = (FieldObject) iter.next();
-							for (org.eclipse.jdt.core.dom.Annotation ann : fieldObject.getAnnotations()) {
-								String name = ann.getTypeName().getFullyQualifiedName();
-								if ((name.equals("OneToMany") || (name.equals("ManyToOne")) || (name.equals("OneToOne"))
-										|| (name.equals("ManyToMany")))) {
-									entityObject.addAssociatedObject(fieldObject);
-									fieldObject.getType().toString();
-									System.out.println(
-											classOb.getName() + "    " + fieldObject.getType().getGenericType());
-								}
-								if (name.equals("Id")) {
-									entityObject.setIdField(fieldObject);
-								}
-								// System.out.println(ann.getTypeName().getFullyQualifiedName());
-							}
-						}
-						entityClasses.add(entityObject);
-					}
+					
 					System.out.println("-------------------------");
 
 					for (ClassObject cl : chosenClasses) {
@@ -997,6 +977,7 @@ public class MicroserviceExtraction extends ViewPart {
 						}
 					}
 				}
+				
 				List<ClassObject> ExtraclassesToBeCopied = new ArrayList<ClassObject>();
 				for (ClassObject cl2 : classesToBeCopied) {
 					for (ClassObject classOb : classes) {
@@ -1087,93 +1068,9 @@ public class MicroserviceExtraction extends ViewPart {
 				for (ClassObject obj : classesToBeCopied) {
 					System.out.println("COPY   " + obj.getName());
 				}
-				/**/
+				
+				/** show results in table */
 
-				/*
-				 * for (SimpleName simpleName : simpleNames) { rewrite.replace(simpleName,
-				 * ast.newSimpleName("id"), null); }
-				 */
-				// TextEdit edits = rewrite.rewriteAST();
-
-				/*
-				 * List<SingleVariableDeclaration> parameters = methodDeclaration.parameters();
-				 * SingleVariableDeclaration newParameter =
-				 * astRoot.getAST().newSingleVariableDeclaration();
-				 * newParameter.setType(astRoot.getAST().newPrimitiveType(PrimitiveType.INT));
-				 * newParameter.setName(astRoot.getAST().newSimpleName("newParam"));
-				 */
-
-				// Replace the old parameter with the new one
-				// parameters.set(0, newParameter);
-				// ListRewrite parametersRewrite =
-				// rewriter.getListRewrite(astRoot.findDeclaringNode(methodDeclaration.resolveBinding().getKey()),
-				// MethodDeclaration.PARAMETERS_PROPERTY);
-				// rewriter.getListRewrite(methodDeclaration,
-				// MethodDeclaration.PARAMETERS_PROPERTY);
-				// parametersRewrite.insertLast(newParameter, null);
-
-				// rewriter.replace(methodDeclaration, methodDeclaration, null);
-
-				// Update the compilation unit
-
-				/*
-				 * for(ClassObject toMove:classesToBeMoved) { for(ClassObject
-				 * toCopy:classesToBeCopied) { ICompilationUnit cu =
-				 * (ICompilationUnit)toMove.getITypeRoot().getPrimaryElement(); ASTParser parser
-				 * = ASTParser.newParser(ASTReader.JLS);
-				 * parser.setKind(ASTParser.K_COMPILATION_UNIT); parser.setSource(cu);
-				 * parser.setResolveBindings(true); CompilationUnit astRoot = (CompilationUnit)
-				 * parser.createAST(null); astRoot.recordModifications();
-				 * //System.out.println(astRoot.imports()); ASTRewrite rewriter =
-				 * ASTRewrite.create(astRoot.getAST()); for (Object o : astRoot.imports()) {
-				 * ImportDeclaration importDeclaration = (ImportDeclaration) o;
-				 * //System.out.println(importDeclaration.getName().getFullyQualifiedName()+"  "
-				 * +toCopy.getName()); if
-				 * (importDeclaration.getName().getFullyQualifiedName().equals(toCopy.getName())
-				 * ) { System.out.println(toMove.getName()+"  "+toCopy.getName()); ListRewrite
-				 * listRewrite = rewriter.getListRewrite(astRoot,
-				 * CompilationUnit.IMPORTS_PROPERTY); String[] arr =
-				 * toCopy.getName().split("\\.");
-				 * System.out.println("hello                        "+arr.length);
-				 * ImportDeclaration id = astRoot.getAST().newImportDeclaration();
-				 * id.setName(astRoot.getAST().newName(new String[] {arr[0], arr[1],
-				 * "Microservice", arr[3], arr[4]})); listRewrite.replace(importDeclaration,id,
-				 * null); ImportRewrite importRewrite =
-				 * CodeStyleConfiguration.createImportRewrite(astRoot, true); TextEdit
-				 * importEdits = importRewrite.rewriteImports(null); TextEdit edits =
-				 * rewriter.rewriteAST(); edits.addChild(importEdits); Document document = new
-				 * Document(cu.getSource()); edits.apply(document);
-				 * cu.getBuffer().setContents(document.get()); cu.save(null, true); } } } }
-				 */
-
-				/*
-				 * ICompilationUnit cu = selectedType.getCompilationUnit();
-				 * RefactoringContribution contribution =
-				 * RefactoringCore.getRefactoringContribution(IJavaRefactorings.MOVE);
-				 * //RefactoringDescriptor descriptor=contribution.createDescriptor();
-				 * IPackageFragment[] roots =
-				 * selectedType.getTypeRoot().getJavaProject().getPackageFragments();
-				 * System.out.println(roots[11].getElementName()); MoveDescriptor descriptor =
-				 * (MoveDescriptor)contribution.createDescriptor();
-				 * descriptor.setProject(cu.getResource().getProject().getName( ));
-				 * //descriptor.setDestination(cu.getResource().getParent()); // new name for a
-				 * Class descriptor.setDestination((IJavaElement)roots[11]);
-				 * //System.out.println(brFile.getITypeRoot().getResource().getParent().
-				 * getParent()); descriptor.setUpdateReferences(true); ICompilationUnit[] moved
-				 * = {cu}; IFile[] files = {}; IFolder[] folders = {};
-				 * descriptor.setMoveResources(files, folders, moved); RefactoringStatus status
-				 * = new RefactoringStatus(); try { Refactoring refactoring =
-				 * descriptor.createRefactoring(status);
-				 * 
-				 * IProgressMonitor monitor = new NullProgressMonitor();
-				 * refactoring.checkInitialConditions(monitor);
-				 * refactoring.checkFinalConditions(monitor); Change change =
-				 * refactoring.createChange(monitor); change.perform(monitor);
-				 * 
-				 * } catch (CoreException e) { // TODO Auto-generated catch block
-				 * e.printStackTrace(); } catch (Exception e) { // TODO Auto-generated catch
-				 * block e.printStackTrace(); }
-				 */
 				final Set<String> classNamesToBeExamined = new LinkedHashSet<String>();
 				for (ClassObject classObject : classObjectsToBeExamined) {
 					if (!classObject.isEnum() && !classObject.isInterface()
@@ -1261,6 +1158,8 @@ public class MicroserviceExtraction extends ViewPart {
 		}
 		
 		IPath path = (IPath) result[0];
+		// remove the project name from the path
+		path = path.removeFirstSegments(1);
 		IResource destinationPkgResource = refactoringContext.getProjectContainer().findMember(path);
 		return destinationPkgResource;
 	}

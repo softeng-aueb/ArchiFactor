@@ -223,7 +223,7 @@ public class ASTReader {
 		return innerTypeDeclarations;
 	}
 
-	private List<ClassObject> parseAST(ICompilationUnit iCompilationUnit) {
+	public static List<ClassObject> parseAST(ICompilationUnit iCompilationUnit) {
 		ASTInformationGenerator.setCurrentITypeRoot(iCompilationUnit);
 		IFile iFile = (IFile)iCompilationUnit.getResource();
         ASTParser parser = ASTParser.newParser(JLS);
@@ -235,7 +235,7 @@ public class ASTReader {
         return parseAST(compilationUnit, iFile);
 	}
 
-	private List<ClassObject> parseAST(CompilationUnit compilationUnit, IFile iFile) {
+	private static List<ClassObject> parseAST(CompilationUnit compilationUnit, IFile iFile) {
 		ITextFileBufferManager bufferManager = FileBuffers.getTextFileBufferManager();
 		IPath path = compilationUnit.getJavaElement().getPath();
 		try {
@@ -274,7 +274,7 @@ public class ASTReader {
         return classObjects;
 	}
 
-	private List<CommentObject> processComments(IFile iFile, IDocument iDocument,
+	private static List<CommentObject> processComments(IFile iFile, IDocument iDocument,
 			AbstractTypeDeclaration typeDeclaration, List<Comment> comments) {
 		List<CommentObject> commentList = new ArrayList<CommentObject>();
 		int typeDeclarationStartPosition = typeDeclaration.getStartPosition();
@@ -315,7 +315,7 @@ public class ASTReader {
 		return commentList;
 	}
 
-	private ClassObject processTypeDeclaration(IFile iFile, IDocument document, TypeDeclaration typeDeclaration, List<Comment> comments) {
+	private static ClassObject processTypeDeclaration(IFile iFile, IDocument document, TypeDeclaration typeDeclaration, List<Comment> comments) {
 		final ClassObject classObject = new ClassObject();
 		classObject.setIFile(iFile);
 		classObject.addComments(processComments(iFile, document, typeDeclaration, comments));
@@ -387,7 +387,7 @@ public class ASTReader {
 		return classObject;
 	}
 
-	private ClassObject processEnumDeclaration(IFile iFile, IDocument document, EnumDeclaration enumDeclaration, List<Comment> comments) {
+	private static ClassObject processEnumDeclaration(IFile iFile, IDocument document, EnumDeclaration enumDeclaration, List<Comment> comments) {
 		final ClassObject classObject = new ClassObject();
 		classObject.setEnum(true);
 		classObject.setIFile(iFile);
@@ -444,7 +444,7 @@ public class ASTReader {
 		return classObject;
 	}
 
-	private void processFieldDeclaration(final ClassObject classObject, FieldDeclaration fieldDeclaration) {
+	private static void processFieldDeclaration(final ClassObject classObject, FieldDeclaration fieldDeclaration) {
 		Type fieldType = fieldDeclaration.getType();
 		ITypeBinding binding = fieldType.resolveBinding();
 		List<CommentObject> fieldDeclarationComments = new ArrayList<CommentObject>();
@@ -493,7 +493,7 @@ public class ASTReader {
 		}
 	}
 
-	private void processMethodDeclaration(final ClassObject classObject, MethodDeclaration methodDeclaration) {
+	private static void processMethodDeclaration(final ClassObject classObject, MethodDeclaration methodDeclaration) {
 		String methodName = methodDeclaration.getName().getIdentifier();
 		final ConstructorObject constructorObject = new ConstructorObject();
 		constructorObject.setMethodDeclaration(methodDeclaration);

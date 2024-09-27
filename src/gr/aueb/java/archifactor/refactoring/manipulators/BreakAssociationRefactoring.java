@@ -59,19 +59,18 @@ import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringContribution;
 import org.eclipse.ltk.core.refactoring.RefactoringCore;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
-import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import org.eclipse.text.edits.MultiTextEdit;
 import org.eclipse.text.edits.TextEdit;
 import org.eclipse.text.edits.TextEditGroup;
 import org.eclipse.ui.PartInitException;
 
+import gr.aueb.java.archifactor.util.ASTParserFactory;
 import gr.aueb.java.jpa.AssociationObject;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodObject;
 import gr.uom.java.jdeodorant.refactoring.manipulators.ExtractAttributeSlice;
-import gr.uom.java.jdeodorant.refactoring.views.MyRefactoringWizard;
 
 public class BreakAssociationRefactoring {
 
@@ -126,7 +125,9 @@ public class BreakAssociationRefactoring {
 		String[] typeName = association.getOwnedClass().getIdField().getType().toString().split("\\.");
         this.FKtype=typeName[typeName.length-1];
         
-        org.eclipse.jdt.core.dom.Annotation joinColumnAnnotation = association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getAnnotations().get(1);
+        NormalAnnotation joinColumnAnnotation = (NormalAnnotation) association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject()).getAnnotations().get(1);
+//        joinColumnAnnotation.values().stream()
+//        .filter(v ->)
         String s = new StringBuilder().append('"').toString();
         String[] arr = joinColumnAnnotation.toString().split(s);
         this.FKfieldName = arr[1];
@@ -150,9 +151,9 @@ public class BreakAssociationRefactoring {
 		
 		extractOwnerServiceClass();
 		
-		updateReferences(newExtractedMethods,extractedMethodNamesWithThisExpression);
+		//updateReferences(newExtractedMethods,extractedMethodNamesWithThisExpression);
 		
-		renameGetterSetterMethodsOfOwnerClass();
+		//renameGetterSetterMethodsOfOwnerClass();
 		
 		IJavaProject project = cu.getJavaProject();
 		return project;
@@ -215,18 +216,20 @@ public class BreakAssociationRefactoring {
 	
 	public Set<MethodDeclaration> extractOwnedServiceClass() {
 		IFile sourceFile = association.getOwnedClass().getClassObject().getIFile();
-		ICompilationUnit cu = (ICompilationUnit)association.getOwnedClass().getClassObject().getITypeRoot().getPrimaryElement();
+		ICompilationUnit cu = (ICompilationUnit)association.getOwnedClass()
+				.getClassObject().getITypeRoot().getPrimaryElement();
+		
 		Set<VariableDeclaration> extractedFieldFragments = new LinkedHashSet<VariableDeclaration>();
-		extractedFieldFragments.add(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()).getVariableDeclaration());
-		final Set<MethodDeclaration> extractedMethods = association.getOwnedClass().getMethodDeclarationsByField(association.getOwnedClass().getAssociatedObjectByClass(association.getOwnerClass().getClassObject()));
+		extractedFieldFragments.add(association.getOwnedClass()
+				.getAssociatedObjectByClass(association.getOwnerClass().getClassObject()).getVariableDeclaration());
+		final Set<MethodDeclaration> extractedMethods = association.getOwnedClass()
+				.getMethodDeclarationsByField(association.getOwnedClass()
+						.getAssociatedObjectByClass(association.getOwnerClass().getClassObject()));
 		Set<MethodDeclaration> delegateMethods = new LinkedHashSet<MethodDeclaration>();
 		
-
 		
-		ASTParser parser2 = ASTParser.newParser(ASTReader.JLS);
-		parser2.setKind(ASTParser.K_COMPILATION_UNIT);
+		ASTParser parser2 = ASTParserFactory.getParser();
 		parser2.setSource(cu);
-        parser2.setResolveBindings(true);
         
         
         final Set<MethodDeclaration> newExtractedMethods = new HashSet<MethodDeclaration>();
@@ -324,8 +327,6 @@ public class BreakAssociationRefactoring {
         sourceCompilationUnitChange.setEdit(sourceMultiTextEdit);
         compilationUnitChanges.put(cuOwner, sourceCompilationUnitChange);
         
-        
-        
         FieldObject fieldObject = association.getOwnerClass().getAssociatedObjectByClass(association.getOwnedClass().getClassObject());
         final FieldDeclaration fieldDeclaration = (FieldDeclaration)fieldObject.getVariableDeclaration().getParent();
 		final CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
@@ -355,12 +356,15 @@ public class BreakAssociationRefactoring {
 		            literal.setLiteralValue(FKfieldName);
 		            pair.setValue(literal);
 		            annotation.values().add(pair);
+		            
+		            // replace Entity reference field with primitive id field
 		            rewriter.getListRewrite(newFieldDeclaration, FieldDeclaration.MODIFIERS2_PROPERTY).insertFirst(annotation, null);
-
-		            // Replace the old FieldDeclaration node with the new one
-		            //TypeDeclaration typeDeclaration = (TypeDeclaration) astRoot.types().get(0);
-		            //ListRewrite listRewriteTypeDecl = rewriter.getListRewrite(typeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
 		            rewriter.replace(node, newFieldDeclaration, null);
+		            
+//		            ASTNode typeDeclaration = node.getParent();
+//		            rewriter.getListRewrite(typeDeclaration, TypeDeclaration.BODY_DECLARATIONS_PROPERTY)
+//		            	.insertBefore(newFieldDeclaration, node, null);
+		            
 		        }
 		        return true;
 		    }
