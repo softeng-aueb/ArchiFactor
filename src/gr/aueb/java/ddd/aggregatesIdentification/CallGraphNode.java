@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
+import gr.uom.java.ast.decomposition.cfg.AbstractVariable;
 
 public class CallGraphNode {
 	MethodObject methodObject;
 	ClassObject classObject;
     String methodName;
     private boolean isEntityMethod;
+    List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
 
     public CallGraphNode(String methodName) {
@@ -20,6 +22,10 @@ public class CallGraphNode {
 
     public void addCalledMethod(CallGraphNode node) {
         this.calledMethods.add(node);
+    }
+    
+    public void setDefinedFields(List<AbstractVariable> list) {
+    	this.definedFields = list;
     }
 
     public String getMethodName() {
@@ -33,7 +39,7 @@ public class CallGraphNode {
     public boolean isEntityMethod() {
         return isEntityMethod;
     }
-
+ 
     public void setEntityMethod(boolean isEntityMethod) {
         this.isEntityMethod = isEntityMethod;
     }

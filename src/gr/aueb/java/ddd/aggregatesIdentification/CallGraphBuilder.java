@@ -6,6 +6,8 @@ import org.eclipse.jdt.core.dom.*;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
 import gr.uom.java.ast.SystemObject;
+import gr.uom.java.ast.decomposition.cfg.AbstractVariable;
+// import gr.uom.java.ast.decomposition.cfg.PlainVariable;
 
 import java.util.*;
 
@@ -85,6 +87,7 @@ public class CallGraphBuilder {
 	                            MethodObject methodObject = (MethodObject) systemObject.getMethodObject(method);
 	                            calledNode.setClassObject(classObjectOfMethod);
 	                            calledNode.setMethodObject(methodObject);
+	                            calledNode.setDefinedFields(getDefinedAttributes(methodObject));
 	                            parentNode.addCalledMethod(calledNode);
                                 ICompilationUnit cu = method.getCompilationUnit();
                                 if (cu != null) {
@@ -128,6 +131,15 @@ public class CallGraphBuilder {
             }
         }
         return false;
+    }
+    
+    private List<AbstractVariable> getDefinedAttributes(MethodObject method) {
+    	ArrayList<AbstractVariable> combinedList = new ArrayList<AbstractVariable>();
+        combinedList.addAll(method.getNonDistinctDefinedFieldsThroughFields());
+        // combinedList.addAll(method.getNonDistinctDefinedFieldsThroughLocalVariables());
+        combinedList.addAll(method.getNonDistinctDefinedFieldsThroughParameters());
+        combinedList.addAll(method.getNonDistinctDefinedFieldsThroughThisReference());
+        return combinedList;
     }
 
     private boolean isEntityMethod(ITypeBinding declaringClass, IJavaProject javaProject) {
