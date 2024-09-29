@@ -91,11 +91,11 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append(indent).append(calledMethod.getMethodName());
             if(calledMethod.isEntityMethod()) {
             	sb.append(" [Entity method]");
-            	if (node.definedFields != null && node.definedFields.size() != 0) {
+            	if (calledMethod.definedFields != null && calledMethod.definedFields.size() != 0) {
                 	sb.append(" [Changes: ");
-                	for(int i = 0; i < node.definedFields.size(); i++) {
-                		sb.append(node.definedFields.get(i).getVariableName());
-                		sb.append(", ");
+                	for (int i = 0; i < calledMethod.definedFields.size(); i++) {
+                		sb.append(calledMethod.definedFields.get(i).getVariableName());
+                		if (i != calledMethod.definedFields.size() - 1)	sb.append(", ");
                 	}
                 	sb.append("]");
             	}

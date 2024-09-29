@@ -10,7 +10,8 @@ public class CallGraphNode {
 	MethodObject methodObject;
 	ClassObject classObject;
     String methodName;
-    private boolean isEntityMethod;
+    boolean isEntityMethod;
+    boolean isTransactional;
     List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
 
