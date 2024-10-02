@@ -78,7 +78,11 @@ public class AggregationsIdentificationView extends ViewPart {
     private void displayCallGraphs(List<CallGraph> callGraphs) {
         StringBuilder sb = new StringBuilder();
         for (CallGraph callGraph : callGraphs) {
-            sb.append("Endpoint: ").append(callGraph.getRoot().getMethodName()).append("\n");
+            sb.append("Endpoint: ").append(callGraph.getRoot().getMethodName());
+            if(callGraph.getRoot().isTransactional) {
+            	sb.append(" [Transactional]");
+            }
+            sb.append("\n");
             sb.append("Calls: \n");
             appendCalls(sb, callGraph.getRoot(), "  ");
             sb.append("\n");

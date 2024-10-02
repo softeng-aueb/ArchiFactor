@@ -88,6 +88,10 @@ public class CallGraphBuilder {
 	                            calledNode.setClassObject(classObjectOfMethod);
 	                            calledNode.setMethodObject(methodObject);
 	                            calledNode.setDefinedFields(getDefinedAttributes(methodObject));
+	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0) {
+	                            	calledNode.isTransactional = true;
+	                            	parentNode.isTransactional = true;
+	                            }
 	                            parentNode.addCalledMethod(calledNode);
                                 ICompilationUnit cu = method.getCompilationUnit();
                                 if (cu != null) {
@@ -104,6 +108,9 @@ public class CallGraphBuilder {
                                                 for (MethodDeclaration md : type.getMethods()) {
                                                     if (md.getName().getIdentifier().equals(methodInvocation.getName().getIdentifier())) {
                                                         findMethodCalls(calledNode, md, visitedMethods);
+                                                        if(calledNode.isTransactional) {
+                                                        	parentNode.isTransactional = true;
+                                                        }
                                                     }
                                                 }
                                             }
