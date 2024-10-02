@@ -1,6 +1,7 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
@@ -12,6 +13,8 @@ public class CallGraphNode {
     String methodName;
     boolean isEntityMethod;
     boolean isTransactional;
+    HashSet<String> accessedEntities;
+    HashSet<String> definedEntities;
     List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
 
@@ -19,6 +22,8 @@ public class CallGraphNode {
         this.methodName = methodName;
         this.calledMethods = new ArrayList<CallGraphNode>();
         this.isEntityMethod = false;
+        this.accessedEntities = new HashSet<String>();
+        this.definedEntities = new HashSet<String>();
     }
 
     public void addCalledMethod(CallGraphNode node) {

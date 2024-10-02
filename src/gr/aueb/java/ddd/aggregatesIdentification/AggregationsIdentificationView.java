@@ -1,6 +1,5 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
-import gr.aueb.java.ddd.aggregatesIdentification.SystemObjectProvider;
 import gr.uom.java.ast.SystemObject;
 
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -83,6 +82,10 @@ public class AggregationsIdentificationView extends ViewPart {
             	sb.append(" [Transactional]");
             }
             sb.append("\n");
+            sb.append("Accessed Entities: ");
+            sb.append(callGraph.getRoot().accessedEntities.toString()).append("\n");
+            sb.append("Defined Entities: ");
+            sb.append(callGraph.getRoot().definedEntities.toString()).append("\n");
             sb.append("Calls: \n");
             appendCalls(sb, callGraph.getRoot(), "  ");
             sb.append("\n");

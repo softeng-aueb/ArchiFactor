@@ -80,7 +80,12 @@ public class CallGraphBuilder {
                         String fulldMethodName = fullClassName + "." + methodInvocation.getName().getIdentifier();
                         if (visitedMethods.add(fulldMethodName)) {
                             final CallGraphNode calledNode = new CallGraphNode(fulldMethodName);
-                            calledNode.setEntityMethod(isEntityMethod(declaringClass, javaProject));
+                            // Check if entity Method
+                            boolean isEntity = isEntityMethod(declaringClass, javaProject);
+                            calledNode.setEntityMethod(isEntity);
+                            if(isEntity) {
+                            	calledNode.accessedEntities.add(declaringClass.getName());
+                            }
                             final IMethod method = (IMethod) methodBinding.getJavaElement();
                             if (method != null) {
 	                            ClassObject classObjectOfMethod = systemObject.getClassObject(fullClassName);
@@ -88,8 +93,9 @@ public class CallGraphBuilder {
 	                            calledNode.setClassObject(classObjectOfMethod);
 	                            calledNode.setMethodObject(methodObject);
 	                            calledNode.setDefinedFields(getDefinedAttributes(methodObject));
-	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0) {
+	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0 &&  calledNode.isEntityMethod()) {
 	                            	calledNode.isTransactional = true;
+	                            	calledNode.definedEntities.add(declaringClass.getName());
 	                            	parentNode.isTransactional = true;
 	                            }
 	                            parentNode.addCalledMethod(calledNode);
@@ -108,6 +114,8 @@ public class CallGraphBuilder {
                                                 for (MethodDeclaration md : type.getMethods()) {
                                                     if (md.getName().getIdentifier().equals(methodInvocation.getName().getIdentifier())) {
                                                         findMethodCalls(calledNode, md, visitedMethods);
+                                                        parentNode.accessedEntities.addAll(calledNode.accessedEntities);
+                                                        parentNode.definedEntities.addAll(calledNode.definedEntities);
                                                         if(calledNode.isTransactional) {
                                                         	parentNode.isTransactional = true;
                                                         }
