@@ -54,6 +54,9 @@ public class CallGraphBuilder {
                                 CallGraph callGraph = new CallGraph();
                                 String methodName = node.getName().getIdentifier() + "." + method.getName().getIdentifier();
                                 CallGraphNode rootNode = new CallGraphNode(methodName);
+                                if(isTransactional(method)) {
+                                	rootNode.transactional = true;
+                                }
                                 callGraph.addNode(rootNode);
                                 findMethodCalls(rootNode, method, new HashSet<String>());
                                 callGraphs.add(callGraph);
@@ -89,14 +92,16 @@ public class CallGraphBuilder {
                             final IMethod method = (IMethod) methodBinding.getJavaElement();
                             if (method != null) {
 	                            ClassObject classObjectOfMethod = systemObject.getClassObject(fullClassName);
+	                        	// List<Association> associations = AssociationDetection.getAssociationsOfClass(classObjectOfMethod);
 	                            MethodObject methodObject = (MethodObject) systemObject.getMethodObject(method);
 	                            calledNode.setClassObject(classObjectOfMethod);
 	                            calledNode.setMethodObject(methodObject);
 	                            calledNode.setDefinedFields(getDefinedAttributes(methodObject));
+	                            calledNode.isReadOnly = true;
 	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0 &&  calledNode.isEntityMethod()) {
-	                            	calledNode.isTransactional = true;
+	                            	calledNode.isReadOnly = false;
 	                            	calledNode.definedEntities.add(declaringClass.getName());
-	                            	parentNode.isTransactional = true;
+	                            	parentNode.isReadOnly = false;
 	                            }
 	                            parentNode.addCalledMethod(calledNode);
                                 ICompilationUnit cu = method.getCompilationUnit();
@@ -116,8 +121,8 @@ public class CallGraphBuilder {
                                                         findMethodCalls(calledNode, md, visitedMethods);
                                                         parentNode.accessedEntities.addAll(calledNode.accessedEntities);
                                                         parentNode.definedEntities.addAll(calledNode.definedEntities);
-                                                        if(calledNode.isTransactional) {
-                                                        	parentNode.isTransactional = true;
+                                                        if(calledNode.transactional) {
+                                                        	parentNode.transactional = true;
                                                         }
                                                     }
                                                 }
@@ -141,6 +146,19 @@ public class CallGraphBuilder {
                 Annotation annotation = (Annotation) modifier;
                 String annotationName = annotation.getTypeName().getFullyQualifiedName();
                 if (annotationName.equals("RestController") || annotationName.equals("Controller") || annotationName.equals("Path")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    private boolean isTransactional(MethodDeclaration method) {
+        for (Object modifier : method.modifiers()) {
+            if (modifier instanceof Annotation) {
+                Annotation annotation = (Annotation) modifier;
+                String annotationName = annotation.getTypeName().getFullyQualifiedName();
+                if (annotationName.equals("Transactional")) {
                     return true;
                 }
             }

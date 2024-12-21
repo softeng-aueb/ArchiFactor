@@ -1,6 +1,7 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
 import gr.uom.java.ast.SystemObject;
+import gr.uom.java.ast.association.AssociationDetection;
 
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.IJavaProject;
@@ -64,9 +65,16 @@ public class AggregationsIdentificationView extends ViewPart {
     private void runAggregationIdentification() {
         String selectedProject = projectComboViewer.getCombo().getText();
         try {
+//            JpaModel jpaModel = new JpaModel();
+//            List<EntityObject> entities = jpaModel.getEntities();
+//            System.out.print(entities);
             IJavaProject javaProject = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProject(selectedProject);
 			SystemObject sysObj = SystemObjectProvider.getSystemObject(javaProject);
-            List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
+			
+			AssociationDetection assosciationsMapper = new AssociationDetection(sysObj);
+			System.out.print(assosciationsMapper);
+            
+			List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
             displayCallGraphs(callGraphs);
         } catch (Exception e) {
             e.printStackTrace();
@@ -78,7 +86,10 @@ public class AggregationsIdentificationView extends ViewPart {
         StringBuilder sb = new StringBuilder();
         for (CallGraph callGraph : callGraphs) {
             sb.append("Endpoint: ").append(callGraph.getRoot().getMethodName());
-            if(callGraph.getRoot().isTransactional) {
+            if(callGraph.getRoot().isReadOnly) {
+            	sb.append(" [ReadOnly]");
+            }
+            if(callGraph.getRoot().transactional) {
             	sb.append(" [Transactional]");
             }
             sb.append("\n");
@@ -98,6 +109,9 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append(indent).append(calledMethod.getMethodName());
             if(calledMethod.isEntityMethod()) {
             	sb.append(" [Entity method]");
+            	if(calledMethod.isReadOnly) {
+            		sb.append(" [ReadOnly]");
+            	}
             	if (calledMethod.definedFields != null && calledMethod.definedFields.size() != 0) {
                 	sb.append(" [Changes: ");
                 	for (int i = 0; i < calledMethod.definedFields.size(); i++) {
