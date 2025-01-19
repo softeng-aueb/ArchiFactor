@@ -6,6 +6,8 @@ import org.eclipse.jdt.core.dom.*;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
 import gr.uom.java.ast.SystemObject;
+//import gr.uom.java.ast.association.Association;
+//import gr.uom.java.ast.association.AssociationDetection;
 import gr.uom.java.ast.decomposition.cfg.AbstractVariable;
 // import gr.uom.java.ast.decomposition.cfg.PlainVariable;
 
@@ -80,6 +82,7 @@ public class CallGraphBuilder {
                     ITypeBinding declaringClass = methodBinding.getDeclaringClass();
                     if (declaringClass != null && declaringClass.getQualifiedName().startsWith(projectPackagePrefix)) {
                     	String fullClassName = declaringClass.getQualifiedName();
+                    	ClassObject classObjecOfEntity = systemObject.getClassObject(fullClassName);
                         String fulldMethodName = fullClassName + "." + methodInvocation.getName().getIdentifier();
                         if (visitedMethods.add(fulldMethodName)) {
                             final CallGraphNode calledNode = new CallGraphNode(fulldMethodName);
@@ -88,11 +91,12 @@ public class CallGraphBuilder {
                             calledNode.setEntityMethod(isEntity);
                             if(isEntity) {
                             	calledNode.accessedEntities.add(declaringClass.getName());
+                            	calledNode.allEntities.add(classObjecOfEntity);
+                            	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
                             }
                             final IMethod method = (IMethod) methodBinding.getJavaElement();
                             if (method != null) {
 	                            ClassObject classObjectOfMethod = systemObject.getClassObject(fullClassName);
-	                        	// List<Association> associations = AssociationDetection.getAssociationsOfClass(classObjectOfMethod);
 	                            MethodObject methodObject = (MethodObject) systemObject.getMethodObject(method);
 	                            calledNode.setClassObject(classObjectOfMethod);
 	                            calledNode.setMethodObject(methodObject);
@@ -101,6 +105,8 @@ public class CallGraphBuilder {
 	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0 &&  calledNode.isEntityMethod()) {
 	                            	calledNode.isReadOnly = false;
 	                            	calledNode.definedEntities.add(declaringClass.getName());
+	                            	calledNode.allEntities.add(calledNode.classObject);
+	                            	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
 	                            	parentNode.isReadOnly = false;
 	                            }
 	                            parentNode.addCalledMethod(calledNode);
@@ -121,6 +127,8 @@ public class CallGraphBuilder {
                                                         findMethodCalls(calledNode, md, visitedMethods);
                                                         parentNode.accessedEntities.addAll(calledNode.accessedEntities);
                                                         parentNode.definedEntities.addAll(calledNode.definedEntities);
+                                                        parentNode.allEntities.addAll(calledNode.allEntities);
+                                                        parentNode.allEntitiesNames.addAll(calledNode.allEntitiesNames);
                                                         if(calledNode.transactional) {
                                                         	parentNode.transactional = true;
                                                         }

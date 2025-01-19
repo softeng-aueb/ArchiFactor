@@ -1,6 +1,8 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
+import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.SystemObject;
+import gr.uom.java.ast.association.Association;
 import gr.uom.java.ast.association.AssociationDetection;
 
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -16,7 +18,14 @@ import org.eclipse.swt.widgets.*;
 import org.eclipse.ui.part.ViewPart;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+//import java.util.Collections;
+//import java.util.Comparator;
+//import java.util.HashMap;
 import java.util.List;
+//import java.util.Map;
+//import java.util.Set;
+import java.util.Set;
 
 public class AggregationsIdentificationView extends ViewPart {
     public static final String ID = "gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView";
@@ -65,16 +74,45 @@ public class AggregationsIdentificationView extends ViewPart {
     private void runAggregationIdentification() {
         String selectedProject = projectComboViewer.getCombo().getText();
         try {
-//            JpaModel jpaModel = new JpaModel();
-//            List<EntityObject> entities = jpaModel.getEntities();
-//            System.out.print(entities);
+        	
+        	// Detect project
             IJavaProject javaProject = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProject(selectedProject);
 			SystemObject sysObj = SystemObjectProvider.getSystemObject(javaProject);
-			
-			AssociationDetection assosciationsMapper = new AssociationDetection(sysObj);
-			System.out.print(assosciationsMapper);
             
+			// Create call graphs
 			List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
+			
+			// Initialize clustering graph
+			ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
+			for (CallGraph callGraph : callGraphs) {
+	            for(ClassObject entity : callGraph.getRoot().allEntities) {
+	            	clusteringGraph.addVertex(entity);
+	            }
+	        }
+			
+			// Create associations mapping
+			AssociationDetection associationsMapper = new AssociationDetection(sysObj);
+			System.out.print(associationsMapper);
+			// Add edges to associations
+			// Set<ClassObject> vertices = clusteringGraph.getVertices();
+			Set<ClassObject> vertices = new HashSet<ClassObject>();
+			vertices.addAll(clusteringGraph.getVertices());
+			for (ClassObject vertex : vertices) {
+				List<Association> associations = associationsMapper.getAssociationsOfClass(vertex);
+				for (Association association : associations) {
+					ClassObject toVertex = sysObj.getClassObject(association.getTo());
+					clusteringGraph.addEdge(vertex,  toVertex, 1.0);
+				}
+			}
+
+        	LouvainClustering<ClassObject> louvain = new LouvainClustering<ClassObject>();
+        	List<Set<ClassObject>> clusters = louvain.louvainClustering(clusteringGraph);
+
+        	for (Set<ClassObject> cluster : clusters) {
+        	    System.out.println("Cluster: " + cluster);
+        	}
+			// End of Testing
+        	 
             displayCallGraphs(callGraphs);
         } catch (Exception e) {
             e.printStackTrace();
@@ -124,8 +162,8 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append("\n");
             appendCalls(sb, calledMethod, indent + "  ");
         }
-    }
-
+    }    
+    
     @Override
     public void setFocus() {
         text.setFocus();

@@ -16,6 +16,8 @@ public class CallGraphNode {
     boolean transactional;
     HashSet<String> accessedEntities;
     HashSet<String> definedEntities;
+    HashSet<ClassObject> allEntities;
+    HashSet<String> allEntitiesNames;
     List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
 
@@ -27,6 +29,8 @@ public class CallGraphNode {
         this.transactional = false;
         this.accessedEntities = new HashSet<String>();
         this.definedEntities = new HashSet<String>();
+        this.allEntities = new HashSet<ClassObject>();
+        this.allEntitiesNames = new HashSet<String>();
     }
 
     public void addCalledMethod(CallGraphNode node) {
