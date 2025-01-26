@@ -12,6 +12,9 @@ import gr.uom.java.ast.decomposition.cfg.AbstractVariable;
 // import gr.uom.java.ast.decomposition.cfg.PlainVariable;
 
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+
 
 public class CallGraphBuilder {
 
@@ -80,67 +83,90 @@ public class CallGraphBuilder {
                 IMethodBinding methodBinding = methodInvocation.resolveMethodBinding();
                 if (methodBinding != null) {
                     ITypeBinding declaringClass = methodBinding.getDeclaringClass();
-                    if (declaringClass != null && declaringClass.getQualifiedName().startsWith(projectPackagePrefix)) {
+                    
+                    String className = declaringClass.getQualifiedName();
+                    String methodName = methodInvocation.getName().toString();
+                    String persistClass ="io.quarkus.hibernate.orm.panache.PanacheRepositoryBase";
+                    Boolean userWritten = className.startsWith(projectPackagePrefix);
+                    Boolean persistMethod = className.startsWith(persistClass) && methodName.equals("persist");
+                    System.out.println("Class: " + className + " --> " + methodName + ", Starts with " + projectPackagePrefix.toString() + " ? " + userWritten);
+                    
+                    
+                    if (declaringClass != null && (userWritten  || persistMethod)) {
                     	String fullClassName = declaringClass.getQualifiedName();
                     	ClassObject classObjecOfEntity = systemObject.getClassObject(fullClassName);
                         String fulldMethodName = fullClassName + "." + methodInvocation.getName().getIdentifier();
                         if (visitedMethods.add(fulldMethodName)) {
                             final CallGraphNode calledNode = new CallGraphNode(fulldMethodName);
-                            // Check if entity Method
-                            boolean isEntity = isEntityMethod(declaringClass, javaProject);
-                            calledNode.setEntityMethod(isEntity);
-                            if(isEntity) {
-                            	calledNode.accessedEntities.add(declaringClass.getName());
-                            	calledNode.allEntities.add(classObjecOfEntity);
+                            // Check if persist method
+                            if (persistMethod) {
+                            	ClassObject classCreated = systemObject.getClassObject(ExtractClassNameOfPersist(fullClassName));
+                            	calledNode.allEntities.add(classCreated);
                             	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
-                            }
-                            final IMethod method = (IMethod) methodBinding.getJavaElement();
-                            if (method != null) {
-	                            ClassObject classObjectOfMethod = systemObject.getClassObject(fullClassName);
-	                            MethodObject methodObject = (MethodObject) systemObject.getMethodObject(method);
-	                            calledNode.setClassObject(classObjectOfMethod);
-	                            calledNode.setMethodObject(methodObject);
-	                            calledNode.setDefinedFields(getDefinedAttributes(methodObject));
-	                            calledNode.isReadOnly = true;
-	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0 &&  calledNode.isEntityMethod()) {
-	                            	calledNode.isReadOnly = false;
-	                            	calledNode.definedEntities.add(declaringClass.getName());
-	                            	calledNode.allEntities.add(calledNode.classObject);
-	                            	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
-	                            	parentNode.isReadOnly = false;
-	                            }
 	                            parentNode.addCalledMethod(calledNode);
-                                ICompilationUnit cu = method.getCompilationUnit();
-                                if (cu != null) {
-                                    @SuppressWarnings("deprecation")
-									ASTParser parser = ASTParser.newParser(AST.JLS8);
-                                    parser.setKind(ASTParser.K_COMPILATION_UNIT);
-                                    parser.setSource(cu);
-                                    parser.setResolveBindings(true);
-                                    CompilationUnit unit = (CompilationUnit) parser.createAST(null);
-                                    unit.accept(new ASTVisitor() {
-                                        @Override
-                                        public boolean visit(TypeDeclaration type) {
-                                            if (type.getName().getIdentifier().equals(method.getDeclaringType().getElementName())) {
-                                                for (MethodDeclaration md : type.getMethods()) {
-                                                    if (md.getName().getIdentifier().equals(methodInvocation.getName().getIdentifier())) {
-                                                        findMethodCalls(calledNode, md, visitedMethods);
-                                                        parentNode.accessedEntities.addAll(calledNode.accessedEntities);
-                                                        parentNode.definedEntities.addAll(calledNode.definedEntities);
-                                                        parentNode.allEntities.addAll(calledNode.allEntities);
-                                                        parentNode.allEntitiesNames.addAll(calledNode.allEntitiesNames);
-                                                        if(calledNode.transactional) {
-                                                        	parentNode.transactional = true;
+                            	calledNode.createdEntities.add(classCreated.getName());
+                                parentNode.createdEntities.addAll(calledNode.createdEntities);
+                            }
+                            // Check if user method
+                            else if (userWritten) {
+                            	boolean isEntity = isEntityMethod(declaringClass, javaProject);
+                                calledNode.setEntityMethod(isEntity);
+                                if(isEntity) {
+                                	calledNode.accessedEntities.add(declaringClass.getQualifiedName());
+                                	calledNode.allEntities.add(classObjecOfEntity);
+                                	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
+                                }
+                                final IMethod method = (IMethod) methodBinding.getJavaElement();
+                                if (method != null) {
+    	                            ClassObject classObjectOfMethod = systemObject.getClassObject(fullClassName);
+    	                            MethodObject methodObject = (MethodObject) systemObject.getMethodObject(method);
+    	                            calledNode.setClassObject(classObjectOfMethod);
+    	                            calledNode.setMethodObject(methodObject);
+    	                            calledNode.setDefinedFields(getDefinedAttributes(methodObject));
+    	                            calledNode.isReadOnly = true;
+    	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0 &&  calledNode.isEntityMethod()) {
+    	                            	calledNode.isReadOnly = false;
+    	                            	calledNode.definedEntities.add(declaringClass.getQualifiedName());
+    	                            	calledNode.allEntities.add(calledNode.classObject);
+    	                            	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
+    	                            	parentNode.isReadOnly = false;
+    	                            }
+    	                            parentNode.addCalledMethod(calledNode);
+                                    ICompilationUnit cu = method.getCompilationUnit();
+                                    if (cu != null) {
+                                        @SuppressWarnings("deprecation")
+    									ASTParser parser = ASTParser.newParser(AST.JLS8);
+                                        parser.setKind(ASTParser.K_COMPILATION_UNIT);
+                                        parser.setSource(cu);
+                                        parser.setResolveBindings(true);
+                                        CompilationUnit unit = (CompilationUnit) parser.createAST(null);
+                                        unit.accept(new ASTVisitor() {
+                                            @Override
+                                            public boolean visit(TypeDeclaration type) {
+                                                if (type.getName().getIdentifier().equals(method.getDeclaringType().getElementName())) {
+                                                    for (MethodDeclaration md : type.getMethods()) {
+                                                        if (md.getName().getIdentifier().equals(methodInvocation.getName().getIdentifier())) {
+                                                            findMethodCalls(calledNode, md, visitedMethods);
+                                                            parentNode.accessedEntities.addAll(calledNode.accessedEntities);
+                                                            parentNode.definedEntities.addAll(calledNode.definedEntities);
+                                                            parentNode.createdEntities.addAll(calledNode.createdEntities);
+                                                            parentNode.allEntities.addAll(calledNode.allEntities);
+                                                            parentNode.allEntitiesNames.addAll(calledNode.allEntitiesNames);
+                                                            if(calledNode.transactional) {
+                                                            	parentNode.transactional = true;
+                                                            }
                                                         }
                                                     }
                                                 }
+                                                return super.visit(type);
                                             }
-                                            return super.visit(type);
-                                        }
-                                    });
+                                        });
+                                    }
                                 }
                             }
+                            
                         }
+                            
                     }
                 }
                 return super.visit(methodInvocation);
@@ -217,6 +243,22 @@ public class CallGraphBuilder {
             e.printStackTrace();
         }
         return false;
+    }
+    
+    private String ExtractClassNameOfPersist(String input) {
+
+        // Regular expression to match the first generic parameter
+        String regex = "<(.*?),";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(input);
+
+        if (matcher.find()) {
+            String className = matcher.group(1); // Extracts the first generic parameter
+            return className;
+        } else {
+            System.out.println("No match found");
+            return "";
+        }
     }
     
     private boolean hasMappingAnnotation(MethodDeclaration method) {

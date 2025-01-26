@@ -94,7 +94,6 @@ public class AggregationsIdentificationView extends ViewPart {
 			AssociationDetection associationsMapper = new AssociationDetection(sysObj);
 			System.out.print(associationsMapper);
 			// Add edges to associations
-			// Set<ClassObject> vertices = clusteringGraph.getVertices();
 			Set<ClassObject> vertices = new HashSet<ClassObject>();
 			vertices.addAll(clusteringGraph.getVertices());
 			for (ClassObject vertex : vertices) {
@@ -104,14 +103,19 @@ public class AggregationsIdentificationView extends ViewPart {
 					clusteringGraph.addEdge(vertex,  toVertex, 1.0);
 				}
 			}
+			
+			// Add edges for call graphs
+			addEdgesForCallGraph(callGraphs, clusteringGraph, sysObj);
 
         	LouvainClustering<ClassObject> louvain = new LouvainClustering<ClassObject>();
         	List<Set<ClassObject>> clusters = louvain.louvainClustering(clusteringGraph);
 
         	for (Set<ClassObject> cluster : clusters) {
-        	    System.out.println("Cluster: " + cluster);
+        	    System.out.println("Cluster: ");
+        	    for (ClassObject entityClass : cluster) {
+        	    	System.out.println(entityClass.getName());
+        	    }
         	}
-			// End of Testing
         	 
             displayCallGraphs(callGraphs);
         } catch (Exception e) {
@@ -120,6 +124,66 @@ public class AggregationsIdentificationView extends ViewPart {
         }
     }
 
+    private void addEdgesForCallGraph(List<CallGraph> callGraphs, ClusteringGraph<ClassObject> clusteringGraph, SystemObject sysObj) {
+        for (CallGraph callGraph : callGraphs) {
+            if (callGraph.getRoot().createdEntities.size() != 0) {
+                HashSet<ClassObject> createdEntities = new HashSet<ClassObject>();
+            	for (String createdEnity : callGraph.getRoot().createdEntities) {
+                	ClassObject classObjecOfEntity = sysObj.getClassObject(createdEnity);
+                	createdEntities.add(classObjecOfEntity);
+            	}
+            	HashSet<ClassObject> otherEntities = new HashSet<ClassObject>();
+            	for (String accessedEntity : callGraph.getRoot().accessedEntities) {
+                	ClassObject classObjecOfEntity = sysObj.getClassObject(accessedEntity);
+                	otherEntities.add(classObjecOfEntity);
+            	}
+            	for (String definedEntity : callGraph.getRoot().definedEntities) {
+                	ClassObject classObjecOfEntity = sysObj.getClassObject(definedEntity);
+                	otherEntities.add(classObjecOfEntity);
+            	}
+            	// add edges
+            	for (ClassObject createdEntity : createdEntities) {
+            		for(ClassObject otherEntity : otherEntities) {
+            			clusteringGraph.addEdge(createdEntity,  otherEntity, 8.0);
+            		}
+            	}
+            }
+            
+            else if (callGraph.getRoot().definedEntities.size() != 0) {
+            	 HashSet<ClassObject> definedEntities = new HashSet<ClassObject>();
+             	for (String definedEntity : callGraph.getRoot().definedEntities) {
+                 	ClassObject classObjecOfEntity = sysObj.getClassObject(definedEntity);
+                 	definedEntities.add(classObjecOfEntity);
+             	}
+             	HashSet<ClassObject> otherEntities = new HashSet<ClassObject>();
+             	for (String accessedEntity : callGraph.getRoot().accessedEntities) {
+                 	ClassObject classObjecOfEntity = sysObj.getClassObject(accessedEntity);
+                 	otherEntities.add(classObjecOfEntity);
+             	}
+             	// add edges
+             	for (ClassObject definedEntity : definedEntities) {
+             		for(ClassObject otherEntity : otherEntities) {
+             			clusteringGraph.addEdge(definedEntity,  otherEntity, 4.0);
+             		}
+             	}
+            }
+            
+            else if (callGraph.getRoot().accessedEntities.size() != 0) {
+            	 HashSet<ClassObject> accessedEntities = new HashSet<ClassObject>();
+              	for (String accessedEntity : callGraph.getRoot().accessedEntities) {
+                  	ClassObject classObjecOfEntity = sysObj.getClassObject(accessedEntity);
+                  	accessedEntities.add(classObjecOfEntity);
+              	}
+              	// add edges
+              	for (ClassObject accessedEntity : accessedEntities) {
+              		for(ClassObject accessedEntity1 : accessedEntities) {
+              			clusteringGraph.addEdge(accessedEntity,  accessedEntity1, 1.0);
+              		}
+              	}
+            }
+        }
+    }
+    
     private void displayCallGraphs(List<CallGraph> callGraphs) {
         StringBuilder sb = new StringBuilder();
         for (CallGraph callGraph : callGraphs) {
@@ -135,6 +199,8 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append(callGraph.getRoot().accessedEntities.toString()).append("\n");
             sb.append("Defined Entities: ");
             sb.append(callGraph.getRoot().definedEntities.toString()).append("\n");
+            sb.append("Created Entities: ");
+            sb.append(callGraph.getRoot().createdEntities.toString()).append("\n");
             sb.append("Calls: \n");
             appendCalls(sb, callGraph.getRoot(), "  ");
             sb.append("\n");
