@@ -19,12 +19,7 @@ import org.eclipse.ui.part.ViewPart;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-//import java.util.Collections;
-//import java.util.Comparator;
-//import java.util.HashMap;
 import java.util.List;
-//import java.util.Map;
-//import java.util.Set;
 import java.util.Set;
 
 public class AggregationsIdentificationView extends ViewPart {
@@ -32,42 +27,104 @@ public class AggregationsIdentificationView extends ViewPart {
 
     private Text text;
     private ComboViewer projectComboViewer;
+    private int createWeight;
+    private int writeWeight;
+    private int readWeight;
+    
 
     @Override
     public void createPartControl(Composite parent) {
-        parent.setLayout(new GridLayout(2, false));
+        // 1) Setup layout with spacing/margins
+        GridLayout layout = new GridLayout(2, false);
+        layout.verticalSpacing = 10;   // Space between rows
+        layout.horizontalSpacing = 10; // Space between columns
+        layout.marginWidth = 10;       // Left/right margin
+        layout.marginHeight = 10;      // Top/bottom margin
+        parent.setLayout(layout);
+
+        // Row 1: "Choose project" label + Combo
+        Label projectLabel = new Label(parent, SWT.NONE);
+        projectLabel.setText("Choose project:");
 
         projectComboViewer = new ComboViewer(parent, SWT.READ_ONLY);
         projectComboViewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         projectComboViewer.setContentProvider(ArrayContentProvider.getInstance());
 
+        // Populate combo
         List<String> projectNames = new ArrayList<String>();
-        IJavaProject[] javaProjects = null;
-		try {
-			javaProjects = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProjects();
-		} catch (JavaModelException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-        for (IJavaProject javaProject : javaProjects) {
-            projectNames.add(javaProject.getElementName());
+        try {
+            IJavaProject[] javaProjects = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProjects();
+            for (IJavaProject jp : javaProjects) {
+                projectNames.add(jp.getElementName());
+            }
+        } catch (JavaModelException e) {
+            e.printStackTrace();
+        }
+        projectComboViewer.setInput(projectNames);
+        if (!projectNames.isEmpty()) {
+            projectComboViewer.getCombo().select(0);
         }
 
-        projectComboViewer.setInput(projectNames);
-        projectComboViewer.getCombo().select(0);
+        // Helper method to create a smaller Text field
+        // Returns a new Text widget with a set widthHint
+        final int TEXT_FIELD_WIDTH = 50;
+        GridData gdSmallText = new GridData(SWT.FILL, SWT.CENTER, false, false);
+        gdSmallText.widthHint = TEXT_FIELD_WIDTH;
 
+        // Row 2: "Create Weight" label + text field
+        Label createWeightLabel = new Label(parent, SWT.NONE);
+        createWeightLabel.setText("Create Weight:");
+
+        final Text createWeightText = new Text(parent, SWT.BORDER);
+        createWeightText.setLayoutData(gdSmallText);
+
+        // Row 3: "Read Weight" label + text field
+        Label readWeightLabel = new Label(parent, SWT.NONE);
+        readWeightLabel.setText("Read Weight:");
+
+        final Text readWeightText = new Text(parent, SWT.BORDER);
+        readWeightText.setLayoutData(gdSmallText);
+
+        // Row 4: "Write Weight" label + text field
+        Label writeWeightLabel = new Label(parent, SWT.NONE);
+        writeWeightLabel.setText("Write Weight:");
+
+        final Text writeWeightText = new Text(parent, SWT.BORDER);
+        writeWeightText.setLayoutData(gdSmallText);
+
+        // Row 5: Centered "Run" button spanning 2 columns
         Button runButton = new Button(parent, SWT.PUSH);
         runButton.setText("Run Aggregation Identification");
-        runButton.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, false, false));
+        GridData buttonGridData = new GridData(SWT.CENTER, SWT.CENTER, true, false, 2, 1);
+        runButton.setLayoutData(buttonGridData);
+
+        // 3) Assign text fields to class fields on click
         runButton.addListener(SWT.Selection, new Listener() {
 			public void handleEvent(Event event) {
-				runAggregationIdentification();
+			    try {
+			        createWeight = Integer.parseInt(createWeightText.getText());
+			    } catch (NumberFormatException e) {
+			        createWeight = 5;
+			    }
+			    try {
+			        readWeight = Integer.parseInt(readWeightText.getText());
+			    } catch (NumberFormatException e) {
+			        readWeight = 1;
+			    }
+			    try {
+			        writeWeight = Integer.parseInt(writeWeightText.getText());
+			    } catch (NumberFormatException e) {
+			        writeWeight = 3;
+			    }
+
+			    // Now run your method, using the just-updated fields
+			    runAggregationIdentification();
 			}
 		});
 
+        // Row 6: Text area (spanning 2 columns)
         text = new Text(parent, SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI);
-        GridData textLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true);
-        textLayoutData.horizontalSpan = 2;
+        GridData textLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1);
         text.setLayoutData(textLayoutData);
     }
 
@@ -144,7 +201,7 @@ public class AggregationsIdentificationView extends ViewPart {
             	// add edges
             	for (ClassObject createdEntity : createdEntities) {
             		for(ClassObject otherEntity : otherEntities) {
-            			clusteringGraph.addEdge(createdEntity,  otherEntity, 8.0);
+            			clusteringGraph.addEdge(createdEntity,  otherEntity, createWeight);
             		}
             	}
             }
@@ -163,7 +220,7 @@ public class AggregationsIdentificationView extends ViewPart {
              	// add edges
              	for (ClassObject definedEntity : definedEntities) {
              		for(ClassObject otherEntity : otherEntities) {
-             			clusteringGraph.addEdge(definedEntity,  otherEntity, 4.0);
+             			clusteringGraph.addEdge(definedEntity,  otherEntity, writeWeight);
              		}
              	}
             }
@@ -177,7 +234,7 @@ public class AggregationsIdentificationView extends ViewPart {
               	// add edges
               	for (ClassObject accessedEntity : accessedEntities) {
               		for(ClassObject accessedEntity1 : accessedEntities) {
-              			clusteringGraph.addEdge(accessedEntity,  accessedEntity1, 1.0);
+              			clusteringGraph.addEdge(accessedEntity,  accessedEntity1, readWeight);
               		}
               	}
             }
