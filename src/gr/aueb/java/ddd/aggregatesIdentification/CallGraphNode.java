@@ -16,11 +16,14 @@ public class CallGraphNode {
     boolean transactional;
     HashSet<String> accessedEntities;
     HashSet<String> definedEntities;
-    HashSet<String> createdEntities;
     HashSet<ClassObject> allEntities;
+    HashSet<String> createdEntities;
+    HashSet<ClassObject> createdEntitiesObjects;
+    HashSet<ClassObject> definedEntitiesObjects;
     HashSet<String> allEntitiesNames;
     List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
+    HashSet<CreationRecord> creationRecords;
 
     public CallGraphNode(String methodName) {
         this.methodName = methodName;
@@ -31,8 +34,11 @@ public class CallGraphNode {
         this.accessedEntities = new HashSet<String>();
         this.definedEntities = new HashSet<String>();
         this.createdEntities = new HashSet<String>();
+        this.createdEntitiesObjects = new HashSet<ClassObject>();
         this.allEntities = new HashSet<ClassObject>();
+        this.definedEntitiesObjects = new HashSet<ClassObject>();
         this.allEntitiesNames = new HashSet<String>();
+        this.creationRecords = new HashSet<CreationRecord>();
     }
 
     public void addCalledMethod(CallGraphNode node) {
@@ -65,5 +71,17 @@ public class CallGraphNode {
     
     public void setClassObject(ClassObject classObj) {
     	this.classObject = classObj;
+    }
+    
+    public HashSet<ClassObject> getDefinedEntitiesObjects() {
+    	return this.definedEntitiesObjects;
+    }
+    
+    public void addCreationRecord(CreationRecord record) {
+        this.creationRecords.add(record);
+    }
+    
+    public HashSet<CreationRecord> getCreationRecords() {
+        return this.creationRecords;
     }
 }

@@ -59,6 +59,11 @@ public class CallGraphBuilder {
                                 CallGraph callGraph = new CallGraph();
                                 String methodName = node.getName().getIdentifier() + "." + method.getName().getIdentifier();
                                 CallGraphNode rootNode = new CallGraphNode(methodName);
+                                IMethodBinding methodBinding = method.resolveBinding();
+                                ITypeBinding declaringClass = methodBinding.getDeclaringClass();
+                                String fullClassName = declaringClass.getQualifiedName();
+                            	ClassObject classObjecOfEntity = systemObject.getClassObject(fullClassName);
+                                rootNode.setClassObject(classObjecOfEntity);
                                 if(isTransactional(method)) {
                                 	rootNode.transactional = true;
                                 }
@@ -98,6 +103,7 @@ public class CallGraphBuilder {
                         String fulldMethodName = fullClassName + "." + methodInvocation.getName().getIdentifier();
                         if (visitedMethods.add(fulldMethodName)) {
                             final CallGraphNode calledNode = new CallGraphNode(fulldMethodName);
+                            calledNode.setClassObject(classObjecOfEntity);
                             // Check if persist method
                             if (persistMethod) {
                             	ClassObject classCreated = systemObject.getClassObject(ExtractClassNameOfPersist(fullClassName));
@@ -105,7 +111,9 @@ public class CallGraphBuilder {
                             	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
 	                            parentNode.addCalledMethod(calledNode);
                             	calledNode.createdEntities.add(classCreated.getName());
+                            	calledNode.createdEntitiesObjects.add(classCreated);
                                 parentNode.createdEntities.addAll(calledNode.createdEntities);
+                                parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
                             }
                             // Check if user method
                             else if (userWritten) {
@@ -127,6 +135,8 @@ public class CallGraphBuilder {
     	                            if(calledNode.definedFields != null && calledNode.definedFields.size() != 0 &&  calledNode.isEntityMethod()) {
     	                            	calledNode.isReadOnly = false;
     	                            	calledNode.definedEntities.add(declaringClass.getQualifiedName());
+    	                            	ClassObject definedClassEntity = systemObject.getClassObject(declaringClass.getQualifiedName());
+    	                            	calledNode.definedEntitiesObjects.add(definedClassEntity);
     	                            	calledNode.allEntities.add(calledNode.classObject);
     	                            	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
     	                            	parentNode.isReadOnly = false;
@@ -149,9 +159,12 @@ public class CallGraphBuilder {
                                                             findMethodCalls(calledNode, md, visitedMethods);
                                                             parentNode.accessedEntities.addAll(calledNode.accessedEntities);
                                                             parentNode.definedEntities.addAll(calledNode.definedEntities);
+                                                            parentNode.definedEntitiesObjects.addAll(calledNode.definedEntitiesObjects);
+                                                            parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
                                                             parentNode.createdEntities.addAll(calledNode.createdEntities);
                                                             parentNode.allEntities.addAll(calledNode.allEntities);
                                                             parentNode.allEntitiesNames.addAll(calledNode.allEntitiesNames);
+                                                            parentNode.creationRecords.addAll(calledNode.creationRecords);
                                                             if(calledNode.transactional) {
                                                             	parentNode.transactional = true;
                                                             }
@@ -170,6 +183,27 @@ public class CallGraphBuilder {
                     }
                 }
                 return super.visit(methodInvocation);
+            }
+            @Override
+            public boolean visit(ClassInstanceCreation node) {
+                IMethodBinding constructorBinding = node.resolveConstructorBinding();
+                if (constructorBinding != null) {
+                    ITypeBinding declaringClass = constructorBinding.getDeclaringClass();
+                    IAnnotationBinding[] annotations = declaringClass.getAnnotations();
+                    System.out.println("Constructor called: " + declaringClass.getName() + " parent: " + parentNode.getMethodName());
+                    for(IAnnotationBinding annotation: annotations) {
+                    	String annotationName = annotation.getName();
+                    	if (annotationName.equals("Entity")) {
+                        	ClassObject classCreated = systemObject.getClassObject(declaringClass.getQualifiedName());
+                        	parentNode.createdEntitiesObjects.add(classCreated);
+                    		parentNode.createdEntities.add(declaringClass.getQualifiedName());
+                    		// ClassObject parentClass =systemObject.getClassObject(ExtractClassNameOfPersist(parentNode.getQualifiedName())); 
+                    		CreationRecord creation = new CreationRecord(classCreated, parentNode.classObject);
+                    		parentNode.addCreationRecord(creation);
+                        }
+                    }
+                }
+                return super.visit(node);
             }
         });
     }

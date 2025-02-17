@@ -9,6 +9,8 @@ import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.Annotation;
+import org.eclipse.jdt.core.dom.IAnnotationBinding;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.ComboViewer;
 import org.eclipse.swt.SWT;
@@ -27,8 +29,13 @@ public class AggregationsIdentificationView extends ViewPart {
 
     private Text text;
     private ComboViewer projectComboViewer;
+    private Boolean strictAggregates;
+    private Boolean displayLogs;
+    @SuppressWarnings("unused")
     private int createWeight;
-    private int writeWeight;
+    @SuppressWarnings("unused")
+	private int writeWeight;
+    @SuppressWarnings("unused")
     private int readWeight;
     
 
@@ -65,67 +72,41 @@ public class AggregationsIdentificationView extends ViewPart {
             projectComboViewer.getCombo().select(0);
         }
 
-        // Helper method to create a smaller Text field
-        // Returns a new Text widget with a set widthHint
-        final int TEXT_FIELD_WIDTH = 50;
-        GridData gdSmallText = new GridData(SWT.FILL, SWT.CENTER, false, false);
-        gdSmallText.widthHint = TEXT_FIELD_WIDTH;
+        // Row 2: "Strict Aggregates" checkbox
+        final Button strictCheck = new Button(parent, SWT.CHECK);
+        strictCheck.setText("Use Strict Aggregates");
+        strictCheck.setSelection(false);
+        // Make the checkbox span 2 columns if you want it on its own row:
+        GridData strictCheckGD = new GridData(SWT.LEFT, SWT.CENTER, true, false, 2, 1);
+        strictCheck.setLayoutData(strictCheckGD);
 
-        // Row 2: "Create Weight" label + text field
-        Label createWeightLabel = new Label(parent, SWT.NONE);
-        createWeightLabel.setText("Create Weight:");
+        // Row 3: "Display Logs" checkbox
+        final Button logsCheck = new Button(parent, SWT.CHECK);
+        logsCheck.setText("Display Logs");
+        logsCheck.setSelection(false);
+        // Also span 2 columns if desired:
+        GridData logsCheckGD = new GridData(SWT.LEFT, SWT.CENTER, true, false, 2, 1);
+        logsCheck.setLayoutData(logsCheckGD);
 
-        final Text createWeightText = new Text(parent, SWT.BORDER);
-        createWeightText.setLayoutData(gdSmallText);
-
-        // Row 3: "Read Weight" label + text field
-        Label readWeightLabel = new Label(parent, SWT.NONE);
-        readWeightLabel.setText("Read Weight:");
-
-        final Text readWeightText = new Text(parent, SWT.BORDER);
-        readWeightText.setLayoutData(gdSmallText);
-
-        // Row 4: "Write Weight" label + text field
-        Label writeWeightLabel = new Label(parent, SWT.NONE);
-        writeWeightLabel.setText("Write Weight:");
-
-        final Text writeWeightText = new Text(parent, SWT.BORDER);
-        writeWeightText.setLayoutData(gdSmallText);
-
-        // Row 5: Centered "Run" button spanning 2 columns
+        // Row 4: Centered "Run" button spanning 2 columns
         Button runButton = new Button(parent, SWT.PUSH);
         runButton.setText("Run Aggregation Identification");
         GridData buttonGridData = new GridData(SWT.CENTER, SWT.CENTER, true, false, 2, 1);
         runButton.setLayoutData(buttonGridData);
 
-        // 3) Assign text fields to class fields on click
-        runButton.addListener(SWT.Selection, new Listener() {
-			public void handleEvent(Event event) {
-			    try {
-			        createWeight = Integer.parseInt(createWeightText.getText());
-			    } catch (NumberFormatException e) {
-			        createWeight = 5;
-			    }
-			    try {
-			        readWeight = Integer.parseInt(readWeightText.getText());
-			    } catch (NumberFormatException e) {
-			        readWeight = 1;
-			    }
-			    try {
-			        writeWeight = Integer.parseInt(writeWeightText.getText());
-			    } catch (NumberFormatException e) {
-			        writeWeight = 3;
-			    }
-
-			    // Now run your method, using the just-updated fields
-			    runAggregationIdentification();
-			}
-		});
-
-        // Row 6: Text area (spanning 2 columns)
+        // Row 5: Text area (spanning 2 columns)
         text = new Text(parent, SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI);
         GridData textLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1);
         text.setLayoutData(textLayoutData);
+
+        // 2) Assign checkbox selections to class fields on click
+        runButton.addListener(SWT.Selection, new Listener() {
+            public void handleEvent(Event event) {
+            	strictAggregates = strictCheck.getSelection();
+                displayLogs = logsCheck.getSelection();
+                runAggregationIdentification();
+            }
+        });
     }
 
     private void runAggregationIdentification() {
@@ -136,110 +117,132 @@ public class AggregationsIdentificationView extends ViewPart {
             IJavaProject javaProject = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProject(selectedProject);
 			SystemObject sysObj = SystemObjectProvider.getSystemObject(javaProject);
             
-			// Create call graphs
-			List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
-			
-			// Initialize clustering graph
-			ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
-			for (CallGraph callGraph : callGraphs) {
-	            for(ClassObject entity : callGraph.getRoot().allEntities) {
-	            	clusteringGraph.addVertex(entity);
+			// Build call graphs using your existing CallGraphBuilder
+	        List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
+	        
+	        // Initialize clustering graph (using our new ClusteringGraph with typed edges)
+	        ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
+	        for (CallGraph callGraph : callGraphs) {
+	            for (ClassObject entity : callGraph.getRoot().allEntities) {
+	                clusteringGraph.addVertex(entity);
 	            }
 	        }
+	        
+	        // Create associations mapping using static analysis
+	        AssociationDetection associationsMapper = new AssociationDetection(sysObj);
+	        // Add static association edges:
+	        Set<ClassObject> vertices = new HashSet<ClassObject>();
+	        vertices.addAll(clusteringGraph.getVertices());
+	        for (ClassObject vertex : vertices) {
+	            List<Association> associations = associationsMapper.getAssociationsOfClass(vertex);
+	            for (Association association : associations) {
+	                ClassObject toVertex = sysObj.getClassObject(association.getTo());
+	                if (!clusteringGraph.hasEdge(vertex, toVertex)) {
+	                    // Decide edge type based on static information:
+	                    ClusteringGraph.EdgeType type = ClusteringGraph.EdgeType.REFERENCE;
+	                    
+	                    List<Annotation> toVertexAnnotations = toVertex.getAnnotations();
+	                    Boolean isEmbedded = false;
+	                    for(Annotation annotation : toVertexAnnotations) {
+	                    	IAnnotationBinding annotationBinding = annotation.resolveAnnotationBinding();
+	                    	if(annotationBinding.getName().equals("Embeddable")) {
+	                    		isEmbedded = true;
+	                    	}
+	                    }
+	                    Boolean isEnumerated = false;
+	                    List<Annotation> fieldAnnotations = association.getFieldObject().getAnnotations();
+	                    for(Annotation annotation : fieldAnnotations) {
+	                    	IAnnotationBinding annotationBinding = annotation.resolveAnnotationBinding();
+	                    	if(annotationBinding.getName().equals("Enumerated")) {
+	                    		isEnumerated = true;
+	                    	}
+	                    }
+	                    
+	                    if (isEmbedded) { 
+	                        type = ClusteringGraph.EdgeType.EMBEDDED;
+	                    }
+	                    if (isEnumerated) {
+	                    	type = ClusteringGraph.EdgeType.VALUE;
+	                    }
+	                    clusteringGraph.addEdge(vertex, toVertex, baselineFor(type), type);
+	                }
+	            }
+	        }
+	        
+	        System.out.println("Graph after static association:");
+	        clusteringGraph.printGraph();
+	        
+//	        addEdgesForCallGraph(callGraphs, clusteringGraph, sysObj);
+	        
+	        // Enhance the graph: adjust weights/promote edges using dynamic coupling data
+	        GraphEnhancer<ClassObject> enhancer = new GraphEnhancer<ClassObject>();
+	        enhancer.enhanceGraph(clusteringGraph, callGraphs);
+	        
+	        System.out.println("Graph after dynamic enhancement:");
+	        clusteringGraph.printGraph();
+	        
+	        
+	        // Perform clustering on the enhanced graph
+	        List<Set<ClassObject>> clusters;
+	        if(strictAggregates) {
+	        	StrictAggregateClustering<ClassObject> clustering = new StrictAggregateClustering<ClassObject>();
+		        clusters = clustering.cluster(clusteringGraph);
+	        } else {
+		        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>();
+		        clusters = clustering.louvainClustering(clusteringGraph);	        	
+	        }
+	        
 			
-			// Create associations mapping
-			AssociationDetection associationsMapper = new AssociationDetection(sysObj);
-			System.out.print(associationsMapper);
-			// Add edges to associations
-			Set<ClassObject> vertices = new HashSet<ClassObject>();
-			vertices.addAll(clusteringGraph.getVertices());
-			for (ClassObject vertex : vertices) {
-				List<Association> associations = associationsMapper.getAssociationsOfClass(vertex);
-				for (Association association : associations) {
-					ClassObject toVertex = sysObj.getClassObject(association.getTo());
-					clusteringGraph.addEdge(vertex,  toVertex, 1.0);
-				}
-			}
-			
-			// Add edges for call graphs
-			addEdgesForCallGraph(callGraphs, clusteringGraph, sysObj);
-
-        	LouvainClustering<ClassObject> louvain = new LouvainClustering<ClassObject>();
-        	List<Set<ClassObject>> clusters = louvain.louvainClustering(clusteringGraph);
-
-        	for (Set<ClassObject> cluster : clusters) {
-        	    System.out.println("Cluster: ");
-        	    for (ClassObject entityClass : cluster) {
-        	    	System.out.println(entityClass.getName());
-        	    }
-        	}
-        	 
-            displayCallGraphs(callGraphs);
+	        if(displayLogs) {
+	        	displayCallGraphs(callGraphs);
+	        }
+	        displayClusters(clusters);
         } catch (Exception e) {
             e.printStackTrace();
             text.setText("Error: " + e.getMessage());
         }
     }
-
-    private void addEdgesForCallGraph(List<CallGraph> callGraphs, ClusteringGraph<ClassObject> clusteringGraph, SystemObject sysObj) {
-        for (CallGraph callGraph : callGraphs) {
-            if (callGraph.getRoot().createdEntities.size() != 0) {
-                HashSet<ClassObject> createdEntities = new HashSet<ClassObject>();
-            	for (String createdEnity : callGraph.getRoot().createdEntities) {
-                	ClassObject classObjecOfEntity = sysObj.getClassObject(createdEnity);
-                	createdEntities.add(classObjecOfEntity);
-            	}
-            	HashSet<ClassObject> otherEntities = new HashSet<ClassObject>();
-            	for (String accessedEntity : callGraph.getRoot().accessedEntities) {
-                	ClassObject classObjecOfEntity = sysObj.getClassObject(accessedEntity);
-                	otherEntities.add(classObjecOfEntity);
-            	}
-            	for (String definedEntity : callGraph.getRoot().definedEntities) {
-                	ClassObject classObjecOfEntity = sysObj.getClassObject(definedEntity);
-                	otherEntities.add(classObjecOfEntity);
-            	}
-            	// add edges
-            	for (ClassObject createdEntity : createdEntities) {
-            		for(ClassObject otherEntity : otherEntities) {
-            			clusteringGraph.addEdge(createdEntity,  otherEntity, createWeight);
-            		}
-            	}
-            }
-            
-            else if (callGraph.getRoot().definedEntities.size() != 0) {
-            	 HashSet<ClassObject> definedEntities = new HashSet<ClassObject>();
-             	for (String definedEntity : callGraph.getRoot().definedEntities) {
-                 	ClassObject classObjecOfEntity = sysObj.getClassObject(definedEntity);
-                 	definedEntities.add(classObjecOfEntity);
-             	}
-             	HashSet<ClassObject> otherEntities = new HashSet<ClassObject>();
-             	for (String accessedEntity : callGraph.getRoot().accessedEntities) {
-                 	ClassObject classObjecOfEntity = sysObj.getClassObject(accessedEntity);
-                 	otherEntities.add(classObjecOfEntity);
-             	}
-             	// add edges
-             	for (ClassObject definedEntity : definedEntities) {
-             		for(ClassObject otherEntity : otherEntities) {
-             			clusteringGraph.addEdge(definedEntity,  otherEntity, writeWeight);
-             		}
-             	}
-            }
-            
-            else if (callGraph.getRoot().accessedEntities.size() != 0) {
-            	 HashSet<ClassObject> accessedEntities = new HashSet<ClassObject>();
-              	for (String accessedEntity : callGraph.getRoot().accessedEntities) {
-                  	ClassObject classObjecOfEntity = sysObj.getClassObject(accessedEntity);
-                  	accessedEntities.add(classObjecOfEntity);
-              	}
-              	// add edges
-              	for (ClassObject accessedEntity : accessedEntities) {
-              		for(ClassObject accessedEntity1 : accessedEntities) {
-              			clusteringGraph.addEdge(accessedEntity,  accessedEntity1, readWeight);
-              		}
-              	}
-            }
+    
+    private double baselineFor(ClusteringGraph.EdgeType type) {
+        switch (type) {
+            case EMBEDDED:
+                return 1.0;
+            case COUPLED:
+                return 1.0;
+            case REFERENCE:
+                return 0.1;
+            case VALUE:
+            	return 2.0;
+            case OWNERSHIP:
+            	return 2.0;
+            default:
+                return 1.0;
         }
     }
+
+//    private void addEdgesForCallGraph(List<CallGraph> callGraphs, ClusteringGraph<ClassObject> clusteringGraph, SystemObject sysObj) {
+//    	
+//    	for (CallGraph callGraph : callGraphs) {
+//    		HashSet<ClassObject> definedClasses = new HashSet<ClassObject>();
+//    		for (String createdEnity : callGraph.getRoot().createdEntities) {
+//            	ClassObject classObjecOfEntity = sysObj.getClassObject(createdEnity);
+//            	definedClasses.add(classObjecOfEntity);
+//        	}
+//        	for (String definedEntity : callGraph.getRoot().definedEntities) {
+//	        	ClassObject classObjecOfEntity = sysObj.getClassObject(definedEntity);
+//	        	definedClasses.add(classObjecOfEntity);
+//        	}
+//        	for (ClassObject definedClass1 : definedClasses) {
+//        		for (ClassObject definedClass2 : definedClasses) {
+//        	        if (!definedClass1.equals(definedClass2)) { // Avoid self-comparison
+//        	        	if(clusteringGraph.hasEdge(definedClass1, definedClass2)) {
+//        	        		clusteringGraph.addEdge(definedClass1,  definedClass2, 0.1);
+//        	        	}
+//        	        }
+//        	    }
+//        	}
+//    	}
+//    }
     
     private void displayCallGraphs(List<CallGraph> callGraphs) {
         StringBuilder sb = new StringBuilder();
@@ -263,6 +266,18 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append("\n");
         }
         text.setText(sb.toString());
+    }
+    
+    private void displayClusters( List<Set<ClassObject>> clusters) {
+        StringBuilder sb = new StringBuilder();
+        
+        for (Set<ClassObject> cluster : clusters) {
+        	sb.append("Cluster:\n");
+            for (ClassObject entityClass : cluster) {
+            	 sb.append("\t" + ClusteringGraph.getSimpleName(entityClass.getName()) + "\n");
+            }
+        }
+        text.append(sb.toString());
     }
 
     private void appendCalls(StringBuilder sb, CallGraphNode node, String indent) {

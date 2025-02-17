@@ -1,21 +1,29 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
 import java.util.*;
+import gr.uom.java.ast.ClassObject;
 
 public class ClusteringGraph<T> {
     private final Map<T, List<Edge<T>>> adjacencyList = new HashMap<T, List<Edge<T>>>();
 
     // Add a vertex to the graph
     public void addVertex(T vertex) {
-        adjacencyList.putIfAbsent(vertex, new ArrayList<Edge<T>>());
+        if (!adjacencyList.containsKey(vertex)) {
+            adjacencyList.put(vertex, new ArrayList<Edge<T>>());
+        }
     }
 
-    // Add an edge with a weight (undirected graph)
+    // Add an edge with a weight and an EdgeType (undirected graph)
+    public void addEdge(T vertex1, T vertex2, double weight, EdgeType type) {
+        addVertex(vertex1);
+        addVertex(vertex2);
+        adjacencyList.get(vertex1).add(new Edge<T>(vertex2, weight, type));
+        adjacencyList.get(vertex2).add(new Edge<T>(vertex1, weight, type));
+    }
+
+    // Overloaded addEdge without explicit type (defaults to REFERENCE)
     public void addEdge(T vertex1, T vertex2, double weight) {
-        adjacencyList.putIfAbsent(vertex1, new ArrayList<Edge<T>>());
-        adjacencyList.putIfAbsent(vertex2, new ArrayList<Edge<T>>());
-        adjacencyList.get(vertex1).add(new Edge<T>(vertex2, weight));
-        adjacencyList.get(vertex2).add(new Edge<T>(vertex1, weight));
+        addEdge(vertex1, vertex2, weight, EdgeType.REFERENCE);
     }
 
     // Get neighbors of a vertex
@@ -28,49 +36,68 @@ public class ClusteringGraph<T> {
         return adjacencyList.keySet();
     }
 
-    // Perform clustering by finding connected components
-    public List<Set<T>> findConnectedComponents() {
-        Set<T> visited = new HashSet<T>();
-        List<Set<T>> components = new ArrayList<Set<T>>();
-
-        for (T vertex : adjacencyList.keySet()) {
-            if (!visited.contains(vertex)) {
-                Set<T> component = new HashSet<T>();
-                dfs(vertex, visited, component);
-                components.add(component);
+    // Check if vertices have an edge
+    public boolean hasEdge(T vertex1, T vertex2) {
+        if (!adjacencyList.containsKey(vertex1)) {
+            return false;
+        }
+        for (Edge<T> edge : adjacencyList.get(vertex1)) {
+            if (edge.getTarget().equals(vertex2)) {
+                return true;
             }
         }
-        return components;
+        return false;
     }
 
-    // Depth-First Search (DFS) helper function
-    private void dfs(T vertex, Set<T> visited, Set<T> component) {
-        visited.add(vertex);
-        component.add(vertex);
-        for (Edge<T> edge : getNeighbors(vertex)) {
-            if (!visited.contains(edge.getTarget())) {
-                dfs(edge.getTarget(), visited, component);
+    // Helper function to print the graph
+    public void printGraph() {
+        for (Map.Entry<T, List<Edge<T>>> entry : adjacencyList.entrySet()) {
+            T vertex = entry.getKey();
+            List<Edge<T>> edges = entry.getValue();
+            ClassObject entity = (ClassObject) vertex;
+            System.out.print("Vertex " + getSimpleName(entity.getName()) + " is connected to:\n");
+            for (Edge<T> edge : edges) {
+                ClassObject edgeEntity = (ClassObject) edge.getTarget();
+                System.out.print("\t(" + getSimpleName(edgeEntity.getName()) + 
+                                   ", weight: " + edge.getWeight() + 
+                                   ", type: " + edge.getType() + ")\n");
             }
+            System.out.println();
         }
     }
 
-    // Edge class to represent connections
+    public static String getSimpleName(String fullName) {
+        if (fullName == null || fullName.isEmpty()) {
+            return fullName;
+        }
+        int lastDotIndex = fullName.lastIndexOf('.');
+        return (lastDotIndex != -1) ? fullName.substring(lastDotIndex + 1) : fullName;
+    }
+
+    // Inner class representing an edge
     public static class Edge<T> {
         private final T target;
-        private final double weight;
+        private double weight;
+        private EdgeType type;
 
-        public Edge(T target, double weight) {
+        public Edge(T target, double weight, EdgeType type) {
             this.target = target;
             this.weight = weight;
+            this.type = type;
         }
 
-        public T getTarget() {
-            return target;
-        }
-
-        public double getWeight() {
-            return weight;
-        }
+        public T getTarget() { return target; }
+        public double getWeight() { return weight; }
+        public void setWeight(double weight) { this.weight = weight; }
+        public EdgeType getType() { return type; }
+        public void setType(EdgeType type) { this.type = type; }
+    }
+    
+    public static enum EdgeType {
+        EMBEDDED,    // For value objects embedded within an entity
+        COUPLED,   	 // For coupled entities relationships
+        REFERENCE,   // For loose references across aggregates
+        VALUE,		 //	For ValueObjects
+        OWNERSHIP	 // For relationships where the parent owns the child
     }
 }
-
