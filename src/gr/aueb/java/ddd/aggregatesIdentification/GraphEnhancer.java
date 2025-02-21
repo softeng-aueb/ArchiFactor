@@ -101,7 +101,7 @@ public class GraphEnhancer<T> {
             }
         }
 
-        calibrateCreationMultiplier(graph, callGraphs);
+        // calibrateCreationMultiplier(graph, callGraphs);
         double threshold = computeDynamicThreshold(graph, callGraphs);
         System.out.println("Dynamic Coupling Threshold: " + threshold);
         
