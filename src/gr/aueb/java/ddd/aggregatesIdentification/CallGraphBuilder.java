@@ -302,7 +302,8 @@ public class CallGraphBuilder {
                 String annotationName = annotation.getTypeName().getFullyQualifiedName();
                 if (annotationName.equals("GetMapping") || annotationName.equals("PostMapping") ||
                         annotationName.equals("PutMapping") || annotationName.equals("DeleteMapping") ||
-                        annotationName.equals("RequestMapping") || annotationName.equals("Path")) {
+                        annotationName.equals("RequestMapping") || annotationName.equals("Path") || 
+                        annotationName.equals("POST")  || annotationName.equals("GET")) {
                     return true;
                 }
             }

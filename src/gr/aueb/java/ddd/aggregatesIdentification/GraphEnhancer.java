@@ -80,7 +80,7 @@ public class GraphEnhancer<T> {
 //        return scores.isEmpty() ? 0.5 : sum / scores.size();
         
         Collections.sort(scores);
-        // Compute index for the 75th percentile
+        // Compute index for the 95th percentile
         int index = (int) Math.ceil(0.95 * scores.size()) - 1;
         index = Math.max(0, index); // Ensure non-negative
         
@@ -101,7 +101,7 @@ public class GraphEnhancer<T> {
             }
         }
 
-        // calibrateCreationMultiplier(graph, callGraphs);
+        calibrateCreationMultiplier(graph, callGraphs);
         double threshold = computeDynamicThreshold(graph, callGraphs);
         System.out.println("Dynamic Coupling Threshold: " + threshold);
         

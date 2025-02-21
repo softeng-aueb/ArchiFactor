@@ -10,7 +10,8 @@ public class AccumulatedWeightClustering<T> {
     // Use 50% of the average accumulated weight as the threshold.
     private final double THRESHOLD_FACTOR = 0.5;
     // Define a minimum edge weight (if needed) for other purposes.
-    private final double MIN_EDGE_THRESHOLD = 0.5;
+    @SuppressWarnings("unused")
+	private final double MIN_EDGE_THRESHOLD = 0.5;
     // Scaling factor for weak (call graph) edges when tie breaking.
     private final double CALL_GRAPH_SCALING_FACTOR = 0.3;
     // A numeric threshold to decide whether an edge is "strong" (association) or weak.
