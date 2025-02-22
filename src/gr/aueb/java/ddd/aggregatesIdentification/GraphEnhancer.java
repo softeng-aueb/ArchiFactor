@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 
+import gr.uom.java.ast.ClassObject;
+
 public class GraphEnhancer<T> {
     
     private double creationMultiplier = 1.0; // This will be calibrated dynamically
@@ -57,10 +59,11 @@ public class GraphEnhancer<T> {
                 }
             }
         }
-        // ClassObject parentClass = (ClassObject) parent;
-        // ClassObject childClass = (ClassObject) child;
-        // System.out.println("Parent: " + parentClass.getName() + ", Child: " + childClass.getName());
-        return totalWeightedEvents > 0 ? weightedEventsToChild / totalWeightedEvents : 0.0;
+        ClassObject parentClass = (ClassObject) parent;
+        ClassObject childClass = (ClassObject) child;
+        double score  = totalWeightedEvents > 0 ? weightedEventsToChild / totalWeightedEvents : 0.0;
+        System.out.println("Parent: " + parentClass.getName() + ", total events: " + totalWeightedEvents + "| to Child: " + childClass.getName() + " - " + weightedEventsToChild + " == score: " + score);
+        return score;
     }
 
     // Compute a dynamic threshold as the average coupling score across all edges in the graph.
@@ -73,18 +76,18 @@ public class GraphEnhancer<T> {
             }
         }
         
-//        double sum = 0.0;
-//        for (double s : scores) {
-//            sum += s;
-//        }
-//        return scores.isEmpty() ? 0.5 : sum / scores.size();
+        double sum = 0.0;
+        for (double s : scores) {
+            sum += s;
+        }
+        return scores.isEmpty() ? 0.5 : sum / scores.size();
         
-        Collections.sort(scores);
+        //Collections.sort(scores);
         // Compute index for the 95th percentile
-        int index = (int) Math.ceil(0.95 * scores.size()) - 1;
-        index = Math.max(0, index); // Ensure non-negative
+        //int index = (int) Math.ceil(0.95 * scores.size()) - 1;
+        //index = Math.max(0, index); // Ensure non-negative
         
-        return scores.get(index);
+        //return scores.get(index);
     }
 
     // Enhance the graph by adjusting edge weights and possibly promoting REFERENCE to COUPLED.
@@ -96,6 +99,7 @@ public class GraphEnhancer<T> {
             	for(CreationRecord record : allCreationRecords) {
             		if(record.getCreatedBy() == parent && record.getCreated() ==  edge.getTarget()) {
             			edge.setType(ClusteringGraph.EdgeType.OWNERSHIP);
+            			edge.setWeight(ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.OWNERSHIP));
             		}
         		}
             }
@@ -107,14 +111,18 @@ public class GraphEnhancer<T> {
         
         for (T parent : graph.getVertices()) {
             for (ClusteringGraph.Edge<T> edge : graph.getNeighbors(parent)) {
+            	if(edge.getType() != ClusteringGraph.EdgeType.REFERENCE) {
+            		continue;
+            	}
                 double score = computeCouplingScore(parent, edge.getTarget(), callGraphs);
-                double factor = (score >= threshold) ? 1.0 : 0.5;
-                double newWeight = edge.getWeight() * factor;
-                edge.setWeight(newWeight);
+//                double factor = (score >= threshold) ? 1.0 : 0.5;
+//                double newWeight = edge.getWeight() * factor;
+//                edge.setWeight(newWeight);
                 
                 // Promote an edge from REFERENCE to COUPLED if coupling is strong.
                 if (edge.getType() == ClusteringGraph.EdgeType.REFERENCE && score >= threshold) {
                     edge.setType(ClusteringGraph.EdgeType.COUPLED);
+                    edge.setWeight(1.0);
                 }
             }
         }

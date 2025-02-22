@@ -164,7 +164,7 @@ public class AggregationsIdentificationView extends ViewPart {
 	                    if (isEnumerated) {
 	                    	type = ClusteringGraph.EdgeType.VALUE;
 	                    }
-	                    clusteringGraph.addEdge(vertex, toVertex, baselineFor(type), type);
+	                    clusteringGraph.addEdge(vertex, toVertex, ClusteringGraph.baselineFor(type), type);
 	                }
 	            }
 	        }
@@ -203,22 +203,6 @@ public class AggregationsIdentificationView extends ViewPart {
         }
     }
     
-    private double baselineFor(ClusteringGraph.EdgeType type) {
-        switch (type) {
-            case EMBEDDED:
-                return 2.0;
-            case COUPLED:
-                return 1.0;
-            case REFERENCE:
-                return 0.1;
-            case VALUE:
-            	return 2.0;
-            case OWNERSHIP:
-            	return 2.0;
-            default:
-                return 1.0;
-        }
-    }
 
 //    private void addEdgesForCallGraph(List<CallGraph> callGraphs, ClusteringGraph<ClassObject> clusteringGraph, SystemObject sysObj) {
 //    	

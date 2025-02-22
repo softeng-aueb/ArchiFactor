@@ -100,4 +100,21 @@ public class ClusteringGraph<T> {
         VALUE,		 //	For ValueObjects
         OWNERSHIP	 // For relationships where the parent owns the child
     }
+    
+    public static double baselineFor(ClusteringGraph.EdgeType type) {
+        switch (type) {
+        case EMBEDDED:
+            return 2.0;
+        case COUPLED:
+            return 1.0;
+        case REFERENCE:
+            return 0.1;
+        case VALUE:
+        	return 2.0;
+        case OWNERSHIP:
+        	return 2.0;
+        default:
+            return 1.0;
+    }
+}
 }

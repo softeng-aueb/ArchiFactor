@@ -14,22 +14,42 @@ public class CallGraphUtil {
      * from the given entity (a ClassObject) in the given call graph.
      */
     public static List<CallEdge> getOutgoingEdges(Object entity, CallGraph callGraph) {
-        if (!(entity instanceof ClassObject))
+        // check if it is entity
+    	if (!(entity instanceof ClassObject))
             return Collections.emptyList();
-        
+        	
         List<CallEdge> edges = new ArrayList<CallEdge>();
         ClassObject targetEntity = (ClassObject) entity;
+        
+        System.out.println("Entity: " + targetEntity.getName() + " for " + callGraph.getRoot().methodName + " -> Edges: ");
+        
+    	// check if entity is involved in callGraph
+        Boolean entityIsUpdated = false;
+        Boolean entityIsCreated = false;
+    	if(callGraph.getRoot().getDefinedEntitiesObjects().contains(targetEntity)) {
+    		System.out.println("Target entity is updated");
+    		entityIsUpdated = true;
+        }
+        if(callGraph.getRoot().createdEntitiesObjects.contains(targetEntity)) {
+    		System.out.println("Target entity is created");
+        	entityIsCreated = true;
+        }
+        if(!entityIsUpdated && !entityIsCreated) {
+        	return Collections.emptyList();
+        }
         
         CallGraphNode root = callGraph.getRoot();
         for(ClassObject updatedEntity : root.definedEntitiesObjects) {
         	if(updatedEntity != targetEntity) {
-        		CallEdge edge = new CallEdge(entity, updatedEntity, true, false);
+        		CallEdge edge = new CallEdge(entity, updatedEntity, entityIsUpdated, entityIsCreated);
+        		System.out.println("\t update" + updatedEntity.getName());
                 edges.add(edge);
         	}
         }
         for(ClassObject createdEntity : root.createdEntitiesObjects) {
         	if(createdEntity != targetEntity) {
-        		CallEdge edge = new CallEdge(entity, createdEntity, true, true);
+        		CallEdge edge = new CallEdge(entity, createdEntity, entityIsUpdated, entityIsCreated);
+        		System.out.println("\t create" + createdEntity.getName());
                 edges.add(edge);
         	}
         }
