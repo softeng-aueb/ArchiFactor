@@ -105,14 +105,14 @@ public class ClusteringGraph<T> {
         switch (type) {
         case EMBEDDED:
             return 2.0;
-        case COUPLED:
-            return 1.0;
-        case REFERENCE:
-            return 0.1;
         case VALUE:
         	return 2.0;
         case OWNERSHIP:
         	return 2.0;
+        case COUPLED:
+            return 1.0;
+        case REFERENCE:
+            return 0.1;
         default:
             return 1.0;
     }

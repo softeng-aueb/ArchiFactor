@@ -1,7 +1,6 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 
@@ -39,30 +38,28 @@ public class GraphEnhancer<T> {
 
     // Compute coupling score for an edge from parent to child based on call graphs.
     public double computeCouplingScore(T parent, T child, List<CallGraph> callGraphs) {
-        double totalWeightedEvents = 0.0;
-        double weightedEventsToChild = 0.0;
+        int totalParentCalls = 0;
+        int totalChildCalls = 0;
+        double childParentCalls = 0.0;
         
         for (CallGraph cg : callGraphs) {
-            List<CallEdge> edges = CallGraphUtil.getOutgoingEdges(parent, cg);
-            if (edges == null) continue;
-            for (CallEdge edge : edges) {
-                double eventWeight = 0.0;
-                if (edge.isInUpdateTransaction()) {
-                    eventWeight += 1.0;
-                }
-                if (edge.isCreationEvent()) {
-                    eventWeight += creationMultiplier;
-                }
-                totalWeightedEvents += eventWeight;
+            List<CallEdge> parentEdges = CallGraphUtil.getOutgoingEdges(parent, cg);
+            List<CallEdge> childEdges = CallGraphUtil.getOutgoingEdges(child, cg);
+            if (parentEdges == null || childEdges == null) continue;
+            totalParentCalls += parentEdges.size();
+            totalChildCalls += childEdges.size();
+            
+            for (CallEdge edge : parentEdges) {
             	if (edge.getTarget() != null && edge.getTarget().equals(child)) {
-                    weightedEventsToChild += eventWeight;
+            		childParentCalls += edge.isInUpdateTransaction() ? 1.0 : creationMultiplier;
                 }
             }
         }
         ClassObject parentClass = (ClassObject) parent;
         ClassObject childClass = (ClassObject) child;
-        double score  = totalWeightedEvents > 0 ? weightedEventsToChild / totalWeightedEvents : 0.0;
-        System.out.println("Parent: " + parentClass.getName() + ", total events: " + totalWeightedEvents + "| to Child: " + childClass.getName() + " - " + weightedEventsToChild + " == score: " + score);
+        double score  = (totalParentCalls + totalChildCalls > 0) ? (double)(childParentCalls * 2) / (double)(totalParentCalls + totalChildCalls) : 0.0;
+        System.out.println("Parent: " + parentClass.getName() + ", total events: " + totalParentCalls 
+        		+ "| to Child: " + childClass.getName() + ", total events: " + totalChildCalls + " - " + childParentCalls + " == score: " + score);
         return score;
     }
 
@@ -81,13 +78,6 @@ public class GraphEnhancer<T> {
             sum += s;
         }
         return scores.isEmpty() ? 0.5 : sum / scores.size();
-        
-        //Collections.sort(scores);
-        // Compute index for the 95th percentile
-        //int index = (int) Math.ceil(0.95 * scores.size()) - 1;
-        //index = Math.max(0, index); // Ensure non-negative
-        
-        //return scores.get(index);
     }
 
     // Enhance the graph by adjusting edge weights and possibly promoting REFERENCE to COUPLED.
@@ -107,7 +97,7 @@ public class GraphEnhancer<T> {
 
         // calibrateCreationMultiplier(graph, callGraphs);
         double threshold = computeDynamicThreshold(graph, callGraphs);
-        System.out.println("Dynamic Coupling Threshold: " + threshold);
+        System.out.println("Dynamic Coupling Threshold: " + threshold + "\n" + "CreationMultiplier: " + creationMultiplier);
         
         for (T parent : graph.getVertices()) {
             for (ClusteringGraph.Edge<T> edge : graph.getNeighbors(parent)) {
@@ -121,8 +111,9 @@ public class GraphEnhancer<T> {
                 
                 // Promote an edge from REFERENCE to COUPLED if coupling is strong.
                 if (edge.getType() == ClusteringGraph.EdgeType.REFERENCE && score >= threshold) {
+                	 System.out.println("Upgrading REFERENCE to COUPLED: " + parent.getClass().getName() + " -> " + edge.getTarget().getClass().getName());
                     edge.setType(ClusteringGraph.EdgeType.COUPLED);
-                    edge.setWeight(1.0);
+                    edge.setWeight(ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.COUPLED));
                 }
             }
         }

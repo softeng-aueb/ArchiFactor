@@ -21,17 +21,17 @@ public class CallGraphUtil {
         List<CallEdge> edges = new ArrayList<CallEdge>();
         ClassObject targetEntity = (ClassObject) entity;
         
-        System.out.println("Entity: " + targetEntity.getName() + " for " + callGraph.getRoot().methodName + " -> Edges: ");
+        //System.out.println("Entity: " + targetEntity.getName() + " for " + callGraph.getRoot().methodName + " -> Edges: ");
         
     	// check if entity is involved in callGraph
         Boolean entityIsUpdated = false;
         Boolean entityIsCreated = false;
     	if(callGraph.getRoot().getDefinedEntitiesObjects().contains(targetEntity)) {
-    		System.out.println("Target entity is updated");
+    		//System.out.println("Target entity is updated");
     		entityIsUpdated = true;
         }
         if(callGraph.getRoot().createdEntitiesObjects.contains(targetEntity)) {
-    		System.out.println("Target entity is created");
+    		//System.out.println("Target entity is created");
         	entityIsCreated = true;
         }
         if(!entityIsUpdated && !entityIsCreated) {
@@ -42,14 +42,14 @@ public class CallGraphUtil {
         for(ClassObject updatedEntity : root.definedEntitiesObjects) {
         	if(updatedEntity != targetEntity) {
         		CallEdge edge = new CallEdge(entity, updatedEntity, entityIsUpdated, entityIsCreated);
-        		System.out.println("\t update" + updatedEntity.getName());
+        		//System.out.println("\t update " + updatedEntity.getName());
                 edges.add(edge);
         	}
         }
         for(ClassObject createdEntity : root.createdEntitiesObjects) {
         	if(createdEntity != targetEntity) {
         		CallEdge edge = new CallEdge(entity, createdEntity, entityIsUpdated, entityIsCreated);
-        		System.out.println("\t create" + createdEntity.getName());
+        		//System.out.println("\t create " + createdEntity.getName());
                 edges.add(edge);
         	}
         }
