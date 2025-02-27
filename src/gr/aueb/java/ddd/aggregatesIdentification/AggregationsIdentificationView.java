@@ -153,7 +153,10 @@ public class AggregationsIdentificationView extends ViewPart {
 	                    List<Annotation> fieldAnnotations = association.getFieldObject().getAnnotations();
 	                    for(Annotation annotation : fieldAnnotations) {
 	                    	IAnnotationBinding annotationBinding = annotation.resolveAnnotationBinding();
-	                    	if(annotationBinding.getName().equals("Enumerated")) {
+	                    	if(
+	                    		annotationBinding.getName().equals("Enumerated") ||
+	                    		annotationBinding.getName().equals("Type")
+	                    	) {
 	                    		isEnumerated = true;
 	                    	}
 	                    }
@@ -168,18 +171,21 @@ public class AggregationsIdentificationView extends ViewPart {
 	                }
 	            }
 	        }
+
+	        StringBuilder graphString = new StringBuilder();
+	        graphString.append("\n\n Graph after static association:\n");
+	        graphString.append(clusteringGraph.printGraph());
+	        text.append(graphString.toString());
 	        
-	        System.out.println("Graph after static association:");
-	        clusteringGraph.printGraph();
-	        
-//	        addEdgesForCallGraph(callGraphs, clusteringGraph, sysObj);
 	        
 	        // Enhance the graph: adjust weights/promote edges using dynamic coupling data
 	        GraphEnhancer<ClassObject> enhancer = new GraphEnhancer<ClassObject>();
 	        enhancer.enhanceGraph(clusteringGraph, callGraphs);
 	        
-	        System.out.println("Graph after dynamic enhancement:");
-	        clusteringGraph.printGraph();
+	        StringBuilder graphString2 = new StringBuilder();
+	        graphString2.append("\n\n Graph after enhancement:\n");
+	        graphString2.append(clusteringGraph.printGraph());
+	        text.append(graphString2.toString());
 	        
 	        
 	        // Perform clustering on the enhanced graph
@@ -203,33 +209,10 @@ public class AggregationsIdentificationView extends ViewPart {
         }
     }
     
-
-//    private void addEdgesForCallGraph(List<CallGraph> callGraphs, ClusteringGraph<ClassObject> clusteringGraph, SystemObject sysObj) {
-//    	
-//    	for (CallGraph callGraph : callGraphs) {
-//    		HashSet<ClassObject> definedClasses = new HashSet<ClassObject>();
-//    		for (String createdEnity : callGraph.getRoot().createdEntities) {
-//            	ClassObject classObjecOfEntity = sysObj.getClassObject(createdEnity);
-//            	definedClasses.add(classObjecOfEntity);
-//        	}
-//        	for (String definedEntity : callGraph.getRoot().definedEntities) {
-//	        	ClassObject classObjecOfEntity = sysObj.getClassObject(definedEntity);
-//	        	definedClasses.add(classObjecOfEntity);
-//        	}
-//        	for (ClassObject definedClass1 : definedClasses) {
-//        		for (ClassObject definedClass2 : definedClasses) {
-//        	        if (!definedClass1.equals(definedClass2)) { // Avoid self-comparison
-//        	        	if(clusteringGraph.hasEdge(definedClass1, definedClass2)) {
-//        	        		clusteringGraph.addEdge(definedClass1,  definedClass2, 0.1);
-//        	        	}
-//        	        }
-//        	    }
-//        	}
-//    	}
-//    }
     
     private void displayCallGraphs(List<CallGraph> callGraphs) {
         StringBuilder sb = new StringBuilder();
+        sb.append("\n\n Callgraphs:\n");
         for (CallGraph callGraph : callGraphs) {
             sb.append("Endpoint: ").append(callGraph.getRoot().getMethodName());
             if(callGraph.getRoot().isReadOnly) {
@@ -249,14 +232,14 @@ public class AggregationsIdentificationView extends ViewPart {
             appendCalls(sb, callGraph.getRoot(), "  ");
             sb.append("\n");
         }
-        text.setText(sb.toString());
+        text.append(sb.toString());
     }
     
     private void displayClusters( List<Set<ClassObject>> clusters) {
         StringBuilder sb = new StringBuilder();
         
         for (Set<ClassObject> cluster : clusters) {
-        	sb.append("Cluster:\n");
+        	sb.append("\nCluster:\n");
             for (ClassObject entityClass : cluster) {
             	 sb.append("\t" + ClusteringGraph.getSimpleName(entityClass.getName()) + "\n");
             }

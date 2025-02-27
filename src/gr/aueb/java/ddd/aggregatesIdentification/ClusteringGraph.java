@@ -50,20 +50,21 @@ public class ClusteringGraph<T> {
     }
 
     // Helper function to print the graph
-    public void printGraph() {
+    public StringBuilder printGraph() {
+    	StringBuilder sb = new StringBuilder();
         for (Map.Entry<T, List<Edge<T>>> entry : adjacencyList.entrySet()) {
             T vertex = entry.getKey();
             List<Edge<T>> edges = entry.getValue();
             ClassObject entity = (ClassObject) vertex;
-            System.out.print("Vertex " + getSimpleName(entity.getName()) + " is connected to:\n");
+            sb.append("Vertex " + getSimpleName(entity.getName()) + " is connected to:\n");
             for (Edge<T> edge : edges) {
                 ClassObject edgeEntity = (ClassObject) edge.getTarget();
-                System.out.print("\t(" + getSimpleName(edgeEntity.getName()) + 
+                sb.append("\t(" + getSimpleName(edgeEntity.getName()) + 
                                    ", weight: " + edge.getWeight() + 
                                    ", type: " + edge.getType() + ")\n");
             }
-            System.out.println();
         }
+        return sb;
     }
 
     public static String getSimpleName(String fullName) {
