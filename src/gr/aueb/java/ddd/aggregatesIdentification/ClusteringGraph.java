@@ -48,6 +48,31 @@ public class ClusteringGraph<T> {
         }
         return false;
     }
+    
+    public void setEdge(T parent, T child, Edge<T> edgeUpdate) {
+        if (!adjacencyList.containsKey(parent)) {
+            return;
+        }
+        for (Edge<T> edge : adjacencyList.get(parent)) {
+            if (edge.getTarget().equals(child)) {
+                edge.type = edgeUpdate.type;
+                edge.weight = edgeUpdate.weight;
+            }
+        }
+    }
+    
+
+	public Edge<T> getEdge(T nodeA, T nodeB) {
+		if (!adjacencyList.containsKey(nodeA)) {
+            return null;
+        }
+        for (Edge<T> edge : adjacencyList.get(nodeA)) {
+            if (edge.getTarget().equals(nodeB)) {
+                return edge;
+            }
+        }
+        return null;
+	}
 
     // Helper function to print the graph
     public StringBuilder printGraph() {
@@ -118,4 +143,5 @@ public class ClusteringGraph<T> {
             return 1.0;
     }
 }
+
 }

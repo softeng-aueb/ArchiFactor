@@ -5,12 +5,14 @@ public class CallEdge {
     private Object target;
     private boolean inUpdateTransaction;
     private boolean creationEvent;
+    private boolean inReadTransaction;
 
-    public CallEdge(Object caller, Object target, boolean inUpdateTransaction, boolean creationEvent) {
+    public CallEdge(Object caller, Object target, boolean inUpdateTransaction, boolean creationEvent, boolean readEvent) {
         this.caller = caller;
         this.target = target;
         this.inUpdateTransaction = inUpdateTransaction;
         this.creationEvent = creationEvent;
+        this.inReadTransaction = readEvent;
     }
 
     public Object getCaller() {
@@ -27,5 +29,9 @@ public class CallEdge {
 
     public boolean isCreationEvent() {
         return creationEvent;
+    }
+    
+    public boolean isInReadTransaction() {
+        return inReadTransaction;
     }
 }

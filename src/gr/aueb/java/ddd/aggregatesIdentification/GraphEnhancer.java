@@ -1,6 +1,7 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 
@@ -51,7 +52,7 @@ public class GraphEnhancer<T> {
             
             for (CallEdge edge : parentEdges) {
             	if (edge.getTarget() != null && edge.getTarget().equals(child)) {
-            		childParentCalls += edge.isInUpdateTransaction() ? 1.0 : creationMultiplier;
+            		childParentCalls += (edge.isInUpdateTransaction() | edge.isCreationEvent() ) ? 1.0 : 0.0;
                 }
             }
         }
@@ -90,6 +91,7 @@ public class GraphEnhancer<T> {
             		if(record.getCreatedBy() == parent && record.getCreated() ==  edge.getTarget()) {
             			edge.setType(ClusteringGraph.EdgeType.OWNERSHIP);
             			edge.setWeight(ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.OWNERSHIP));
+            			graph.setEdge(edge.getTarget(), parent, edge);
             		}
         		}
             }
@@ -107,7 +109,7 @@ public class GraphEnhancer<T> {
                 double score = computeCouplingScore(parent, edge.getTarget(), callGraphs);
 //                double factor = (score >= threshold) ? 1.0 : 0.5;
 //                double newWeight = edge.getWeight() * factor;
-//                edge.setWeight(newWeight);
+                if(score != 0.0) edge.setWeight(score);
                 
                 // Promote an edge from REFERENCE to COUPLED if coupling is strong.
                 if (edge.getType() == ClusteringGraph.EdgeType.REFERENCE && score >= threshold) {
@@ -115,6 +117,7 @@ public class GraphEnhancer<T> {
                     edge.setType(ClusteringGraph.EdgeType.COUPLED);
                     edge.setWeight(ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.COUPLED));
                 }
+                graph.setEdge(parent, edge.getTarget(), edge);
             }
         }
     }

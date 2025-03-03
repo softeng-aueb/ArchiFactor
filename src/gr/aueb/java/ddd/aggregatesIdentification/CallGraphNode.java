@@ -20,6 +20,7 @@ public class CallGraphNode {
     HashSet<String> createdEntities;
     HashSet<ClassObject> createdEntitiesObjects;
     HashSet<ClassObject> definedEntitiesObjects;
+    HashSet<ClassObject> accessedEntitiesObjects;
     HashSet<String> allEntitiesNames;
     List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
@@ -35,6 +36,7 @@ public class CallGraphNode {
         this.definedEntities = new HashSet<String>();
         this.createdEntities = new HashSet<String>();
         this.createdEntitiesObjects = new HashSet<ClassObject>();
+        this.accessedEntitiesObjects = new HashSet<ClassObject>();
         this.allEntities = new HashSet<ClassObject>();
         this.definedEntitiesObjects = new HashSet<ClassObject>();
         this.allEntitiesNames = new HashSet<String>();

@@ -4,16 +4,43 @@ import java.util.*;
 
 public class LouvainClustering<T> {
 
-    // Perform Louvain clustering on the graph
+    private static final int LOUVAIN_ITERATIONS = 5;
+
     public List<Set<T>> louvainClustering(ClusteringGraph<T> graph) {
+        Map<List<Set<T>>, Integer> clusteringCounts = new HashMap<List<Set<T>>, Integer>();
+
+        for (int i = 0; i < LOUVAIN_ITERATIONS; i++) {
+            List<Set<T>> clustering = singleLouvainRun(graph);
+            if (clusteringCounts.containsKey(clustering)) {
+                clusteringCounts.put(clustering, clusteringCounts.get(clustering) + 1);
+            } else {
+                clusteringCounts.put(clustering, 1);
+            }
+        }
+
+        return getMostFrequentClustering(clusteringCounts);
+    }
+
+    private List<Set<T>> singleLouvainRun(final ClusteringGraph<T> graph) {
         Map<T, Integer> nodeToCommunity = new HashMap<T, Integer>();
         Map<Integer, Set<T>> communities = new HashMap<Integer, Set<T>>();
+        List<T> nodes = new ArrayList<T>(graph.getVertices());
 
-        // Step 1: Initialize each node to its own community
+        // Sort nodes by highest total edge weight (strongest relationships first)
+        Collections.sort(nodes, new Comparator<T>() {
+            public int compare(T a, T b) {
+                double weightA = getTotalEdgeWeight(a, graph);
+                double weightB = getTotalEdgeWeight(b, graph);
+                return Double.compare(weightB, weightA); // Descending order
+            }
+        });
+
         int communityId = 0;
-        for (T node : graph.getVertices()) {
+        for (T node : nodes) {
             nodeToCommunity.put(node, communityId);
-            communities.put(communityId, new HashSet<T>(Collections.singleton(node)));
+            Set<T> initialSet = new HashSet<T>();
+            initialSet.add(node);
+            communities.put(communityId, initialSet);
             communityId++;
         }
 
@@ -21,27 +48,32 @@ public class LouvainClustering<T> {
         do {
             changed = false;
 
-            // Step 2: Iteratively refine communities
-            for (T node : graph.getVertices()) {
+            // Sort nodes again before each iteration (ensuring stable processing order)
+            Collections.sort(nodes, new Comparator<T>() {
+                public int compare(T a, T b) {
+                    double weightA = getTotalEdgeWeight(a, graph);
+                    double weightB = getTotalEdgeWeight(b, graph);
+                    return Double.compare(weightB, weightA);
+                }
+            });
+
+            for (T node : nodes) {
                 int currentCommunity = nodeToCommunity.get(node);
                 Map<Integer, Double> neighborCommunityWeights = new HashMap<Integer, Double>();
 
-                // Calculate modularity contribution from neighboring communities
                 for (ClusteringGraph.Edge<T> edge : graph.getNeighbors(node)) {
                     T neighbor = edge.getTarget();
                     int neighborCommunity = nodeToCommunity.get(neighbor);
-
-                    // Add weight to the corresponding community
-                    if (neighborCommunityWeights.containsKey(neighborCommunity)) {
-                        neighborCommunityWeights.put(neighborCommunity, neighborCommunityWeights.get(neighborCommunity) + edge.getWeight());
-                    } else {
-                        neighborCommunityWeights.put(neighborCommunity, edge.getWeight());
+                    
+                    if (!neighborCommunityWeights.containsKey(neighborCommunity)) {
+                        neighborCommunityWeights.put(neighborCommunity, 0.0);
                     }
+                    neighborCommunityWeights.put(neighborCommunity,
+                            neighborCommunityWeights.get(neighborCommunity) + edge.getWeight());
                 }
 
-                // Find the best community for the node
                 int bestCommunity = currentCommunity;
-                double maxGain = 0;
+                double maxGain = -1;
 
                 for (Map.Entry<Integer, Double> entry : neighborCommunityWeights.entrySet()) {
                     int targetCommunity = entry.getKey();
@@ -53,7 +85,6 @@ public class LouvainClustering<T> {
                     }
                 }
 
-                // Move the node if a better community is found
                 if (bestCommunity != currentCommunity) {
                     communities.get(currentCommunity).remove(node);
                     if (communities.get(currentCommunity).isEmpty()) {
@@ -70,7 +101,27 @@ public class LouvainClustering<T> {
             }
         } while (changed);
 
-        // Step 3: Return the final clusters
         return new ArrayList<Set<T>>(communities.values());
+    }
+
+    private double getTotalEdgeWeight(T node, ClusteringGraph<T> graph) {
+        double totalWeight = 0.0;
+        for (ClusteringGraph.Edge<T> edge : graph.getNeighbors(node)) {
+            totalWeight += edge.getWeight();
+        }
+        return totalWeight;
+    }
+
+    private List<Set<T>> getMostFrequentClustering(Map<List<Set<T>>, Integer> clusteringCounts) {
+        List<Set<T>> bestClustering = null;
+        int maxCount = 0;
+
+        for (Map.Entry<List<Set<T>>, Integer> entry : clusteringCounts.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                maxCount = entry.getValue();
+                bestClustering = entry.getKey();
+            }
+        }
+        return bestClustering;
     }
 }

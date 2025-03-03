@@ -122,6 +122,7 @@ public class CallGraphBuilder {
                                 if(isEntity) {
                                 	calledNode.accessedEntities.add(declaringClass.getQualifiedName());
                                 	calledNode.allEntities.add(classObjecOfEntity);
+                                	calledNode.accessedEntitiesObjects.add(classObjecOfEntity);
                                 	calledNode.allEntitiesNames.add(declaringClass.getQualifiedName());
                                 }
                                 final IMethod method = (IMethod) methodBinding.getJavaElement();
@@ -158,6 +159,7 @@ public class CallGraphBuilder {
                                                         if (md.getName().getIdentifier().equals(methodInvocation.getName().getIdentifier())) {
                                                             findMethodCalls(calledNode, md, visitedMethods);
                                                             parentNode.accessedEntities.addAll(calledNode.accessedEntities);
+                                                            parentNode.accessedEntitiesObjects.addAll(calledNode.accessedEntitiesObjects);
                                                             parentNode.definedEntities.addAll(calledNode.definedEntities);
                                                             parentNode.definedEntitiesObjects.addAll(calledNode.definedEntitiesObjects);
                                                             parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);

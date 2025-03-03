@@ -26,6 +26,7 @@ public class CallGraphUtil {
     	// check if entity is involved in callGraph
         Boolean entityIsUpdated = false;
         Boolean entityIsCreated = false;
+        Boolean entityIsRead = false;
     	if(callGraph.getRoot().getDefinedEntitiesObjects().contains(targetEntity)) {
     		//System.out.println("Target entity is updated");
     		entityIsUpdated = true;
@@ -41,18 +42,25 @@ public class CallGraphUtil {
         CallGraphNode root = callGraph.getRoot();
         for(ClassObject updatedEntity : root.definedEntitiesObjects) {
         	if(updatedEntity != targetEntity) {
-        		CallEdge edge = new CallEdge(entity, updatedEntity, entityIsUpdated, entityIsCreated);
+        		CallEdge edge = new CallEdge(entity, updatedEntity, entityIsUpdated, entityIsCreated, entityIsRead);
         		//System.out.println("\t update " + updatedEntity.getName());
                 edges.add(edge);
         	}
         }
         for(ClassObject createdEntity : root.createdEntitiesObjects) {
         	if(createdEntity != targetEntity) {
-        		CallEdge edge = new CallEdge(entity, createdEntity, entityIsUpdated, entityIsCreated);
+        		CallEdge edge = new CallEdge(entity, createdEntity, entityIsUpdated, entityIsCreated, entityIsRead);
         		//System.out.println("\t create " + createdEntity.getName());
                 edges.add(edge);
         	}
         }
+//        for(ClassObject readEntity : root.accessedEntitiesObjects) {
+//        	if(readEntity != targetEntity) {
+//        		CallEdge edge = new CallEdge(entity, readEntity, entityIsUpdated, entityIsCreated, entityIsRead);
+//        		//System.out.println("\t create " + createdEntity.getName());
+//                edges.add(edge);
+//        	}
+//        }
         return edges;
     }
     
