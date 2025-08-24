@@ -40,6 +40,14 @@
                id="gr.uom.java.jdeodorant.actions.MicroserviceExtraction">
          </action>
          <action
+               label="Unmap JPA Relationships"
+               icon="icons/repair.png"
+               class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
+               tooltip="Unmap JPA Relationships"
+               menubarPath="BadSmellsMenu/sampleGroup"
+               id="gr.aueb.java.jdeodorant.actions.UnmapJpaRelationships">
+         </action>
+         <action
                class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
                icon="icons/repair.png"
                id="gr.uom.java.jdeodorant.actions.FeatureEnvy"
@@ -108,6 +116,13 @@
             name="Microservice Extraction">
       </view>
       <view
+            category="gr.uom.java.jdeodorant"
+            class="gr.aueb.java.archifactor.refactoring.views.UnmapJpaRelationships"
+            icon="icons/repair.png"
+            id="gr.aueb.java.jdeodorant.views.UnmapJpaRelationships"
+            name="Unmap JPA Relationships">
+      </view>
+      <view
             name="Feature Envy"
             icon="icons/repair.png"
             category="gr.uom.java.jdeodorant"
@@ -172,6 +187,15 @@
             targetID="org.eclipse.ui.resourcePerspective">
          <view
                id="gr.uom.java.jdeodorant.views.MicroserviceExtraction"
+               ratio="0.5"
+               relationship="right"
+               relative="org.eclipse.ui.views.TaskList">
+         </view>
+      </perspectiveExtension>
+      <perspectiveExtension
+            targetID="org.eclipse.ui.resourcePerspective">
+         <view
+               id="gr.aueb.java.jdeodorant.views.UnmapJpaRelationships"
                ratio="0.5"
                relationship="right"
                relative="org.eclipse.ui.views.TaskList">

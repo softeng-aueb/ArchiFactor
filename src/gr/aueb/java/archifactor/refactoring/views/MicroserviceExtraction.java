@@ -120,7 +120,6 @@ import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.ui.texteditor.ITextEditor;
 
 import gr.aueb.java.archifactor.refactoring.manipulators.BreakAssociationRefactoring;
-import gr.aueb.java.archifactor.util.JpaModelUtil;
 import gr.aueb.java.jpa.AssociationObject;
 import gr.aueb.java.jpa.EntityObject;
 import gr.aueb.java.jpa.JpaModel;
