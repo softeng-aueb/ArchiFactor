@@ -17,13 +17,16 @@ import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Iterator;
 
 public class EntityTransformer {
     private SystemObject systemObject;
+    private Map<String, List<ServiceMethodRequirement>> serviceMethodRequirements;
 
-    public EntityTransformer(SystemObject systemObject) {
+    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodRequirement>> serviceMethodRequirements) {
         this.systemObject = systemObject;
+        this.serviceMethodRequirements = serviceMethodRequirements;
     }
 
     public Change transformFromEntity(ClassObject entity, RelationshipInfo relationship) throws Exception {
@@ -341,6 +344,13 @@ public class EntityTransformer {
         String serviceName = UnmapJpaRelationshipsUtils.decapitalize(simpleTargetEntityName) + "Service";
         String serviceClassName = simpleTargetEntityName + "Service";
 
+        ServiceMethodRequirement requirement = findServiceMethodRequirement(targetEntityName, relationship);
+        if (requirement == null) {
+            throw new IllegalStateException("No service method requirement found for the " + relationship.getRelationshipType() 
+            	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
+        }
+        String serviceMethodName = requirement.getMethodName();
+
         MethodInvocation isEmptyCall = ast.newMethodInvocation();
         isEmptyCall.setExpression(ast.newSimpleName(fieldName));
         isEmptyCall.setName(ast.newSimpleName("isEmpty"));
@@ -368,12 +378,7 @@ public class EntityTransformer {
 
         MethodInvocation serviceMethodCall = ast.newMethodInvocation();
         serviceMethodCall.setExpression(ast.newSimpleName(serviceName));
-        serviceMethodCall.setName(ast.newSimpleName("get" + simpleTargetEntityName + "sByForeignKey"));
-
-        String fkColumnName = relationship.getJoinColumnName();
-        StringLiteral columnNameLiteral = ast.newStringLiteral();
-        columnNameLiteral.setLiteralValue(fkColumnName);
-        serviceMethodCall.arguments().add(columnNameLiteral);
+        serviceMethodCall.setName(ast.newSimpleName(serviceMethodName));
 
         JpaAnnotationExtractor jpaAnnotationExtractor = new JpaAnnotationExtractor(systemObject);
         String idAnnotatedFieldName = jpaAnnotationExtractor.extractIdFieldName(entity.getName());
@@ -402,6 +407,13 @@ public class EntityTransformer {
         String simpleTargetEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(targetEntityName);
         String serviceName = UnmapJpaRelationshipsUtils.decapitalize(simpleTargetEntityName) + "Service";
         String serviceClassName = simpleTargetEntityName + "Service";
+
+        ServiceMethodRequirement requirement = findServiceMethodRequirement(targetEntityName, relationship);
+        if (requirement == null) {
+            throw new IllegalStateException("No service method requirement found for the " + relationship.getRelationshipType() 
+            	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
+        }
+        String serviceMethodName = requirement.getMethodName();
 
         InfixExpression fieldNullCheck = ast.newInfixExpression();
         fieldNullCheck.setLeftOperand(ast.newSimpleName(fieldName));
@@ -439,7 +451,7 @@ public class EntityTransformer {
 
         MethodInvocation serviceMethodCall = ast.newMethodInvocation();
         serviceMethodCall.setExpression(ast.newSimpleName(serviceName));
-        serviceMethodCall.setName(ast.newSimpleName("get" + simpleTargetEntityName + "ById"));
+        serviceMethodCall.setName(ast.newSimpleName(serviceMethodName));
         serviceMethodCall.arguments().add(ast.newSimpleName(fkFieldName));
 
         Assignment assignment = ast.newAssignment();
@@ -459,6 +471,33 @@ public class EntityTransformer {
         importRewrite.addImport(servicePackage + ".ServiceFactory");
 
         return newBody;
+    }
+
+    private ServiceMethodRequirement findServiceMethodRequirement(String targetEntityName, RelationshipInfo relationship) {
+        if (!serviceMethodRequirements.containsKey(targetEntityName)) {
+            return null;
+        }
+
+        String relationshipType = relationship.getRelationshipType();
+        List<ServiceMethodRequirement> requirements = serviceMethodRequirements.get(targetEntityName);
+        for (ServiceMethodRequirement requirement : requirements) {
+            if (relationshipType.equals("ManyToOne") && requirement.getMethodType() == ServiceMethodType.GET_BY_ID) {
+                return requirement;
+            } else if (relationshipType.equals("OneToMany") 
+            		&& requirement.getMethodType() == ServiceMethodType.GET_BY_FOREIGN_KEY 
+            		&& requirement.getForeignKeyFieldName() != null 
+                    && requirement.getForeignKeyFieldName().equals(relationship.getJoinColumnName())) {
+                return requirement;
+            } else if (relationshipType.equals("ManyToMany")) {
+                if (relationship.isOwningSide() && requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
+                    return requirement;
+                } else if (!relationship.isOwningSide() && requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_NON_OWNING) {
+                    return requirement;
+                }
+            }
+        }
+
+        return null;
     }
 
     private boolean replaceFieldAccessesWithMethodCalls(

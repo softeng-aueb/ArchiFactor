@@ -19,9 +19,9 @@ import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
 import gr.aueb.java.jpa.JpaModel;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.ListIterator;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -30,19 +30,19 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     private List<RelationshipInfo> relationships;
     private SystemObject systemObject;
     private Map<String, ClassObject> entityMap;
-    private Set<String> servicesToCreate;
-    
+    private Map<String, List<ServiceMethodRequirement>> serviceMethodRequirements;
+
     public UnmapJpaRelationshipsRefactoring(IJavaProject project, List<RelationshipInfo> relationships, SystemObject systemObject) {
         this.project = project;
         this.relationships = relationships;
         this.systemObject = systemObject;
         this.entityMap = new HashMap<>();
-        this.servicesToCreate = new HashSet<>();
-        
+        this.serviceMethodRequirements = new HashMap<>();
+
         buildEntityMap();
-        identifyRequiredServices();
+        identifyRequiredServiceMethods();
     }
-    
+
     private void buildEntityMap() {
         ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
         while (classIterator.hasNext()) {
@@ -52,14 +52,147 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             }
         }
     }
-    
-    private void identifyRequiredServices() {
+
+    /**
+     * Analyzes all relationships to determine which service methods are needed for lazy loading.
+     * ManyToOne: needs getXById(Y) where X is toEntity, and Y is toEntity's @Id type
+     * OneToMany: needs getXsByY(Z) where X is toEntity, Y is toEntity's FK field name, and Z is fromEntity's @Id type
+     * ManyToMany owning: needs getXsByIds(Y) where X is toEntity, and Y is a Collection of toEntity's @Id type
+     * ManyToMany non-owning: needs getXsByYId(Z) where X is toEntity, Y is fromEntity, and Z is fromEntity's @Id type
+     */
+    private void identifyRequiredServiceMethods() {
         for (RelationshipInfo relationship : relationships) {
-            servicesToCreate.add(relationship.getFromEntity());
-            servicesToCreate.add(relationship.getToEntity());
+            String relationshipType = relationship.getRelationshipType();
+
+            if (relationshipType.equals("ManyToOne")) {
+                addManyToOneRequirements(relationship);
+            } else if (relationshipType.equals("OneToMany")) {
+                addOneToManyRequirements(relationship);
+            } else if (relationshipType.equals("ManyToMany")) {
+                if (relationship.isOwningSide()) {
+                    addManyToManyOwningRequirements(relationship);
+                } else {
+                    addManyToManyNonOwningRequirements(relationship);
+                }
+            }
         }
     }
-    
+
+    private void addManyToOneRequirements(RelationshipInfo relationship) {
+        String toEntity = relationship.getToEntity();
+        String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
+        String toEntityIdType = relationship.getReferencedPkType();
+        String toEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(toEntityIdType);
+
+        String methodName = "get" + toEntitySimple + "ById";
+
+        ServiceMethodRequirement requirement = new ServiceMethodRequirement(
+            toEntity,
+            null,
+            ServiceMethodType.GET_BY_ID,
+            toEntityIdTypeSimple,
+            toEntitySimple,
+            null,
+            methodName,
+            null,
+            null
+        );
+
+        addMethodRequirement(toEntity, requirement);
+    }
+
+    private void addOneToManyRequirements(RelationshipInfo relationship) {
+        String toEntity = relationship.getToEntity();
+        String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
+
+        JpaAnnotationExtractor jpaExtractor = new JpaAnnotationExtractor(systemObject);
+        String fromEntity = relationship.getFromEntity();
+        String fromEntityIdType = jpaExtractor.extractIdFieldType(fromEntity);
+        String fromEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(fromEntityIdType);
+
+        String fkFieldName = relationship.getJoinColumnName();
+        String methodName = "get" + toEntitySimple + "sBy" + UnmapJpaRelationshipsUtils.capitalize(fkFieldName);
+
+        ServiceMethodRequirement requirement = new ServiceMethodRequirement(
+            toEntity,
+            null,
+            ServiceMethodType.GET_BY_FOREIGN_KEY,
+            fromEntityIdTypeSimple,
+            "List<" + toEntitySimple + ">",
+            fkFieldName,
+            methodName,
+            null,
+            null
+        );
+
+        addMethodRequirement(toEntity, requirement);
+    }
+
+    private void addManyToManyOwningRequirements(RelationshipInfo relationship) {
+        String toEntity = relationship.getToEntity();
+        String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
+        String toEntityIdType = relationship.getReferencedPkType();
+        String toEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(toEntityIdType);
+        String toEntityIdFieldName = relationship.getReferencedPkName();
+
+        String methodName = "get" + toEntitySimple + "sByIds";
+
+        ServiceMethodRequirement requirement = new ServiceMethodRequirement(
+            toEntity,
+            null,
+            ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING,
+            toEntityIdTypeSimple,
+            "List<" + toEntitySimple + ">",
+            null,
+            methodName,
+            toEntityIdFieldName,
+            null
+        );
+
+        addMethodRequirement(toEntity, requirement);
+    }
+
+    private void addManyToManyNonOwningRequirements(RelationshipInfo relationship) {
+        String toEntity = relationship.getToEntity();
+        String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
+
+        String fromEntity = relationship.getFromEntity();
+        String fromEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(fromEntity);
+
+        JpaAnnotationExtractor jpaExtractor = new JpaAnnotationExtractor(systemObject);
+        String fromEntityIdType = jpaExtractor.extractIdFieldType(fromEntity);
+        String fromEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(fromEntityIdType);
+
+        String methodName = "get" + toEntitySimple + "sBy" + fromEntitySimple + "Id";
+
+        String joinTableInverseJoinColumns = relationship.getJoinTableInverseJoinColumns();
+
+        ServiceMethodRequirement requirement = new ServiceMethodRequirement(
+            toEntity,
+            fromEntitySimple,
+            ServiceMethodType.GET_BY_MANY_TO_MANY_NON_OWNING,
+            fromEntityIdTypeSimple,
+            "List<" + toEntitySimple + ">",
+            null,
+            methodName,
+            null,
+            joinTableInverseJoinColumns
+        );
+
+        addMethodRequirement(toEntity, requirement);
+    }
+
+    private void addMethodRequirement(String entityName, ServiceMethodRequirement requirement) {
+        if (!serviceMethodRequirements.containsKey(entityName)) {
+            serviceMethodRequirements.put(entityName, new ArrayList<>());
+        }
+
+        List<ServiceMethodRequirement> requirements = serviceMethodRequirements.get(entityName);
+        if (!requirements.contains(requirement)) {
+            requirements.add(requirement);
+        }
+    }
+
     @Override
     public String getName() {
         return "Unmap JPA Relationships";
@@ -110,18 +243,23 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     public Change createChange(IProgressMonitor monitor) throws OperationCanceledException {
         CompositeChange compositeChange = new CompositeChange("Unmap JPA Relationships");
         try {
+            Set<String> entitiesNeedingServices = serviceMethodRequirements.keySet();
+
             // 1. Create ServiceFactory first (so entity imports can reference it)
             ServiceFactoryGenerator factoryGenerator = new ServiceFactoryGenerator(project, systemObject);
-            String factoryPackage = UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(servicesToCreate, entityMap);
-            Change factoryChange = factoryGenerator.createOrUpdateServiceFactory(servicesToCreate, factoryPackage);
+            String factoryPackage = UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap);
+            Change factoryChange = factoryGenerator.createOrUpdateServiceFactory(entitiesNeedingServices, factoryPackage);
             if (factoryChange != null) {
                 compositeChange.add(factoryChange);
             }
-            
-            // 2. Create service interfaces and implementations
-            for (String entityName : servicesToCreate) {
-                Change serviceInterfaceChange = createServiceInterfaceChange(entityName, monitor);
-                Change serviceImplChange = createServiceImplementationChange(entityName, monitor);
+
+            // 2. Create service interfaces and implementations (only required methods)
+            for (Map.Entry<String, List<ServiceMethodRequirement>> entry : serviceMethodRequirements.entrySet()) {
+                String entityName = entry.getKey();
+                List<ServiceMethodRequirement> requirements = entry.getValue();
+
+                Change serviceInterfaceChange = createServiceInterfaceChange(entityName, requirements);
+                Change serviceImplChange = createServiceImplementationChange(entityName, requirements);
                 if (serviceInterfaceChange != null) {
                     compositeChange.add(serviceInterfaceChange);
                 }
@@ -129,10 +267,10 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
                     compositeChange.add(serviceImplChange);
                 }
             }
-            
+
             // 3. Transform entity classes last (so imports reference existing files)
             for (RelationshipInfo relationship : relationships) {
-                Change entityChange = createEntityTransformationChange(relationship, monitor);
+                Change entityChange = createEntityTransformationChange(relationship);
                 if (entityChange != null) {
                     compositeChange.add(entityChange);
                 }
@@ -143,30 +281,30 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
         }
         return compositeChange;
     }
-    
-    private Change createEntityTransformationChange(RelationshipInfo relationship, IProgressMonitor monitor) throws Exception {
+
+    private Change createEntityTransformationChange(RelationshipInfo relationship) throws Exception {
         CompositeChange entityChange = new CompositeChange("Transform relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
 
-        EntityTransformer entityTransformer = new EntityTransformer(systemObject);
+        EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodRequirements);
         ClassObject fromEntity = entityMap.get(relationship.getFromEntity());
         if (fromEntity == null) {
             throw new IllegalStateException("Entity not found: " + relationship.getFromEntity());
         }
-        
+
         Change change = entityTransformer.transformFromEntity(fromEntity, relationship);
         if (change != null) {
             entityChange.add(change);
         }
         return entityChange.getChildren().length > 0 ? entityChange : null;
     }
-    
-    private Change createServiceInterfaceChange(String entityName, IProgressMonitor monitor) throws Exception {
+
+    private Change createServiceInterfaceChange(String entityName, List<ServiceMethodRequirement> requirements) throws Exception {
         ServiceInterfaceGenerator generator = new ServiceInterfaceGenerator(project, systemObject);
-        return generator.createServiceInterface(entityName, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
+        return generator.createOrUpdateServiceInterface(entityName, requirements, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
     }
-    
-    private Change createServiceImplementationChange(String entityName, IProgressMonitor monitor) throws Exception {
+
+    private Change createServiceImplementationChange(String entityName, List<ServiceMethodRequirement> requirements) throws Exception {
         ServiceImplementationGenerator generator = new ServiceImplementationGenerator(project, systemObject);
-        return generator.createServiceImplementation(entityName, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
+        return generator.createOrUpdateServiceImplementation(entityName, requirements, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
     }
 }
