@@ -6,6 +6,7 @@ import org.eclipse.jdt.core.dom.SingleMemberAnnotation;
 import org.eclipse.jdt.core.dom.MemberValuePair;
 import org.eclipse.jdt.core.dom.StringLiteral;
 import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.ArrayInitializer;
 
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
@@ -170,6 +171,94 @@ public class JpaAnnotationExtractor {
                     if (value instanceof StringLiteral) {
                         return ((StringLiteral) value).getLiteralValue();
                     }
+                }
+            }
+        }
+        return null;
+    }
+
+    public JoinTableInfo extractJoinTableInfo(FieldObject field) {
+        // First check if this field has a direct @JoinTable annotation
+        for (Annotation annotation : field.getAnnotations()) {
+            String annotationType = annotation.getTypeName().getFullyQualifiedName();
+            if (annotationType.equals("JoinTable")) {
+                String tableName = extractAnnotationStringProperty(annotation, "name");
+                String joinColumns = extractJoinColumns(annotation, "joinColumns");
+                String inverseJoinColumns = extractJoinColumns(annotation, "inverseJoinColumns");
+                return new JoinTableInfo(tableName, joinColumns, inverseJoinColumns);
+            }
+        }
+
+        // If there is no direct @JoinTable, check if this is a mappedBy relationship
+        String mappedByFieldName = extractManyToManyMappedByProperty(field);
+        if (mappedByFieldName == null) return null;
+
+        String targetEntityType = field.getType().getGenericType();
+        if (targetEntityType != null) {
+        	targetEntityType = targetEntityType.replaceAll("[<>]", "").trim();
+        }
+
+        ClassObject targetEntity = findEntityByTypeName(targetEntityType);
+        if (targetEntity == null) return null;
+
+        FieldObject referencedField = findFieldInEntity(targetEntity, mappedByFieldName);
+        if (referencedField == null) return null;
+
+        JoinTableInfo owningInfo = extractJoinTableInfo(referencedField);
+        if (owningInfo == null) return null;
+
+        return new JoinTableInfo(owningInfo.getTableName(), owningInfo.getJoinColumns(), owningInfo.getInverseJoinColumns());
+    }
+
+    private String extractJoinColumns(Annotation joinTableAnnotation, String propertyName) {
+        if (!(joinTableAnnotation instanceof NormalAnnotation)) {
+            return null;
+        }
+
+        NormalAnnotation normalAnnotation = (NormalAnnotation) joinTableAnnotation;
+        for (Object obj : normalAnnotation.values()) {
+            MemberValuePair pair = (MemberValuePair) obj;
+            String pairName = pair.getName().getIdentifier();
+            if (!propertyName.equals(pairName)) {
+                continue;
+            }
+
+            Expression value = pair.getValue();
+
+            // Handle joinColumns=@JoinColumn(name="bookid")
+            if (value instanceof NormalAnnotation) {
+                NormalAnnotation joinColumn = (NormalAnnotation) value;
+                return extractAnnotationStringProperty(joinColumn, "name");
+            }
+
+            // Handle joinColumns={@JoinColumn(name="bookid")} or joinColumns={@JoinColumn(name="bookid"), ...}
+            if (value instanceof ArrayInitializer) {
+                ArrayInitializer arrayInit = (ArrayInitializer) value;
+                if (arrayInit.expressions().size() > 1) {
+                    throw new CompositeKeyException("ManyToMany relationships with composite keys are not supported. " +
+                            "Found multiple " + propertyName + " in @JoinTable annotation.");
+                }
+
+                if (arrayInit.expressions().size() == 1) {
+                    Expression joinColumnExpr = (Expression) arrayInit.expressions().get(0);
+                    if (joinColumnExpr instanceof NormalAnnotation) {
+                        NormalAnnotation joinColumn = (NormalAnnotation) joinColumnExpr;
+                        return extractAnnotationStringProperty(joinColumn, "name");
+                    }
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String extractManyToManyMappedByProperty(FieldObject field) {
+        for (Annotation annotation : field.getAnnotations()) {
+            String annotationType = annotation.getTypeName().getFullyQualifiedName();
+            if (annotationType.equals("ManyToMany")) {
+                String mappedBy = extractAnnotationStringProperty(annotation, "mappedBy");
+                if (mappedBy != null) {
+                    return mappedBy;
                 }
             }
         }

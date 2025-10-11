@@ -57,7 +57,9 @@ import org.eclipse.jdt.core.dom.MemberValuePair;
 import gr.uom.java.ast.FieldObject;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 
+import gr.aueb.java.archifactor.refactoring.manipulators.CompositeKeyException;
 import gr.aueb.java.archifactor.refactoring.manipulators.JpaAnnotationExtractor;
+import gr.aueb.java.archifactor.refactoring.manipulators.JoinTableInfo;
 import gr.aueb.java.archifactor.refactoring.manipulators.RelationshipInfo;
 import gr.aueb.java.archifactor.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
 import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
@@ -361,6 +363,9 @@ public class UnmapJpaRelationships extends ViewPart {
                 MessageDialog.openError(shell, "Cannot Break Relationships", 
                     "Cannot proceed with breaking relationships:\n" + e.getMessage() + 
                     "\n\nThese properties indicate that the entities belong to the same aggregate and should not be separated.");
+            } catch (CompositeKeyException e) {
+                MessageDialog.openError(shell, "Composite Keys Not Supported",
+                    "Cannot proceed with breaking relationships:\n" + e.getMessage());
             } catch (Exception e) {
                 MessageDialog.openError(shell, "Error", "Error analyzing relationships:\n" + e.getMessage());
             }
@@ -419,8 +424,18 @@ public class UnmapJpaRelationships extends ViewPart {
                         String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject);
                         String idFieldType = jpaExtractor.extractIdFieldType(fieldTypeName);
                         String idFieldName = jpaExtractor.extractIdFieldName(fieldTypeName);
+                        String joinTableName = null;
+                        String joinTableJoinColumns = null;
+                        String joinTableInverseJoinColumns = null;
+                        if (relationshipType.equals("ManyToMany")) {
+                            JoinTableInfo joinTableInfo = jpaExtractor.extractJoinTableInfo(fieldObject);
+                            joinTableName = joinTableInfo.getTableName();
+                            joinTableJoinColumns = joinTableInfo.getJoinColumns();
+                            joinTableInverseJoinColumns = joinTableInfo.getInverseJoinColumns();
+                        }
                         RelationshipInfo relInfo = new RelationshipInfo(selectedEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
-                                                                     joinColumnName, fieldObject.getName(), idFieldType, idFieldName);
+                                                                        joinColumnName, fieldObject.getName(), idFieldType, idFieldName,
+                                                                        joinTableName, joinTableJoinColumns, joinTableInverseJoinColumns);
                         detectedRelationships.add(relInfo);
                     }
                 }
@@ -464,8 +479,18 @@ public class UnmapJpaRelationships extends ViewPart {
                         String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject);
                         String idFieldType = jpaExtractor.extractIdFieldType(fieldTypeName);
                         String idFieldName = jpaExtractor.extractIdFieldName(fieldTypeName);
+                        String joinTableName = null;
+                        String joinTableJoinColumns = null;
+                        String joinTableInverseJoinColumns = null;
+                        if (relationshipType.equals("ManyToMany")) {
+                            JoinTableInfo joinTableInfo = jpaExtractor.extractJoinTableInfo(fieldObject);
+                            joinTableName = joinTableInfo.getTableName();
+                            joinTableJoinColumns = joinTableInfo.getJoinColumns();
+                            joinTableInverseJoinColumns = joinTableInfo.getInverseJoinColumns();
+                        }
                         RelationshipInfo relInfo = new RelationshipInfo(otherEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
-                                                                        joinColumnName, fieldObject.getName(), idFieldType, idFieldName);
+                                                                        joinColumnName, fieldObject.getName(), idFieldType, idFieldName,
+                                                                        joinTableName, joinTableJoinColumns, joinTableInverseJoinColumns);
                         detectedRelationships.add(relInfo);
                     }
                 }

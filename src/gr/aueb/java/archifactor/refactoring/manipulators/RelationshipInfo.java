@@ -9,9 +9,13 @@ public class RelationshipInfo {
     private String fieldName;
     private String referencedPkType;
     private String referencedPkName;
+    private String joinTableName;
+    private String joinTableJoinColumns;
+    private String joinTableInverseJoinColumns;
 
     public RelationshipInfo(String fromEntity, String relationshipType, String toEntity, boolean isOwningSide,
-                            String joinColumnName, String fieldName, String referencedPkType, String referencedPkName) {
+                            String joinColumnName, String fieldName, String referencedPkType, String referencedPkName,
+                            String joinTableName, String joinTableJoinColumns, String joinTableInverseJoinColumns) {
         this.fromEntity = fromEntity;
         this.relationshipType = relationshipType;
         this.toEntity = toEntity;
@@ -20,6 +24,9 @@ public class RelationshipInfo {
         this.fieldName = fieldName;
         this.referencedPkType = referencedPkType;
         this.referencedPkName = referencedPkName;
+        this.joinTableName = joinTableName;
+        this.joinTableJoinColumns = joinTableJoinColumns;
+        this.joinTableInverseJoinColumns = joinTableInverseJoinColumns;
     }
     
     public String getFromEntity() {
@@ -68,5 +75,29 @@ public class RelationshipInfo {
     
     public void setReferencedPkName(String referencedPkName) {
         this.referencedPkName = referencedPkName;
+    }
+
+    public String getJoinTableName() {
+        return joinTableName;
+    }
+
+    public void setJoinTableName(String joinTableName) {
+        this.joinTableName = joinTableName;
+    }
+
+    public String getJoinTableJoinColumns() {
+        return joinTableJoinColumns;
+    }
+
+    public void setJoinTableJoinColumns(String joinTableJoinColumns) {
+        this.joinTableJoinColumns = joinTableJoinColumns;
+    }
+
+    public String getJoinTableInverseJoinColumns() {
+        return joinTableInverseJoinColumns;
+    }
+
+    public void setJoinTableInverseJoinColumns(String joinTableInverseJoinColumns) {
+        this.joinTableInverseJoinColumns = joinTableInverseJoinColumns;
     }
 }
