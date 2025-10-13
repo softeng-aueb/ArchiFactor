@@ -19,8 +19,6 @@ import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.swt.widgets.Display;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.CompilationErrorDetectedException;
-import org.eclipse.jface.viewers.TableLayout;
-import org.eclipse.jface.viewers.ColumnWeightData;
 import org.eclipse.ui.*;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ControlAdapter;
@@ -70,7 +68,9 @@ public class UnmapJpaRelationships extends ViewPart {
     private Action selectEntitiesAction;
     private Action previewAndApplyAction;
     private ComboViewer projectComboViewer;
+    private ComboViewer frameworkComboViewer;
     private IJavaProject selectedProject;
+    private FrameworkType selectedFramework = FrameworkType.QUARKUS;
     private SystemObject cachedSystemObject;
     private List<ClassObject> selectedEntities = new ArrayList<ClassObject>();
     private List<RelationshipInfo> detectedRelationships = new ArrayList<RelationshipInfo>();
@@ -167,7 +167,9 @@ public class UnmapJpaRelationships extends ViewPart {
         // Grid layout:
         // 1) Row 1 | Column 1: Label ("Select project:")
         // 2) Row 1 | Column 2: ComboViewer (dropdown)
-        // 3) Row 2 | Columns 1+2: TableViewer (table spans both columns)
+        // 3) Row 2 | Column 1: Label ("Select framework:")
+        // 4) Row 2 | Column 2: ComboViewer (dropdown)
+        // 5) Row 3 | Columns 1+2: TableViewer (table spans both columns)
         Composite container = new Composite(parent, SWT.NONE);
         GridLayout layout = new GridLayout(2, false);
         layout.verticalSpacing = 10;
@@ -175,11 +177,11 @@ public class UnmapJpaRelationships extends ViewPart {
         layout.marginWidth = 10;
         layout.marginHeight = 10;
         container.setLayout(layout);
-        
+
         // Project selection dropdown
         Label projectLabel = new Label(container, SWT.NONE);
         projectLabel.setText("Select project:");
-        
+
         projectComboViewer = new ComboViewer(container, SWT.READ_ONLY);
         projectComboViewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         projectComboViewer.setContentProvider(ArrayContentProvider.getInstance());
@@ -189,8 +191,25 @@ public class UnmapJpaRelationships extends ViewPart {
                 return ((IJavaProject) element).getElementName();
             }
         });
-        
+
         populateProjectCombo();
+
+        // Framework selection dropdown
+        Label frameworkLabel = new Label(container, SWT.NONE);
+        frameworkLabel.setText("Select framework:");
+
+        frameworkComboViewer = new ComboViewer(container, SWT.READ_ONLY);
+        frameworkComboViewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        frameworkComboViewer.setContentProvider(ArrayContentProvider.getInstance());
+        frameworkComboViewer.setLabelProvider(new LabelProvider() {
+            @Override
+            public String getText(Object element) {
+                return ((FrameworkType) element).getDisplayName();
+            }
+        });
+
+        frameworkComboViewer.setInput(FrameworkType.values());
+        frameworkComboViewer.setSelection(new StructuredSelection(FrameworkType.QUARKUS));
         
         // Table
         tableViewer = new TableViewer(container, SWT.SINGLE | SWT.H_SCROLL | SWT.V_SCROLL | SWT.BORDER | SWT.FULL_SELECTION);
@@ -250,6 +269,16 @@ public class UnmapJpaRelationships extends ViewPart {
             @Override
             public void selectionChanged(SelectionChangedEvent event) {
                 onProjectSelectedBuildSystemObject();
+            }
+        });
+
+        frameworkComboViewer.addSelectionChangedListener(new ISelectionChangedListener() {
+            @Override
+            public void selectionChanged(SelectionChangedEvent event) {
+                IStructuredSelection selection = (IStructuredSelection) event.getSelection();
+                if (!selection.isEmpty()) {
+                    selectedFramework = (FrameworkType) selection.getFirstElement();
+                }
             }
         });
     }
