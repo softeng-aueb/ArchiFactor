@@ -307,7 +307,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     }
 
     private Change createServiceImplementationChange(String entityName, List<ServiceMethodRequirement> requirements) throws Exception {
-        ServiceImplementationGenerator generator = new ServiceImplementationGenerator(project, systemObject);
+        BaseServiceImplementationGenerator generator = ServiceImplementationGeneratorFactory.createGenerator(frameworkType, project, systemObject);
         return generator.createOrUpdateServiceImplementation(entityName, requirements, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
     }
 }
