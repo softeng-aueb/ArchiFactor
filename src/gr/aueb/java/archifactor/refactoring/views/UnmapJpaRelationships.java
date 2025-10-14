@@ -667,7 +667,7 @@ public class UnmapJpaRelationships extends ViewPart {
         }
 
         try {
-            UnmapJpaRelationshipsRefactoring refactoring = new UnmapJpaRelationshipsRefactoring(selectedProject, detectedRelationships, cachedSystemObject);
+            UnmapJpaRelationshipsRefactoring refactoring = new UnmapJpaRelationshipsRefactoring(selectedProject, detectedRelationships, cachedSystemObject, selectedFramework);
             MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, null);
             RefactoringWizardOpenOperation operation = new RefactoringWizardOpenOperation(wizard);
             operation.run(shell, "Unmap JPA Relationships");

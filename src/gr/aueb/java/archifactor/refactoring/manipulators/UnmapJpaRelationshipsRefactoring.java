@@ -16,6 +16,7 @@ import org.eclipse.core.runtime.CoreException;
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.ast.ClassObject;
 import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
+import gr.aueb.java.archifactor.refactoring.views.FrameworkType;
 import gr.aueb.java.jpa.JpaModel;
 
 import java.util.List;
@@ -29,13 +30,15 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     private IJavaProject project;
     private List<RelationshipInfo> relationships;
     private SystemObject systemObject;
+    private FrameworkType frameworkType;
     private Map<String, ClassObject> entityMap;
     private Map<String, List<ServiceMethodRequirement>> serviceMethodRequirements;
 
-    public UnmapJpaRelationshipsRefactoring(IJavaProject project, List<RelationshipInfo> relationships, SystemObject systemObject) {
+    public UnmapJpaRelationshipsRefactoring(IJavaProject project, List<RelationshipInfo> relationships, SystemObject systemObject, FrameworkType frameworkType) {
         this.project = project;
         this.relationships = relationships;
         this.systemObject = systemObject;
+        this.frameworkType = frameworkType;
         this.entityMap = new HashMap<>();
         this.serviceMethodRequirements = new HashMap<>();
 
@@ -246,7 +249,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             Set<String> entitiesNeedingServices = serviceMethodRequirements.keySet();
 
             // 1. Create ServiceFactory first (so entity imports can reference it)
-            ServiceFactoryGenerator factoryGenerator = new ServiceFactoryGenerator(project, systemObject);
+            BaseServiceFactoryGenerator factoryGenerator = ServiceFactoryGeneratorFactory.createGenerator(frameworkType, project, systemObject);
             String factoryPackage = UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap);
             Change factoryChange = factoryGenerator.createOrUpdateServiceFactory(entitiesNeedingServices, factoryPackage);
             if (factoryChange != null) {

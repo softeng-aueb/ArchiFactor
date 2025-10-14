@@ -6,6 +6,7 @@ import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.IJavaProject;
 
+import gr.aueb.java.archifactor.refactoring.views.FrameworkType;
 import gr.uom.java.ast.SystemObject;
 
 import java.util.List;
@@ -16,16 +17,18 @@ public class UnmapJpaRelationshipsRefactoringDescriptor extends RefactoringDescr
     private IJavaProject project;
     private List<RelationshipInfo> relationships;
     private SystemObject systemObject;
+    private FrameworkType frameworkType;
     
-    public UnmapJpaRelationshipsRefactoringDescriptor(IJavaProject project, List<RelationshipInfo> relationships, SystemObject systemObject) {
+    public UnmapJpaRelationshipsRefactoringDescriptor(IJavaProject project, List<RelationshipInfo> relationships, SystemObject systemObject, FrameworkType frameworkType) {
         super(REFACTORING_ID, null, "Unmap JPA Relationships", null, RefactoringDescriptor.STRUCTURAL_CHANGE | RefactoringDescriptor.MULTI_CHANGE);
         this.project = project;
         this.relationships = relationships;
         this.systemObject = systemObject;
+        this.frameworkType = frameworkType;
     }
     
     @Override
     public Refactoring createRefactoring(RefactoringStatus status) throws CoreException {
-        return new UnmapJpaRelationshipsRefactoring(project, relationships, systemObject);
+        return new UnmapJpaRelationshipsRefactoring(project, relationships, systemObject, frameworkType);
     }
 }
