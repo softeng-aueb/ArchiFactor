@@ -575,8 +575,8 @@ public class UnmapJpaRelationships extends ViewPart {
     
     private List<ClassObject> selectEntityClasses(Shell shell, IJavaProject project) {
         try {
-            List<ICompilationUnit> entities = findEntitiesUsingJDT(project);
-            
+            List<ClassObject> entities = findEntityClasses();
+
             if (entities.isEmpty()) {
                 MessageDialog.openInformation(shell, "No Entities Found", "No classes annotated with @Entity were found in the selected project.");
                 return null;
@@ -611,9 +611,6 @@ public class UnmapJpaRelationships extends ViewPart {
                 }
                 return selectedEntities;
             }
-        } catch (JavaModelException e) {
-            MessageDialog.openError(shell, "Error", "Error analyzing project: " + e.getMessage());
-            e.printStackTrace();
         } catch (Exception e) {
             MessageDialog.openError(shell, "Error", "Unexpected error: " + e.getMessage());
             e.printStackTrace();
@@ -621,44 +618,27 @@ public class UnmapJpaRelationships extends ViewPart {
         return null;
     }
 
-    private List<ICompilationUnit> findEntitiesUsingJDT(IJavaProject project) throws JavaModelException {
-        List<ICompilationUnit> entities = new ArrayList<ICompilationUnit>();
-        for (IPackageFragmentRoot root : project.getPackageFragmentRoots()) {
-            if (root.getKind() == IPackageFragmentRoot.K_SOURCE) {
-                for (IJavaElement element : root.getChildren()) {
-                    if (element instanceof IPackageFragment) {
-                        IPackageFragment packageFragment = (IPackageFragment) element;
-                        for (ICompilationUnit cu : packageFragment.getCompilationUnits()) {
-                            IType mainType = cu.findPrimaryType();
-                            if (mainType != null && hasEntityAnnotation(mainType)) {
-                                entities.add(cu);
-                            }
-                        }
-                    }
-                }
+    private List<ClassObject> findEntityClasses() {
+        List<ClassObject> entities = new ArrayList<ClassObject>();
+        ListIterator<ClassObject> classIterator = cachedSystemObject.getClassListIterator();
+        while (classIterator.hasNext()) {
+            ClassObject classObj = classIterator.next();
+            if (JpaModel.isEntity(classObj)) {
+                entities.add(classObj);
             }
         }
         return entities;
     }
 
-    private boolean hasEntityAnnotation(IType type) throws JavaModelException {
-        for (IAnnotation annotation : type.getAnnotations()) {
-            String annotationName = annotation.getElementName();
-            if (annotationName.contains("Entity")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private Map<IPackageFragment, List<ICompilationUnit>> groupEntitiesByPackage(List<ICompilationUnit> entities) {
+    private Map<IPackageFragment, List<ICompilationUnit>> groupEntitiesByPackage(List<ClassObject> entities) {
         Map<IPackageFragment, List<ICompilationUnit>> entitiesByPackage = new HashMap<IPackageFragment, List<ICompilationUnit>>();
-        for (ICompilationUnit entity : entities) {
-            IPackageFragment pkg = (IPackageFragment) entity.getParent();
+        for (ClassObject entity : entities) {
+            ICompilationUnit cu = (ICompilationUnit) entity.getITypeRoot();
+            IPackageFragment pkg = (IPackageFragment) cu.getParent();
             if (!entitiesByPackage.containsKey(pkg)) {
                 entitiesByPackage.put(pkg, new ArrayList<ICompilationUnit>());
             }
-            entitiesByPackage.get(pkg).add(entity);
+            entitiesByPackage.get(pkg).add(cu);
         }
         return entitiesByPackage;
     }
