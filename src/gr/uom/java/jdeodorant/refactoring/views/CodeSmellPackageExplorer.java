@@ -269,6 +269,6 @@ public class CodeSmellPackageExplorer extends ViewPart {
 	}
 
 	public enum CodeSmellType{
-		FEATURE_ENVY, GOD_CLASS, MICROSERVICE_EXTRACTION;
+		FEATURE_ENVY, GOD_CLASS;
 	}
 }

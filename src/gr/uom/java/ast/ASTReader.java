@@ -381,7 +381,6 @@ public class ASTReader {
 			if(extendedModifier.isAnnotation()) {
 				Annotation annotation = (Annotation)extendedModifier;
 				classObject.addAnnotation(annotation);
-				//System.out.println(annotation.getTypeName().getFullyQualifiedName());
 			}
 		}
 		return classObject;
@@ -485,7 +484,6 @@ public class ASTReader {
 				if(extendedModifier.isAnnotation()) {
 					Annotation annotation = (Annotation)extendedModifier;
 					fieldObject.addAnnotation(annotation);
-					//System.out.println(annotation.getTypeName().getFullyQualifiedName());
 				}
 			}
 			

@@ -187,22 +187,6 @@ public class ClassObject extends ClassDeclarationObject {
     public List<Annotation> getAnnotations() {
     	return this.annotations;
     }
-    
-    public boolean isTestClass() {
-    	if(this.containsMethodWithTestAnnotation()) {
-    		return true;
-    	}else {
-    		if (this.annotations.size()>0) {
-	    		for(Annotation ann: this.annotations) {
-	    			if(ann.getTypeName().getFullyQualifiedName().equals("Test")) {
-	    				return true;
-	    			}
-	    		}
-    		}
-    	}
-    	return false;
-    }
-    
 
     public void setSuperclass(TypeObject superclass) {
 		this.superclass = superclass;
