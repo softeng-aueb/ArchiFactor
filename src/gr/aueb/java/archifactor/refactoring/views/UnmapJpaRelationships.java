@@ -40,6 +40,7 @@ import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.IAnnotation;
+import org.eclipse.jdt.core.JavaCore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -61,6 +62,7 @@ import gr.aueb.java.archifactor.refactoring.manipulators.JoinTableInfo;
 import gr.aueb.java.archifactor.refactoring.manipulators.RelationshipInfo;
 import gr.aueb.java.archifactor.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
 import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
+import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 
 public class UnmapJpaRelationships extends ViewPart {
@@ -281,6 +283,8 @@ public class UnmapJpaRelationships extends ViewPart {
                 }
             }
         });
+
+        JavaCore.addElementChangedListener(ElementChangedListener.getInstance());
     }
 
     private void contributeToActionBars() {
@@ -384,8 +388,9 @@ public class UnmapJpaRelationships extends ViewPart {
         List<ClassObject> entities = selectEntityClasses(shell, selectedProject);
         if (entities != null && !entities.isEmpty()) {
             selectedEntities = entities;
-            
+
             try {
+                refreshSystemObjectToMatchCurrentCode(shell);
                 detectRelationships();
                 tableViewer.refresh();
             } catch (AggregateViolationException e) {
@@ -395,6 +400,11 @@ public class UnmapJpaRelationships extends ViewPart {
             } catch (CompositeKeyException e) {
                 MessageDialog.openError(shell, "Composite Keys Not Supported",
                     "Cannot proceed with breaking relationships:\n" + e.getMessage());
+            } catch (InterruptedException e) {
+                // User cancelled - no action needed
+            } catch (InvocationTargetException e) {
+                MessageDialog.openError(shell, "Error Refreshing Project",
+                    "Error refreshing project structure: " + e.getTargetException().getMessage());
             } catch (Exception e) {
                 MessageDialog.openError(shell, "Error", "Error analyzing relationships:\n" + e.getMessage());
             }
@@ -652,7 +662,7 @@ public class UnmapJpaRelationships extends ViewPart {
         }
         return entitiesByPackage;
     }
-    
+
     private void previewAndApplyRefactoring() {
         Shell shell = getSite().getShell();
 
@@ -667,6 +677,8 @@ public class UnmapJpaRelationships extends ViewPart {
         }
 
         try {
+            refreshSystemObjectToMatchCurrentCode(shell);
+
             UnmapJpaRelationshipsRefactoring refactoring = new UnmapJpaRelationshipsRefactoring(selectedProject, detectedRelationships, cachedSystemObject, selectedFramework);
             MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, null);
             RefactoringWizardOpenOperation operation = new RefactoringWizardOpenOperation(wizard);
@@ -676,9 +688,32 @@ public class UnmapJpaRelationships extends ViewPart {
             }
         } catch (InterruptedException e) {
             // User cancelled - no action needed
+        } catch (InvocationTargetException e) {
+            MessageDialog.openError(shell, "Error Refreshing Project",
+                "Error refreshing project structure: " + e.getTargetException().getMessage());
         } catch (Exception e) {
             MessageDialog.openError(shell, "Refactoring Error", "An error occurred during refactoring: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void refreshSystemObjectToMatchCurrentCode(Shell shell) throws InterruptedException, InvocationTargetException {
+        IWorkbench wb = PlatformUI.getWorkbench();
+        IProgressService ps = wb.getProgressService();
+        ps.busyCursorWhile(new IRunnableWithProgress() {
+            public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
+                try {
+                    new ASTReader(selectedProject, cachedSystemObject, monitor);
+                    cachedSystemObject = ASTReader.getSystemObject();
+                } catch (CompilationErrorDetectedException e) {
+                    Display.getDefault().asyncExec(new Runnable() {
+                        public void run() {
+                            MessageDialog.openInformation(shell, "Compilation Errors",
+                                "Compilation errors were detected in the project. Fix the errors before using this feature.");
+                        }
+                    });
+                }
+            }
+        });
     }
 }
