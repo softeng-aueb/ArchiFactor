@@ -1,6 +1,6 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.model;
 
-import gr.aueb.java.archifactor.util.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
 
 public class RelationshipInfo {
     private String fromEntity;

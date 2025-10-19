@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
@@ -14,8 +14,10 @@ import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
+import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
+import gr.aueb.java.archifactor.jpa.model.ServiceMethodRequirementInfo;
+import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
-import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -36,7 +38,7 @@ public abstract class BaseServiceImplementationGenerator {
 	protected abstract String getClassAnnotation();
 	protected abstract String getEntityManagerFieldAnnotation();
 
-	public Change createOrUpdateServiceImplementation(String entityName, List<ServiceMethodRequirement> requirements, String servicePackage) throws JavaModelException {
+	public Change createOrUpdateServiceImplementation(String entityName, List<ServiceMethodRequirementInfo> requirements, String servicePackage) throws JavaModelException {
 		String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
 		String serviceImplName = simpleEntityName + "ServiceImpl";
 		String serviceImplFileName = serviceImplName + ".java";
@@ -64,14 +66,14 @@ public abstract class BaseServiceImplementationGenerator {
 		return change;
 	}
 
-	private Change updateExistingServiceImplementation(ICompilationUnit existingCU, String entityName, List<ServiceMethodRequirement> requirements) throws JavaModelException, IllegalArgumentException {
+	private Change updateExistingServiceImplementation(ICompilationUnit existingCU, String entityName, List<ServiceMethodRequirementInfo> requirements) throws JavaModelException, IllegalArgumentException {
 		ASTParser parser = ASTParser.newParser(ASTReader.JLS);
 		parser.setSource(existingCU);
 		parser.setResolveBindings(true);
 		CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
 
 		Set<String> existingMethodSignatures = extractExistingMethodSignatures(astRoot);
-		List<ServiceMethodRequirement> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
+		List<ServiceMethodRequirementInfo> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
 		if (missingMethods.isEmpty()) {
 			return null;
 		}
@@ -82,7 +84,7 @@ public abstract class BaseServiceImplementationGenerator {
 		ListRewrite methodsRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
 
 		Set<String> neededImports = new TreeSet<>();
-		for (ServiceMethodRequirement requirement : missingMethods) {
+		for (ServiceMethodRequirementInfo requirement : missingMethods) {
 			if (requirement.getReturnType().contains("List")) {
 				neededImports.add("java.util.List");
 			}
@@ -101,7 +103,7 @@ public abstract class BaseServiceImplementationGenerator {
 			}
 		}
 
-		for (ServiceMethodRequirement requirement : missingMethods) {
+		for (ServiceMethodRequirementInfo requirement : missingMethods) {
 			MethodDeclaration methodDecl = generateMethodImplementation(ast, requirement, entityName);
 			methodsRewrite.insertLast(methodDecl, new TextEditGroup("Add missing service method implementation"));
 		}
@@ -155,9 +157,9 @@ public abstract class BaseServiceImplementationGenerator {
 		return methodName + "(" + paramType + " " + paramName + ")";
 	}
 
-	private List<ServiceMethodRequirement> findMissingMethods(List<ServiceMethodRequirement> requirements, Set<String> existingSignatures) {
-		List<ServiceMethodRequirement> missing = new ArrayList<>();
-		for (ServiceMethodRequirement requirement : requirements) {
+	private List<ServiceMethodRequirementInfo> findMissingMethods(List<ServiceMethodRequirementInfo> requirements, Set<String> existingSignatures) {
+		List<ServiceMethodRequirementInfo> missing = new ArrayList<>();
+		for (ServiceMethodRequirementInfo requirement : requirements) {
 			if (!existingSignatures.contains(requirement.getMethodSignature())) {
 				missing.add(requirement);
 			}
@@ -165,7 +167,7 @@ public abstract class BaseServiceImplementationGenerator {
 		return missing;
 	}
 
-	protected String generateServiceImplementationContent(String entityName, List<ServiceMethodRequirement> requirements, String packageName) {
+	protected String generateServiceImplementationContent(String entityName, List<ServiceMethodRequirementInfo> requirements, String packageName) {
 		Set<String> imports = new TreeSet<>();
 
 		StringBuilder content = new StringBuilder();
@@ -179,7 +181,7 @@ public abstract class BaseServiceImplementationGenerator {
 		imports.addAll(getFrameworkImports());
 		imports.add("jakarta.persistence.EntityManager");
 
-		for (ServiceMethodRequirement requirement : requirements) {
+		for (ServiceMethodRequirementInfo requirement : requirements) {
 			if (requirement.getReturnType().contains("List")) {
 				imports.add("java.util.List");
 			}
@@ -198,7 +200,7 @@ public abstract class BaseServiceImplementationGenerator {
 		content.append("    ").append(getEntityManagerFieldAnnotation()).append("\n");
 		content.append("    private EntityManager entityManager;\n\n");
 
-		for (ServiceMethodRequirement requirement : requirements) {
+		for (ServiceMethodRequirementInfo requirement : requirements) {
 			content.append(generateMethodImplementationString(requirement, entityName));
 			content.append("\n");
 		}
@@ -207,7 +209,7 @@ public abstract class BaseServiceImplementationGenerator {
 		return content.toString();
 	}
 
-	private String generateMethodImplementationString(ServiceMethodRequirement requirement, String entityName) {
+	private String generateMethodImplementationString(ServiceMethodRequirementInfo requirement, String entityName) {
 		StringBuilder impl = new StringBuilder();
 		impl.append("    @Override\n");
 		impl.append("    public ").append(requirement.getReturnType()).append(" ").append(requirement.getMethodName()).append("(");
@@ -267,7 +269,7 @@ public abstract class BaseServiceImplementationGenerator {
 		return "null";
 	}
 
-	private MethodDeclaration generateMethodImplementation(AST ast, ServiceMethodRequirement requirement, String entityName) {
+	private MethodDeclaration generateMethodImplementation(AST ast, ServiceMethodRequirementInfo requirement, String entityName) {
 		MethodDeclaration method = ast.newMethodDeclaration();
 		method.setName(ast.newSimpleName(requirement.getMethodName()));
 
@@ -290,7 +292,7 @@ public abstract class BaseServiceImplementationGenerator {
 		return method;
 	}
 
-	private Block createMethodBody(AST ast, ServiceMethodRequirement requirement, String entityName) {
+	private Block createMethodBody(AST ast, ServiceMethodRequirementInfo requirement, String entityName) {
 		Block body = ast.newBlock();
 		String paramName = requirement.getParameterName();
 		String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);

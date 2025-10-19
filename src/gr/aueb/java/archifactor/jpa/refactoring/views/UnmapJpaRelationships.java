@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.views;
+package gr.aueb.java.archifactor.jpa.refactoring.views;
 
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.TableColumn;
@@ -51,13 +51,15 @@ import org.eclipse.jdt.core.dom.MemberValuePair;
 import gr.uom.java.ast.FieldObject;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 
-import gr.aueb.java.archifactor.refactoring.manipulators.CompositeKeyException;
-import gr.aueb.java.archifactor.refactoring.manipulators.JpaAnnotationExtractor;
-import gr.aueb.java.archifactor.refactoring.manipulators.JoinTableInfo;
-import gr.aueb.java.archifactor.refactoring.manipulators.RelationshipInfo;
-import gr.aueb.java.archifactor.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
-import gr.aueb.java.archifactor.util.JpaJoinType;
-import gr.aueb.java.archifactor.util.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
+import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
+import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.exceptions.AggregateViolationException;
+import gr.aueb.java.archifactor.jpa.exceptions.CompositeKeyException;
+import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
+import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
+import gr.aueb.java.archifactor.jpa.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
+import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
 import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 
@@ -71,12 +73,6 @@ public class UnmapJpaRelationships extends ViewPart {
     private FrameworkType selectedFramework = FrameworkType.QUARKUS;
     private SystemObject cachedSystemObject;
     private List<RelationshipInfo> detectedRelationships = new ArrayList<RelationshipInfo>();
-
-    class AggregateViolationException extends RuntimeException {
-        public AggregateViolationException(String message) {
-            super(message);
-        }
-    }
 
     class ViewContentProvider implements IStructuredContentProvider {
         public void inputChanged(Viewer v, Object oldInput, Object newInput) {
@@ -423,7 +419,7 @@ public class UnmapJpaRelationships extends ViewPart {
             .map(ClassObject::getName)
             .collect(Collectors.toSet());
 
-        JpaAnnotationExtractor jpaExtractor = new JpaAnnotationExtractor(cachedSystemObject);
+        JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(cachedSystemObject);
 
         // 1. Detect relationships FROM selected entities TO other entities
         detectRelationshipsFromTo(selectedEntities, otherEntityNames, jpaExtractor);
@@ -432,7 +428,7 @@ public class UnmapJpaRelationships extends ViewPart {
         detectRelationshipsFromTo(otherEntities, selectedEntityNames, jpaExtractor);
     }
 
-    private void detectRelationshipsFromTo(List<ClassObject> sourceEntities, Set<String> targetEntityNames, JpaAnnotationExtractor jpaExtractor) {
+    private void detectRelationshipsFromTo(List<ClassObject> sourceEntities, Set<String> targetEntityNames, JpaAnnotationExtractorUtils jpaExtractor) {
         for (ClassObject sourceEntity : sourceEntities) {
             Iterator<FieldObject> fieldIterator = sourceEntity.getFieldIterator();
             while (fieldIterator.hasNext()) {

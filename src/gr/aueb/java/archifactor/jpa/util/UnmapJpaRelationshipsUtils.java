@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.util;
+package gr.aueb.java.archifactor.jpa.util;
 
 import java.util.Arrays;
 import java.util.HashSet;

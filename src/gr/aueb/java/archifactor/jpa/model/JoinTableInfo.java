@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.model;
 
 public class JoinTableInfo {
     private String tableName;

@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
@@ -14,8 +14,10 @@ import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
+import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
+import gr.aueb.java.archifactor.jpa.model.ServiceMethodRequirementInfo;
+import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
-import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -32,7 +34,7 @@ public class ServiceInterfaceGenerator {
         this.systemObject = systemObject;
     }
 
-    public Change createOrUpdateServiceInterface(String entityName, List<ServiceMethodRequirement> requirements, String servicePackage) throws JavaModelException {
+    public Change createOrUpdateServiceInterface(String entityName, List<ServiceMethodRequirementInfo> requirements, String servicePackage) throws JavaModelException {
         String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
         String serviceName = simpleEntityName + "Service";
         String serviceFileName = serviceName + ".java";
@@ -60,14 +62,14 @@ public class ServiceInterfaceGenerator {
         return change;
     }
 
-    private Change updateExistingServiceInterface(ICompilationUnit existingCU, String entityName, List<ServiceMethodRequirement> requirements) throws JavaModelException, IllegalArgumentException {
+    private Change updateExistingServiceInterface(ICompilationUnit existingCU, String entityName, List<ServiceMethodRequirementInfo> requirements) throws JavaModelException, IllegalArgumentException {
         ASTParser parser = ASTParser.newParser(ASTReader.JLS);
         parser.setSource(existingCU);
         parser.setResolveBindings(true);
         CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
 
         Set<String> existingMethodSignatures = extractExistingMethodSignatures(astRoot);
-        List<ServiceMethodRequirement> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
+        List<ServiceMethodRequirementInfo> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
         if (missingMethods.isEmpty()) {
             return null;
         }
@@ -78,7 +80,7 @@ public class ServiceInterfaceGenerator {
         ListRewrite methodsRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
 
         Set<String> neededImports = new TreeSet<>();
-        for (ServiceMethodRequirement requirement : missingMethods) {
+        for (ServiceMethodRequirementInfo requirement : missingMethods) {
             if (requirement.getReturnType().contains("List")) {
                 neededImports.add("java.util.List");
             }
@@ -97,7 +99,7 @@ public class ServiceInterfaceGenerator {
             }
         }
 
-        for (ServiceMethodRequirement requirement : missingMethods) {
+        for (ServiceMethodRequirementInfo requirement : missingMethods) {
             MethodDeclaration methodDecl = generateMethodDeclaration(ast, requirement);
             methodsRewrite.insertLast(methodDecl, new TextEditGroup("Add missing service method"));
         }
@@ -150,9 +152,9 @@ public class ServiceInterfaceGenerator {
         return methodName + "(" + paramType + " " + paramName + ")";
     }
 
-    private List<ServiceMethodRequirement> findMissingMethods(List<ServiceMethodRequirement> requirements, Set<String> existingSignatures) {
-        List<ServiceMethodRequirement> missing = new ArrayList<>();
-        for (ServiceMethodRequirement requirement : requirements) {
+    private List<ServiceMethodRequirementInfo> findMissingMethods(List<ServiceMethodRequirementInfo> requirements, Set<String> existingSignatures) {
+        List<ServiceMethodRequirementInfo> missing = new ArrayList<>();
+        for (ServiceMethodRequirementInfo requirement : requirements) {
             if (!existingSignatures.contains(requirement.getMethodSignature())) {
                 missing.add(requirement);
             }
@@ -160,7 +162,7 @@ public class ServiceInterfaceGenerator {
         return missing;
     }
 
-    private String generateServiceInterfaceContent(String entityName, List<ServiceMethodRequirement> requirements, String packageName) {
+    private String generateServiceInterfaceContent(String entityName, List<ServiceMethodRequirementInfo> requirements, String packageName) {
         Set<String> imports = new TreeSet<>();
 
         StringBuilder content = new StringBuilder();
@@ -171,7 +173,7 @@ public class ServiceInterfaceGenerator {
             imports.add(entityName);
         }
 
-        for (ServiceMethodRequirement requirement : requirements) {
+        for (ServiceMethodRequirementInfo requirement : requirements) {
             if (requirement.getReturnType().contains("List")) {
                 imports.add("java.util.List");
             }
@@ -187,7 +189,7 @@ public class ServiceInterfaceGenerator {
         String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
         content.append("\npublic interface ").append(simpleEntityName).append("Service {\n");
 
-        for (ServiceMethodRequirement requirement : requirements) {
+        for (ServiceMethodRequirementInfo requirement : requirements) {
             content.append("    ").append(requirement.getMethodDeclaration()).append(";\n");
         }
 
@@ -195,7 +197,7 @@ public class ServiceInterfaceGenerator {
         return content.toString();
     }
 
-    private MethodDeclaration generateMethodDeclaration(AST ast, ServiceMethodRequirement requirement) {
+    private MethodDeclaration generateMethodDeclaration(AST ast, ServiceMethodRequirementInfo requirement) {
         MethodDeclaration method = ast.newMethodDeclaration();
         method.setName(ast.newSimpleName(requirement.getMethodName()));
 

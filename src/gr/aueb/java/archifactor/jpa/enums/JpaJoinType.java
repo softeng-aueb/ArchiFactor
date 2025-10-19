@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.util;
+package gr.aueb.java.archifactor.jpa.enums;
 
 public enum JpaJoinType {
     JOIN_COLUMN("JoinColumn"),

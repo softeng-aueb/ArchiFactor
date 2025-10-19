@@ -1,6 +1,8 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.model;
 
-public class ServiceMethodRequirement {
+import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
+
+public class ServiceMethodRequirementInfo {
     private String toEntityName;
     private String fromEntitySimpleName;
     private ServiceMethodType methodType;
@@ -11,7 +13,7 @@ public class ServiceMethodRequirement {
     private String toEntityIdFieldName;
     private String joinTableInverseJoinColumns;
 
-    public ServiceMethodRequirement(String toEntityName, String fromEntitySimpleName, ServiceMethodType methodType,
+    public ServiceMethodRequirementInfo(String toEntityName, String fromEntitySimpleName, ServiceMethodType methodType,
                                     String parameterType, String returnType, String foreignKeyFieldName, String methodName,
                                     String toEntityIdFieldName, String joinTableInverseJoinColumns) {
         this.toEntityName = toEntityName;
@@ -115,7 +117,7 @@ public class ServiceMethodRequirement {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
 
-        ServiceMethodRequirement other = (ServiceMethodRequirement) obj;
+        ServiceMethodRequirementInfo other = (ServiceMethodRequirementInfo) obj;
         return getMethodSignature().equals(other.getMethodSignature());
     }
 

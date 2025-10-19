@@ -1,7 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
-
-import gr.aueb.java.archifactor.util.JpaJoinType;
-import gr.aueb.java.archifactor.util.JpaRelationshipType;
+package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.dom.*;
@@ -14,7 +11,13 @@ import org.eclipse.text.edits.TextEditGroup;
 import org.eclipse.core.resources.IFile;
 
 import gr.uom.java.ast.SystemObject;
-import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
+import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
+import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
+import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
+import gr.aueb.java.archifactor.jpa.model.ServiceMethodRequirementInfo;
+import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
+import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
@@ -27,9 +30,9 @@ import java.util.Iterator;
 
 public class EntityTransformer {
     private SystemObject systemObject;
-    private Map<String, List<ServiceMethodRequirement>> serviceMethodRequirements;
+    private Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements;
 
-    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodRequirement>> serviceMethodRequirements) {
+    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements) {
         this.systemObject = systemObject;
         this.serviceMethodRequirements = serviceMethodRequirements;
     }
@@ -540,7 +543,7 @@ public class EntityTransformer {
         importRewrite.addImport(servicePackage + "." + serviceClassName);
         importRewrite.addImport(servicePackage + ".ServiceFactory");
 
-        ServiceMethodRequirement requirement = findServiceMethodRequirement(targetEntityName, relationship);
+        ServiceMethodRequirementInfo requirement = findServiceMethodRequirement(targetEntityName, relationship);
         if (requirement == null) {
             throw new IllegalStateException("No service method requirement found for the " + relationship.getRelationshipType()
             	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
@@ -554,7 +557,7 @@ public class EntityTransformer {
             serviceMethodArgument = elementCollectionFieldName;
             condition = buildManyToManyOwningCondition(ast, fieldName, elementCollectionFieldName);
         } else {
-            JpaAnnotationExtractor jpaAnnotationExtractor = new JpaAnnotationExtractor(systemObject);
+            JpaAnnotationExtractorUtils jpaAnnotationExtractor = new JpaAnnotationExtractorUtils(systemObject);
             serviceMethodArgument = jpaAnnotationExtractor.extractIdFieldName(entity.getName());
             condition = buildNonOwningCondition(ast, fieldName, entity, jpaAnnotationExtractor);
         }
@@ -594,7 +597,7 @@ public class EntityTransformer {
         return combined;
     }
 
-    private Expression buildNonOwningCondition(AST ast, String fieldName, ClassObject entity, JpaAnnotationExtractor jpaAnnotationExtractor) {
+    private Expression buildNonOwningCondition(AST ast, String fieldName, ClassObject entity, JpaAnnotationExtractorUtils jpaAnnotationExtractor) {
         MethodInvocation fieldIsEmptyCall = ast.newMethodInvocation();
         fieldIsEmptyCall.setExpression(ast.newSimpleName(fieldName));
         fieldIsEmptyCall.setName(ast.newSimpleName("isEmpty"));
@@ -649,7 +652,7 @@ public class EntityTransformer {
         String serviceName = UnmapJpaRelationshipsUtils.decapitalize(simpleTargetEntityName) + "Service";
         String serviceClassName = simpleTargetEntityName + "Service";
 
-        ServiceMethodRequirement requirement = findServiceMethodRequirement(targetEntityName, relationship);
+        ServiceMethodRequirementInfo requirement = findServiceMethodRequirement(targetEntityName, relationship);
         if (requirement == null) {
             throw new IllegalStateException("No service method requirement found for the " + relationship.getRelationshipType() 
             	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
@@ -714,14 +717,14 @@ public class EntityTransformer {
         return newBody;
     }
 
-    private ServiceMethodRequirement findServiceMethodRequirement(String targetEntityName, RelationshipInfo relationship) {
+    private ServiceMethodRequirementInfo findServiceMethodRequirement(String targetEntityName, RelationshipInfo relationship) {
         if (!serviceMethodRequirements.containsKey(targetEntityName)) {
             return null;
         }
 
         JpaRelationshipType relationshipType = relationship.getRelationshipType();
-        List<ServiceMethodRequirement> requirements = serviceMethodRequirements.get(targetEntityName);
-        for (ServiceMethodRequirement requirement : requirements) {
+        List<ServiceMethodRequirementInfo> requirements = serviceMethodRequirements.get(targetEntityName);
+        for (ServiceMethodRequirementInfo requirement : requirements) {
             if (relationshipType == JpaRelationshipType.MANY_TO_ONE && requirement.getMethodType() == ServiceMethodType.GET_BY_ID) {
                 return requirement;
             } else if (relationshipType == JpaRelationshipType.ONE_TO_MANY
@@ -1193,7 +1196,7 @@ public class EntityTransformer {
         String syncingSetClassName = "Syncing" + simpleTargetEntityName + "Set";
         String elementCollectionFieldName = relationship.getJoinTableInverseJoinColumns() + "s";
 
-        JpaAnnotationExtractor jpaExtractor = new JpaAnnotationExtractor(systemObject);
+        JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(systemObject);
         String targetIdFieldName = jpaExtractor.extractIdFieldName(targetEntityName);
         String idAccessMethod = determineIdAccessMethod(targetEntityName, targetIdFieldName);
 

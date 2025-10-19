@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.views;
+package gr.aueb.java.archifactor.jpa.enums;
 
 public enum FrameworkType {
 	QUARKUS("Quarkus"),

@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringDescriptor;
@@ -6,7 +6,8 @@ import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.jdt.core.IJavaProject;
 
-import gr.aueb.java.archifactor.refactoring.views.FrameworkType;
+import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
+import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
 import gr.uom.java.ast.SystemObject;
 
 import java.util.List;

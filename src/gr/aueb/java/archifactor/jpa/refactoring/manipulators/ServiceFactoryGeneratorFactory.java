@@ -1,9 +1,9 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.IJavaProject;
 
+import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
 import gr.uom.java.ast.SystemObject;
-import gr.aueb.java.archifactor.refactoring.views.FrameworkType;
 
 public class ServiceFactoryGeneratorFactory {
 

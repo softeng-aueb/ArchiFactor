@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.enums;
 
 public enum ServiceMethodType {
     GET_BY_ID,

@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.util;
 
 import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.NormalAnnotation;
@@ -8,8 +8,10 @@ import org.eclipse.jdt.core.dom.StringLiteral;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.ArrayInitializer;
 
-import gr.aueb.java.archifactor.util.JpaJoinType;
-import gr.aueb.java.archifactor.util.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
+import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.exceptions.CompositeKeyException;
+import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.SystemObject;
@@ -17,10 +19,10 @@ import gr.uom.java.ast.SystemObject;
 import java.util.Iterator;
 import java.util.ListIterator;
 
-public class JpaAnnotationExtractor {
+public class JpaAnnotationExtractorUtils {
     private SystemObject systemObject;
     
-    public JpaAnnotationExtractor(SystemObject systemObject) {
+    public JpaAnnotationExtractorUtils(SystemObject systemObject) {
         this.systemObject = systemObject;
     }
 

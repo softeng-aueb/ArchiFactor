@@ -102,7 +102,7 @@
       </category>
       <view
             category="gr.uom.java.jdeodorant"
-            class="gr.aueb.java.archifactor.refactoring.views.UnmapJpaRelationships"
+            class="gr.aueb.java.archifactor.jpa.refactoring.views.UnmapJpaRelationships"
             icon="icons/repair.png"
             id="gr.aueb.java.jdeodorant.views.UnmapJpaRelationships"
             name="Unmap JPA Relationships">

@@ -1,4 +1,4 @@
-package gr.aueb.java.archifactor.refactoring.manipulators;
+package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
@@ -16,7 +16,7 @@ import org.eclipse.text.edits.TextEditGroup;
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
-import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
+import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.aueb.java.jpa.JpaModel;
 
 import java.util.Set;
