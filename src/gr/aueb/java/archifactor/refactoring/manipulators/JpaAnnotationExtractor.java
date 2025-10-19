@@ -8,6 +8,8 @@ import org.eclipse.jdt.core.dom.StringLiteral;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.ArrayInitializer;
 
+import gr.aueb.java.archifactor.util.JpaJoinType;
+import gr.aueb.java.archifactor.util.JpaRelationshipType;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.SystemObject;
@@ -26,7 +28,7 @@ public class JpaAnnotationExtractor {
         // First check if this field has a direct @JoinColumn annotation
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("JoinColumn")) {
+            if (JpaJoinType.fromAnnotationName(annotationType) == JpaJoinType.JOIN_COLUMN) {
                 String columnName = extractAnnotationStringProperty(annotation, "name");
                 if (columnName != null) {
                     return columnName;
@@ -62,7 +64,8 @@ public class JpaAnnotationExtractor {
     private String extractMappedByProperty(FieldObject field) {
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("OneToMany") || annotationType.equals("OneToOne")) {
+            JpaRelationshipType relType = JpaRelationshipType.fromAnnotationName(annotationType);
+            if (relType == JpaRelationshipType.ONE_TO_MANY || relType == JpaRelationshipType.ONE_TO_ONE) {
                 String mappedBy = extractAnnotationStringProperty(annotation, "mappedBy");
                 if (mappedBy != null) {
                     return mappedBy;
@@ -98,7 +101,7 @@ public class JpaAnnotationExtractor {
     private String extractDirectJoinColumnName(FieldObject field) {
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("JoinColumn")) {
+            if (JpaJoinType.fromAnnotationName(annotationType) == JpaJoinType.JOIN_COLUMN) {
                 String columnName = extractAnnotationStringProperty(annotation, "name");
                 if (columnName != null) {
                     return columnName;
@@ -181,7 +184,7 @@ public class JpaAnnotationExtractor {
         // First check if this field has a direct @JoinTable annotation
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("JoinTable")) {
+            if (JpaJoinType.fromAnnotationName(annotationType) == JpaJoinType.JOIN_TABLE) {
                 String tableName = extractAnnotationStringProperty(annotation, "name");
                 String joinColumns = extractJoinColumns(annotation, "joinColumns");
                 String inverseJoinColumns = extractJoinColumns(annotation, "inverseJoinColumns");
@@ -255,7 +258,7 @@ public class JpaAnnotationExtractor {
     private String extractManyToManyMappedByProperty(FieldObject field) {
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("ManyToMany")) {
+            if (JpaRelationshipType.fromAnnotationName(annotationType) == JpaRelationshipType.MANY_TO_MANY) {
                 String mappedBy = extractAnnotationStringProperty(annotation, "mappedBy");
                 if (mappedBy != null) {
                     return mappedBy;

@@ -1,5 +1,8 @@
 package gr.aueb.java.archifactor.refactoring.manipulators;
 
+import gr.aueb.java.archifactor.util.JpaJoinType;
+import gr.aueb.java.archifactor.util.JpaRelationshipType;
+
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
@@ -58,7 +61,7 @@ public class EntityTransformer {
         hasChanges |= transformMethodsInSameAST(astRoot, entity, relationship, relationship.getFieldName(), rewriter, importRewrite);
 
         // 3. Add SyncingSet inner class for ManyToMany owning side
-        if (relationship.getRelationshipType().equals("ManyToMany") && relationship.isOwningSide()) {
+        if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY && relationship.isOwningSide()) {
             System.out.println("[DEBUG] Adding SyncingSet inner class for ManyToMany owning side");
             hasChanges |= addSyncingSetInnerClass(astRoot, entity, relationship, rewriter, importRewrite, astRoot.getAST());
         }
@@ -111,7 +114,7 @@ public class EntityTransformer {
             if (modifier instanceof Annotation) {
                 Annotation annotation = (Annotation) modifier;
                 String annotationName = annotation.getTypeName().getFullyQualifiedName();
-                if (UnmapJpaRelationshipsUtils.isJpaRelationshipAnnotation(annotationName) || UnmapJpaRelationshipsUtils.isJoinAnnotation(annotationName)) {
+                if (JpaRelationshipType.isRelationshipType(annotationName) || JpaJoinType.isJoinType(annotationName)) {
                     modifiersRewrite.remove(annotation, editGroup);
                     removedAnnotations = true;
                 }
@@ -130,7 +133,7 @@ public class EntityTransformer {
         }
 
         if (relationship.isOwningSide()) {
-            if (relationship.getRelationshipType().equals("ManyToMany")) {
+            if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY) {
                 System.out.println("[DEBUG] Transforming ManyToMany owning side: " + entity.getName() + "." + relationship.getFieldName());
                 hasChanges |= changeFieldInitializationToSyncingSet(fieldDecl, relationship, rewriter, ast, editGroup, entity);
                 hasChanges |= addElementCollectionField(fieldDecl, relationship, rewriter, importRewrite, ast, editGroup);
@@ -340,7 +343,7 @@ public class EntityTransformer {
 
         // 4. Handle field assignments for owning side
         if (relationship.isOwningSide()) {
-            if (relationship.getRelationshipType().equals("ManyToMany")) {
+            if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY) {
                 System.out.println("[DEBUG] Replacing assignments with setter calls for ManyToMany owning side field: " + targetFieldName);
                 hasChanges |= replaceAssignmentsWithSetterCalls(astRoot, targetFieldName, directAccessMethodName, entity, relationship, rewriter, importRewrite, ast);
             } else {
@@ -546,7 +549,7 @@ public class EntityTransformer {
 
         Expression condition;
         String serviceMethodArgument;
-        if (relationship.getRelationshipType().equals("ManyToMany") && relationship.isOwningSide()) {
+        if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY && relationship.isOwningSide()) {
             String elementCollectionFieldName = relationship.getJoinTableInverseJoinColumns() + "s";
             serviceMethodArgument = elementCollectionFieldName;
             condition = buildManyToManyOwningCondition(ast, fieldName, elementCollectionFieldName);
@@ -716,17 +719,17 @@ public class EntityTransformer {
             return null;
         }
 
-        String relationshipType = relationship.getRelationshipType();
+        JpaRelationshipType relationshipType = relationship.getRelationshipType();
         List<ServiceMethodRequirement> requirements = serviceMethodRequirements.get(targetEntityName);
         for (ServiceMethodRequirement requirement : requirements) {
-            if (relationshipType.equals("ManyToOne") && requirement.getMethodType() == ServiceMethodType.GET_BY_ID) {
+            if (relationshipType == JpaRelationshipType.MANY_TO_ONE && requirement.getMethodType() == ServiceMethodType.GET_BY_ID) {
                 return requirement;
-            } else if (relationshipType.equals("OneToMany") 
-            		&& requirement.getMethodType() == ServiceMethodType.GET_BY_FOREIGN_KEY 
-            		&& requirement.getForeignKeyFieldName() != null 
+            } else if (relationshipType == JpaRelationshipType.ONE_TO_MANY
+            		&& requirement.getMethodType() == ServiceMethodType.GET_BY_FOREIGN_KEY
+            		&& requirement.getForeignKeyFieldName() != null
                     && requirement.getForeignKeyFieldName().equals(relationship.getJoinColumnName())) {
                 return requirement;
-            } else if (relationshipType.equals("ManyToMany")) {
+            } else if (relationshipType == JpaRelationshipType.MANY_TO_MANY) {
                 if (relationship.isOwningSide() && requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
                     return requirement;
                 } else if (!relationship.isOwningSide() && requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_NON_OWNING) {

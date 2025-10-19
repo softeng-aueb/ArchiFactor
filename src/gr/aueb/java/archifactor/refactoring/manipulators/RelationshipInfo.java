@@ -1,8 +1,10 @@
 package gr.aueb.java.archifactor.refactoring.manipulators;
 
+import gr.aueb.java.archifactor.util.JpaRelationshipType;
+
 public class RelationshipInfo {
     private String fromEntity;
-    private String relationshipType;
+    private JpaRelationshipType relationshipType;
     private String toEntity;
     private boolean isOwningSide;
     private String joinColumnName;
@@ -13,7 +15,7 @@ public class RelationshipInfo {
     private String joinTableJoinColumns;
     private String joinTableInverseJoinColumns;
 
-    public RelationshipInfo(String fromEntity, String relationshipType, String toEntity, boolean isOwningSide,
+    public RelationshipInfo(String fromEntity, JpaRelationshipType relationshipType, String toEntity, boolean isOwningSide,
                             String joinColumnName, String fieldName, String referencedPkType, String referencedPkName,
                             String joinTableName, String joinTableJoinColumns, String joinTableInverseJoinColumns) {
         this.fromEntity = fromEntity;
@@ -28,12 +30,12 @@ public class RelationshipInfo {
         this.joinTableJoinColumns = joinTableJoinColumns;
         this.joinTableInverseJoinColumns = joinTableInverseJoinColumns;
     }
-    
+
     public String getFromEntity() {
         return fromEntity;
     }
 
-    public String getRelationshipType() {
+    public JpaRelationshipType getRelationshipType() {
         return relationshipType;
     }
 

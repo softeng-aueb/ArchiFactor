@@ -15,6 +15,7 @@ import org.eclipse.core.runtime.CoreException;
 
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.ast.ClassObject;
+import gr.aueb.java.archifactor.util.JpaRelationshipType;
 import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
 import gr.aueb.java.archifactor.refactoring.views.FrameworkType;
 import gr.aueb.java.jpa.JpaModel;
@@ -65,13 +66,13 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
      */
     private void identifyRequiredServiceMethods() {
         for (RelationshipInfo relationship : relationships) {
-            String relationshipType = relationship.getRelationshipType();
+            JpaRelationshipType relationshipType = relationship.getRelationshipType();
 
-            if (relationshipType.equals("ManyToOne")) {
+            if (relationshipType == JpaRelationshipType.MANY_TO_ONE) {
                 addManyToOneRequirements(relationship);
-            } else if (relationshipType.equals("OneToMany")) {
+            } else if (relationshipType == JpaRelationshipType.ONE_TO_MANY) {
                 addOneToManyRequirements(relationship);
-            } else if (relationshipType.equals("ManyToMany")) {
+            } else if (relationshipType == JpaRelationshipType.MANY_TO_MANY) {
                 if (relationship.isOwningSide()) {
                     addManyToManyOwningRequirements(relationship);
                 } else {

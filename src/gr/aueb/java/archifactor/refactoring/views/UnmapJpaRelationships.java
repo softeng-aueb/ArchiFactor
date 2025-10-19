@@ -56,7 +56,8 @@ import gr.aueb.java.archifactor.refactoring.manipulators.JpaAnnotationExtractor;
 import gr.aueb.java.archifactor.refactoring.manipulators.JoinTableInfo;
 import gr.aueb.java.archifactor.refactoring.manipulators.RelationshipInfo;
 import gr.aueb.java.archifactor.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
-import gr.aueb.java.archifactor.util.UnmapJpaRelationshipsUtils;
+import gr.aueb.java.archifactor.util.JpaJoinType;
+import gr.aueb.java.archifactor.util.JpaRelationshipType;
 import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 
@@ -95,7 +96,7 @@ public class UnmapJpaRelationships extends ViewPart {
                 case 0:
                     return rel.getFromEntity();
                 case 1:
-                    return rel.getRelationshipType();
+                    return rel.getRelationshipType().getAnnotationName();
                 case 2:
                     return rel.getToEntity();
                 default:
@@ -446,13 +447,13 @@ public class UnmapJpaRelationships extends ViewPart {
 
                 if (targetEntityNames.contains(fieldTypeName)) {
                     boolean isOwningSide = false;
-                    String relationshipType = null;
+                    JpaRelationshipType relationshipType = null;
                     for (Annotation annotation : fieldObject.getAnnotations()) {
-                        String annotationType = annotation.getTypeName().getFullyQualifiedName();
-                        if (UnmapJpaRelationshipsUtils.isJpaRelationshipAnnotation(annotationType)) {
-                            relationshipType = annotationType;
+                        String annotationName = annotation.getTypeName().getFullyQualifiedName();
+                        if (JpaRelationshipType.isRelationshipType(annotationName)) {
+                            relationshipType = JpaRelationshipType.fromAnnotationName(annotationName);
                             //checkForDangerousCascading(sourceEntity, fieldObject, annotation);
-                        } else if (UnmapJpaRelationshipsUtils.isJoinAnnotation(annotationType)) {
+                        } else if (JpaJoinType.isJoinType(annotationName)) {
                             isOwningSide = true;
                         }
                     }
@@ -464,7 +465,7 @@ public class UnmapJpaRelationships extends ViewPart {
                         String joinTableName = null;
                         String joinTableJoinColumns = null;
                         String joinTableInverseJoinColumns = null;
-                        if (relationshipType.equals("ManyToMany")) {
+                        if (relationshipType == JpaRelationshipType.MANY_TO_MANY) {
                             JoinTableInfo joinTableInfo = jpaExtractor.extractJoinTableInfo(fieldObject);
                             joinTableName = joinTableInfo.getTableName();
                             joinTableJoinColumns = joinTableInfo.getJoinColumns();

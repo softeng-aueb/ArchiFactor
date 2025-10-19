@@ -108,17 +108,6 @@ public class UnmapJpaRelationshipsUtils {
         return packageFragment;
     }
     
-    public static boolean isJpaRelationshipAnnotation(String annotationType) {
-        return annotationType.equals("OneToMany") || 
-               annotationType.equals("ManyToOne") || 
-               annotationType.equals("OneToOne") || 
-               annotationType.equals("ManyToMany");
-    }
-    
-    public static boolean isJoinAnnotation(String annotationType) {
-        return annotationType.equals("JoinColumn") || 
-               annotationType.equals("JoinTable");
-    }
 
     public static Type createAstTypeForFieldType(AST ast, String typeName) {
         switch (typeName.toLowerCase()) {
