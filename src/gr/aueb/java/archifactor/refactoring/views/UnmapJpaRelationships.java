@@ -35,12 +35,7 @@ import gr.uom.java.jdeodorant.refactoring.views.MyRefactoringWizard;
 import gr.uom.java.ast.ClassObject;
 import gr.aueb.java.jpa.JpaModel;
 import org.eclipse.jdt.core.ICompilationUnit;
-import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IPackageFragment;
-import org.eclipse.jdt.core.IPackageFragmentRoot;
-import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.IAnnotation;
-import org.eclipse.jdt.core.JavaCore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -74,7 +69,6 @@ public class UnmapJpaRelationships extends ViewPart {
     private IJavaProject selectedProject;
     private FrameworkType selectedFramework = FrameworkType.QUARKUS;
     private SystemObject cachedSystemObject;
-    private List<ClassObject> selectedEntities = new ArrayList<ClassObject>();
     private List<RelationshipInfo> detectedRelationships = new ArrayList<RelationshipInfo>();
 
     class AggregateViolationException extends RuntimeException {
@@ -338,7 +332,6 @@ public class UnmapJpaRelationships extends ViewPart {
         }
         
         selectedProject = project;
-        selectedEntities.clear();
         detectedRelationships.clear();
         tableViewer.refresh();
 
@@ -387,11 +380,9 @@ public class UnmapJpaRelationships extends ViewPart {
 
         List<ClassObject> entities = selectEntityClasses(shell, selectedProject);
         if (entities != null && !entities.isEmpty()) {
-            selectedEntities = entities;
-
             try {
                 refreshSystemObjectToMatchCurrentCode(shell);
-                detectRelationships();
+                detectRelationships(entities);
                 tableViewer.refresh();
             } catch (AggregateViolationException e) {
                 MessageDialog.openError(shell, "Cannot Break Relationships", 
@@ -411,85 +402,38 @@ public class UnmapJpaRelationships extends ViewPart {
         }
     }
     
-    private void detectRelationships() {
+    private void detectRelationships(List<ClassObject> selectedEntities) {
         detectedRelationships.clear();
-
-        Set<String> allEntityNames = new HashSet<String>();
-        ListIterator<ClassObject> classIterator = cachedSystemObject.getClassListIterator();
-        while (classIterator.hasNext()) {
-            ClassObject classObj = classIterator.next();
-            if (JpaModel.isEntity(classObj)) {
-                allEntityNames.add(classObj.getName());
-            }
-        }
 
         Set<String> selectedEntityNames = selectedEntities.stream()
             .map(ClassObject::getName)
             .collect(Collectors.toSet());
 
-        Set<String> otherEntityNames = new HashSet<String>(allEntityNames);
-        otherEntityNames.removeAll(selectedEntityNames);
+        List<ClassObject> otherEntities = new ArrayList<ClassObject>();
+        ListIterator<ClassObject> classIterator = cachedSystemObject.getClassListIterator();
+        while (classIterator.hasNext()) {
+            ClassObject classObj = classIterator.next();
+            if (JpaModel.isEntity(classObj) && !selectedEntityNames.contains(classObj.getName())) {
+                otherEntities.add(classObj);
+            }
+        }
+
+        Set<String> otherEntityNames = otherEntities.stream()
+            .map(ClassObject::getName)
+            .collect(Collectors.toSet());
 
         JpaAnnotationExtractor jpaExtractor = new JpaAnnotationExtractor(cachedSystemObject);
 
         // 1. Detect relationships FROM selected entities TO other entities
-        for (ClassObject selectedEntity : selectedEntities) {
-            Iterator<FieldObject> fieldIterator = selectedEntity.getFieldIterator();
-            while (fieldIterator.hasNext()) {
-                // private Customer customer;  // name="customer", type.classType="Customer"
-                // private List<Item> items;   // name="items", type.classType="List", type.genericType="<Item>"
-                FieldObject fieldObject = fieldIterator.next();
-                String fieldTypeName = fieldObject.getType().getClassType();
-                String genericType = fieldObject.getType().getGenericType();
-                if (genericType != null) {
-                    fieldTypeName = genericType.replaceAll("[<>]", "").trim();
-                }
+        detectRelationshipsFromTo(selectedEntities, otherEntityNames, jpaExtractor);
 
-                if (otherEntityNames.contains(fieldTypeName)) {
-                    boolean isOwningSide = false;
-                    String relationshipType = null;
-                    for (Annotation annotation : fieldObject.getAnnotations()) {
-                        String annotationType = annotation.getTypeName().getFullyQualifiedName();
-                        if (UnmapJpaRelationshipsUtils.isJpaRelationshipAnnotation(annotationType)) {
-                            relationshipType = annotationType;
-                            //checkForDangerousCascading(selectedEntity, fieldObject, annotation);
-                        } else if (UnmapJpaRelationshipsUtils.isJoinAnnotation(annotationType)) {
-                            isOwningSide = true;
-                        }
-                    }
-
-                    if (relationshipType != null) {
-                        // Extract JPA annotation details
-                        String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject);
-                        String idFieldType = jpaExtractor.extractIdFieldType(fieldTypeName);
-                        String idFieldName = jpaExtractor.extractIdFieldName(fieldTypeName);
-                        String joinTableName = null;
-                        String joinTableJoinColumns = null;
-                        String joinTableInverseJoinColumns = null;
-                        if (relationshipType.equals("ManyToMany")) {
-                            JoinTableInfo joinTableInfo = jpaExtractor.extractJoinTableInfo(fieldObject);
-                            joinTableName = joinTableInfo.getTableName();
-                            joinTableJoinColumns = joinTableInfo.getJoinColumns();
-                            joinTableInverseJoinColumns = joinTableInfo.getInverseJoinColumns();
-                        }
-                        RelationshipInfo relInfo = new RelationshipInfo(selectedEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
-                                                                        joinColumnName, fieldObject.getName(), idFieldType, idFieldName,
-                                                                        joinTableName, joinTableJoinColumns, joinTableInverseJoinColumns);
-                        detectedRelationships.add(relInfo);
-                    }
-                }
-            }
-        }
-        
         // 2. Detect relationships FROM other entities TO selected entities
-        ListIterator<ClassObject> allClassIterator = cachedSystemObject.getClassListIterator();
-        while (allClassIterator.hasNext()) {
-            ClassObject otherEntity = allClassIterator.next();
-            if (selectedEntityNames.contains(otherEntity.getName()) || !JpaModel.isEntity(otherEntity)) {
-                continue;
-            }
-            
-            Iterator<FieldObject> fieldIterator = otherEntity.getFieldIterator();
+        detectRelationshipsFromTo(otherEntities, selectedEntityNames, jpaExtractor);
+    }
+
+    private void detectRelationshipsFromTo(List<ClassObject> sourceEntities, Set<String> targetEntityNames, JpaAnnotationExtractor jpaExtractor) {
+        for (ClassObject sourceEntity : sourceEntities) {
+            Iterator<FieldObject> fieldIterator = sourceEntity.getFieldIterator();
             while (fieldIterator.hasNext()) {
                 // private Customer customer;  // name="customer", type.classType="Customer"
                 // private List<Item> items;   // name="items", type.classType="List", type.genericType="<Item>"
@@ -500,21 +444,20 @@ public class UnmapJpaRelationships extends ViewPart {
                     fieldTypeName = genericType.replaceAll("[<>]", "").trim();
                 }
 
-                if (selectedEntityNames.contains(fieldTypeName)) {
+                if (targetEntityNames.contains(fieldTypeName)) {
                     boolean isOwningSide = false;
                     String relationshipType = null;
                     for (Annotation annotation : fieldObject.getAnnotations()) {
                         String annotationType = annotation.getTypeName().getFullyQualifiedName();
                         if (UnmapJpaRelationshipsUtils.isJpaRelationshipAnnotation(annotationType)) {
                             relationshipType = annotationType;
-                            //checkForDangerousCascading(otherEntity, fieldObject, annotation);
+                            //checkForDangerousCascading(sourceEntity, fieldObject, annotation);
                         } else if (UnmapJpaRelationshipsUtils.isJoinAnnotation(annotationType)) {
                             isOwningSide = true;
                         }
                     }
 
                     if (relationshipType != null) {
-                        // Extract JPA annotation details
                         String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject);
                         String idFieldType = jpaExtractor.extractIdFieldType(fieldTypeName);
                         String idFieldName = jpaExtractor.extractIdFieldName(fieldTypeName);
@@ -527,7 +470,7 @@ public class UnmapJpaRelationships extends ViewPart {
                             joinTableJoinColumns = joinTableInfo.getJoinColumns();
                             joinTableInverseJoinColumns = joinTableInfo.getInverseJoinColumns();
                         }
-                        RelationshipInfo relInfo = new RelationshipInfo(otherEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
+                        RelationshipInfo relInfo = new RelationshipInfo(sourceEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
                                                                         joinColumnName, fieldObject.getName(), idFieldType, idFieldName,
                                                                         joinTableName, joinTableJoinColumns, joinTableInverseJoinColumns);
                         detectedRelationships.add(relInfo);
