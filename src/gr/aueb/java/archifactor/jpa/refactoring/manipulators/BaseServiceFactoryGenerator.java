@@ -2,15 +2,20 @@ package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
-import org.eclipse.ltk.core.refactoring.Change;
-import org.eclipse.ltk.core.refactoring.TextFileChange;
+import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
+import org.eclipse.core.resources.IContainer;
 import org.eclipse.core.resources.IFile;
-import org.eclipse.text.edits.ReplaceEdit;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jface.text.Document;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
@@ -48,45 +53,67 @@ public abstract class BaseServiceFactoryGenerator {
 		}
 	}
 
-	public Change createOrUpdateServiceFactory(Set<String> entityNames, String servicePackage) throws JavaModelException {
+	public void createOrUpdateServiceFactory(
+		Set<String> entityNames, 
+		String servicePackage,
+		Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges,
+		Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
+	) throws JavaModelException {
 		String factoryName = "ServiceFactory";
 		String factoryFileName = factoryName + ".java";
 
 		IPackageFragment packageFragment = UnmapJpaRelationshipsUtils.findOrCreatePackage(project, servicePackage);
 		if (packageFragment == null) {
-			return null;
+			return;
 		}
 
 		ICompilationUnit existingCU = packageFragment.getCompilationUnit(factoryFileName);
 		if (existingCU.exists()) {
-			return updateExistingServiceFactory(existingCU, entityNames);
+			updateExistingServiceFactory(existingCU, entityNames, compilationUnitChanges);
 		} else {
-			return createNewServiceFactory(packageFragment, entityNames, servicePackage);
+			createNewServiceFactory(packageFragment, entityNames, servicePackage, createCompilationUnitChanges);
 		}
 	}
 
-	protected Change createNewServiceFactory(IPackageFragment packageFragment, Set<String> entityNames, String servicePackage) throws JavaModelException {
+	protected void createNewServiceFactory(
+		IPackageFragment packageFragment, 
+		Set<String> entityNames, 
+		String servicePackage,
+		Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
+	) throws JavaModelException {
 		String factoryName = "ServiceFactory";
 		String factoryFileName = factoryName + ".java";
 
-		// Create the service factory content
+		IContainer contextContainer = (IContainer) packageFragment.getResource();
+		IFile factoryFile = null;
+		if (contextContainer instanceof IProject) {
+			IProject contextProject = (IProject) contextContainer;
+			factoryFile = contextProject.getFile(factoryFileName);
+		} else if (contextContainer instanceof IFolder) {
+			IFolder contextFolder = (IFolder) contextContainer;
+			factoryFile = contextFolder.getFile(factoryFileName);
+		}
+
+		ICompilationUnit factoryCompilationUnit = JavaCore.createCompilationUnitFrom(factoryFile);
 		String factoryContent = generateServiceFactoryContent(entityNames, servicePackage);
+		Document document = new Document(factoryContent);
 
-		// Create empty compilation unit first
-		ICompilationUnit newCU = packageFragment.createCompilationUnit(factoryFileName, "", false, null);
-		IFile file = (IFile) newCU.getResource();
-
-		// Create a change that replaces the empty content with the service factory content
-		TextFileChange change = new TextFileChange("Create " + factoryName, file);
-		change.setEdit(new ReplaceEdit(0, 0, factoryContent));
-		return change;
+		try {
+			CreateCompilationUnitChange createChange = new CreateCompilationUnitChange(factoryCompilationUnit, document.get(), factoryFile.getCharset());
+			createCompilationUnitChanges.put(factoryCompilationUnit, createChange);
+		} catch (CoreException e) {
+			e.printStackTrace();
+		}
 	}
 
 	protected abstract String generateServiceFactoryContent(Set<String> entityNames, String packageName);
 
-	protected Change updateExistingServiceFactory(ICompilationUnit existingCU, Set<String> entityNames) throws JavaModelException {
-		IFile file = (IFile) existingCU.getResource();
-
+	protected void updateExistingServiceFactory(
+		ICompilationUnit existingCU, 
+		Set<String> entityNames,
+		Map<ICompilationUnit, 
+		CompilationUnitChange> compilationUnitChanges
+	) throws JavaModelException {
 		ASTParser parser = ASTParser.newParser(ASTReader.JLS);
 		parser.setSource(existingCU);
 		parser.setResolveBindings(true);
@@ -100,7 +127,7 @@ public abstract class BaseServiceFactoryGenerator {
 
 		TypeDeclaration factoryClass = findServiceFactoryClass(astRoot);
 		if (factoryClass == null) {
-			return null;
+			return;
 		}
 
 		for (String entityName : entityNames) {
@@ -135,12 +162,12 @@ public abstract class BaseServiceFactoryGenerator {
 		}
 
 		if (!hasChanges) {
-			return null;
+			return;
 		}
 
-		TextFileChange change = new TextFileChange("Update " + existingCU.getElementName(), file);
+		CompilationUnitChange change = new CompilationUnitChange("Update " + existingCU.getElementName(), existingCU);
 		change.setEdit(rewriter.rewriteAST());
-		return change;
+		compilationUnitChanges.put(existingCU, change);
 	}
 
 	protected TypeDeclaration findServiceFactoryClass(CompilationUnit astRoot) {

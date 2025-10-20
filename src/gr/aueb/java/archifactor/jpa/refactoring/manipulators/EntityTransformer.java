@@ -5,10 +5,8 @@ import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
-import org.eclipse.ltk.core.refactoring.Change;
-import org.eclipse.ltk.core.refactoring.TextFileChange;
+import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
 import org.eclipse.text.edits.TextEditGroup;
-import org.eclipse.core.resources.IFile;
 
 import gr.uom.java.ast.SystemObject;
 import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
@@ -37,10 +35,10 @@ public class EntityTransformer {
         this.serviceMethodRequirements = serviceMethodRequirements;
     }
 
-    public Change transformFromEntity(ClassObject entity, RelationshipInfo relationship) throws Exception {
+    public void transformFromEntity(ClassObject entity, RelationshipInfo relationship, Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges) throws Exception {
         ICompilationUnit cu = (ICompilationUnit) entity.getITypeRoot();
         if (cu == null) {
-            return null;
+            return;
         }
 
         ASTParser parser = ASTParser.newParser(ASTReader.JLS);
@@ -50,7 +48,7 @@ public class EntityTransformer {
 
         ASTRewrite rewriter = ASTRewrite.create(astRoot.getAST());
         ImportRewrite importRewrite = ImportRewrite.create(astRoot, true);
-        
+
         boolean hasChanges = false;
 
         // 1. Transform field declaration
@@ -70,16 +68,15 @@ public class EntityTransformer {
         }
 
         if (!hasChanges) {
-            return null;
+            return;
         }
 
-        IFile file = entity.getIFile();
-        TextFileChange change = new TextFileChange(cu.getElementName(), file);
+        CompilationUnitChange change = new CompilationUnitChange(cu.getElementName(), cu);
         change.setEdit(rewriter.rewriteAST());
         if (importRewrite.hasRecordedChanges()) {
             change.addEdit(importRewrite.rewriteImports(null));
         }
-        return change;
+        compilationUnitChanges.put(cu, change);
     }
     
     private FieldDeclaration findFieldDeclaration(CompilationUnit astRoot, String fieldName) {

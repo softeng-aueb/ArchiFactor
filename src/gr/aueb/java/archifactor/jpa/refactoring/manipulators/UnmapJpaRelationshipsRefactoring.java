@@ -6,8 +6,11 @@ import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.CompositeChange;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IJavaModelMarker;
+import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
@@ -26,6 +29,7 @@ import gr.aueb.java.jpa.JpaModel;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.ListIterator;
 import java.util.Set;
 import java.util.Map;
@@ -38,6 +42,8 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     private FrameworkType frameworkType;
     private Map<String, ClassObject> entityMap;
     private Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements;
+    private Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges;
+    private Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges;
 
     public UnmapJpaRelationshipsRefactoring(IJavaProject project, List<RelationshipInfo> relationships, SystemObject systemObject, FrameworkType frameworkType) {
         this.project = project;
@@ -46,6 +52,8 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
         this.frameworkType = frameworkType;
         this.entityMap = new HashMap<>();
         this.serviceMethodRequirements = new HashMap<>();
+        this.compilationUnitChanges = new LinkedHashMap<>();
+        this.createCompilationUnitChanges = new LinkedHashMap<>();
 
         buildEntityMap();
         identifyRequiredServiceMethods();
@@ -249,70 +257,67 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     
     @Override
     public Change createChange(IProgressMonitor monitor) throws OperationCanceledException {
-        CompositeChange compositeChange = new CompositeChange("Unmap JPA Relationships");
         try {
             Set<String> entitiesNeedingServices = serviceMethodRequirements.keySet();
 
             // 1. Create ServiceFactory first (so entity imports can reference it)
             BaseServiceFactoryGenerator factoryGenerator = ServiceFactoryGeneratorFactory.createGenerator(frameworkType, project, systemObject);
             String factoryPackage = UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap);
-            Change factoryChange = factoryGenerator.createOrUpdateServiceFactory(entitiesNeedingServices, factoryPackage);
-            if (factoryChange != null) {
-                compositeChange.add(factoryChange);
-            }
+            factoryGenerator.createOrUpdateServiceFactory(entitiesNeedingServices, factoryPackage, compilationUnitChanges, createCompilationUnitChanges);
 
             // 2. Create service interfaces and implementations (only required methods)
             for (Map.Entry<String, List<ServiceMethodRequirementInfo>> entry : serviceMethodRequirements.entrySet()) {
                 String entityName = entry.getKey();
                 List<ServiceMethodRequirementInfo> requirements = entry.getValue();
 
-                Change serviceInterfaceChange = createServiceInterfaceChange(entityName, requirements);
-                Change serviceImplChange = createServiceImplementationChange(entityName, requirements);
-                if (serviceInterfaceChange != null) {
-                    compositeChange.add(serviceInterfaceChange);
-                }
-                if (serviceImplChange != null) {
-                    compositeChange.add(serviceImplChange);
-                }
+                createServiceInterfaceChange(entityName, requirements);
+                createServiceImplementationChange(entityName, requirements);
             }
 
             // 3. Transform entity classes last (so imports reference existing files)
             for (RelationshipInfo relationship : relationships) {
-                Change entityChange = createEntityTransformationChange(relationship);
-                if (entityChange != null) {
-                    compositeChange.add(entityChange);
-                }
+                createEntityTransformationChange(relationship);
             }
         } catch (Exception e) {
             e.printStackTrace();
             throw new OperationCanceledException("Error creating changes: " + e.getMessage());
         }
-        return compositeChange;
+
+        List<Change> changes = new ArrayList<>();
+        changes.addAll(compilationUnitChanges.values());
+        changes.addAll(createCompilationUnitChanges.values());
+        return new CompositeChange("Unmap JPA Relationships", changes.toArray(new Change[changes.size()]));
     }
 
-    private Change createEntityTransformationChange(RelationshipInfo relationship) throws Exception {
-        CompositeChange entityChange = new CompositeChange("Transform relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
-
+    private void createEntityTransformationChange(RelationshipInfo relationship) throws Exception {
         EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodRequirements);
         ClassObject fromEntity = entityMap.get(relationship.getFromEntity());
         if (fromEntity == null) {
             throw new IllegalStateException("Entity not found: " + relationship.getFromEntity());
         }
 
-        Change change = entityTransformer.transformFromEntity(fromEntity, relationship);
-        if (change != null) {
-            entityChange.add(change);
-        }
-        return entityChange.getChildren().length > 0 ? entityChange : null;
+        entityTransformer.transformFromEntity(fromEntity, relationship, compilationUnitChanges);
     }
 
-    private Change createServiceInterfaceChange(String entityName, List<ServiceMethodRequirementInfo> requirements) throws Exception {
+    private void createServiceInterfaceChange(String entityName, List<ServiceMethodRequirementInfo> requirements) throws Exception {
         ServiceInterfaceGenerator generator = new ServiceInterfaceGenerator(project, systemObject);
-        return generator.createOrUpdateServiceInterface(entityName, requirements, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
+        generator.createOrUpdateServiceInterface(
+            entityName, 
+            requirements, 
+            UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)),
+            compilationUnitChanges, 
+            createCompilationUnitChanges
+        );
     }
 
-    private Change createServiceImplementationChange(String entityName, List<ServiceMethodRequirementInfo> requirements) throws Exception {
+    private void createServiceImplementationChange(String entityName, List<ServiceMethodRequirementInfo> requirements) throws Exception {
         BaseServiceImplementationGenerator generator = ServiceImplementationGeneratorFactory.createGenerator(frameworkType, project, systemObject);
-        return generator.createOrUpdateServiceImplementation(entityName, requirements, UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)));
+        generator.createOrUpdateServiceImplementation(
+            entityName, 
+            requirements, 
+            UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)), 
+            compilationUnitChanges, 
+            createCompilationUnitChanges
+        );
     }
 }

@@ -2,15 +2,20 @@ package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.*;
-import org.eclipse.ltk.core.refactoring.Change;
-import org.eclipse.ltk.core.refactoring.TextFileChange;
-import org.eclipse.core.resources.IFile;
-import org.eclipse.text.edits.ReplaceEdit;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
+import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
+import org.eclipse.jdt.internal.corext.refactoring.changes.CreateCompilationUnitChange;
+import org.eclipse.core.resources.IContainer;
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.jface.text.Document;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
@@ -22,6 +27,7 @@ import gr.uom.java.ast.ASTReader;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -34,35 +40,69 @@ public class ServiceInterfaceGenerator {
         this.systemObject = systemObject;
     }
 
-    public Change createOrUpdateServiceInterface(String entityName, List<ServiceMethodRequirementInfo> requirements, String servicePackage) throws JavaModelException {
+    public void createOrUpdateServiceInterface(
+		String entityName, 
+		List<ServiceMethodRequirementInfo> requirements, 
+		String servicePackage,
+        Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges,
+        Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
+    ) throws JavaModelException {
         String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
         String serviceName = simpleEntityName + "Service";
         String serviceFileName = serviceName + ".java";
 
         IPackageFragment packageFragment = UnmapJpaRelationshipsUtils.findOrCreatePackage(project, servicePackage);
         if (packageFragment == null) {
-            return null;
+            return;
         }
 
         ICompilationUnit existingCU = packageFragment.getCompilationUnit(serviceFileName);
         if (existingCU.exists()) {
-            return updateExistingServiceInterface(existingCU, entityName, requirements);
+            updateExistingServiceInterface(existingCU, entityName, requirements, compilationUnitChanges);
+        } else {
+            createNewServiceInterface(packageFragment, entityName, requirements, servicePackage, createCompilationUnitChanges);
         }
-
-        // Create the service interface content
-        String serviceInterfaceContent = generateServiceInterfaceContent(entityName, requirements, servicePackage);
-
-        // Create empty compilation unit first
-        ICompilationUnit newCU = packageFragment.createCompilationUnit(serviceFileName, "", false, null);
-        IFile file = (IFile) newCU.getResource();
-
-        // Create a change that replaces the empty content with the interface content
-        TextFileChange change = new TextFileChange("Create " + serviceName + " interface", file);
-        change.setEdit(new ReplaceEdit(0, 0, serviceInterfaceContent));
-        return change;
     }
 
-    private Change updateExistingServiceInterface(ICompilationUnit existingCU, String entityName, List<ServiceMethodRequirementInfo> requirements) throws JavaModelException, IllegalArgumentException {
+    private void createNewServiceInterface(
+		IPackageFragment packageFragment, 
+		String entityName, 
+		List<ServiceMethodRequirementInfo> requirements,
+        String servicePackage, 
+        Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
+    ) throws JavaModelException {
+        String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
+        String serviceName = simpleEntityName + "Service";
+        String serviceFileName = serviceName + ".java";
+
+        IContainer contextContainer = (IContainer) packageFragment.getResource();
+        IFile serviceFile = null;
+        if (contextContainer instanceof IProject) {
+            IProject contextProject = (IProject) contextContainer;
+            serviceFile = contextProject.getFile(serviceFileName);
+        } else if (contextContainer instanceof IFolder) {
+            IFolder contextFolder = (IFolder) contextContainer;
+            serviceFile = contextFolder.getFile(serviceFileName);
+        }
+
+        ICompilationUnit serviceCompilationUnit = JavaCore.createCompilationUnitFrom(serviceFile);
+        String serviceInterfaceContent = generateServiceInterfaceContent(entityName, requirements, servicePackage);
+        Document document = new Document(serviceInterfaceContent);
+
+        try {
+            CreateCompilationUnitChange createChange = new CreateCompilationUnitChange(serviceCompilationUnit, document.get(), serviceFile.getCharset());
+            createCompilationUnitChanges.put(serviceCompilationUnit, createChange);
+        } catch (CoreException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateExistingServiceInterface(
+		ICompilationUnit existingCU, 
+		String entityName, 
+		List<ServiceMethodRequirementInfo> requirements,
+        Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges
+    ) throws JavaModelException, IllegalArgumentException {
         ASTParser parser = ASTParser.newParser(ASTReader.JLS);
         parser.setSource(existingCU);
         parser.setResolveBindings(true);
@@ -71,7 +111,7 @@ public class ServiceInterfaceGenerator {
         Set<String> existingMethodSignatures = extractExistingMethodSignatures(astRoot);
         List<ServiceMethodRequirementInfo> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
         if (missingMethods.isEmpty()) {
-            return null;
+            return;
         }
 
         ASTRewrite rewriter = ASTRewrite.create(astRoot.getAST());
@@ -104,10 +144,9 @@ public class ServiceInterfaceGenerator {
             methodsRewrite.insertLast(methodDecl, new TextEditGroup("Add missing service method"));
         }
 
-        IFile file = (IFile) existingCU.getResource();
-        TextFileChange change = new TextFileChange("Update " + existingCU.getElementName(), file);
+        CompilationUnitChange change = new CompilationUnitChange("Update " + existingCU.getElementName(), existingCU);
         change.setEdit(rewriter.rewriteAST());
-        return change;
+        compilationUnitChanges.put(existingCU, change);
     }
 
     private Set<String> extractExistingImports(CompilationUnit astRoot) {
