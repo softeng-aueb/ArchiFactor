@@ -41,7 +41,7 @@ public abstract class BaseServiceImplementationGenerator {
 	}
 
 	protected abstract List<String> getFrameworkImports();
-	protected abstract String getClassAnnotation();
+	protected abstract List<String> getClassAnnotations();
 	protected abstract String getEntityManagerFieldAnnotation();
 
 	public void createOrUpdateServiceImplementation(
@@ -233,7 +233,10 @@ public abstract class BaseServiceImplementationGenerator {
 			content.append("import ").append(imp).append(";\n");
 		}
 
-		content.append("\n").append(getClassAnnotation()).append("\n");
+		content.append("\n");
+		for (String annotation : getClassAnnotations()) {
+			content.append(annotation).append("\n");
+		}
 		String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
 		content.append("public class ").append(simpleEntityName).append("ServiceImpl implements ").append(simpleEntityName).append("Service {\n");
 		content.append("    ").append(getEntityManagerFieldAnnotation()).append("\n");

@@ -22,8 +22,8 @@ public class SpringBootServiceImplementationGenerator extends BaseServiceImpleme
 	}
 
 	@Override
-	protected String getClassAnnotation() {
-		return "@Component";
+	protected List<String> getClassAnnotations() {
+		return Arrays.asList("@Component");
 	}
 
 	@Override

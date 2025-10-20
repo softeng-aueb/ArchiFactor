@@ -16,14 +16,15 @@ public class QuarkusServiceImplementationGenerator extends BaseServiceImplementa
 	@Override
 	protected List<String> getFrameworkImports() {
 		return Arrays.asList(
+			"io.quarkus.arc.Unremovable",
 			"jakarta.inject.Inject",
 			"jakarta.inject.Singleton"
 		);
 	}
 
 	@Override
-	protected String getClassAnnotation() {
-		return "@Singleton";
+	protected List<String> getClassAnnotations() {
+		return Arrays.asList("@Unremovable", "@Singleton");
 	}
 
 	@Override
