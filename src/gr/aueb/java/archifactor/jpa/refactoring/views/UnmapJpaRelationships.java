@@ -19,6 +19,8 @@ import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.swt.widgets.Display;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.CompilationErrorDetectedException;
+import gr.uom.java.ast.CompilationUnitCache;
+
 import org.eclipse.ui.*;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ControlAdapter;
@@ -49,6 +51,8 @@ import org.eclipse.jdt.core.dom.Annotation;
 import org.eclipse.jdt.core.dom.NormalAnnotation;
 import org.eclipse.jdt.core.dom.MemberValuePair;
 import gr.uom.java.ast.FieldObject;
+
+import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 
 import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
@@ -602,9 +606,13 @@ public class UnmapJpaRelationships extends ViewPart {
             UnmapJpaRelationshipsRefactoring refactoring = new UnmapJpaRelationshipsRefactoring(selectedProject, detectedRelationships, cachedSystemObject, selectedFramework);
             MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, null);
             RefactoringWizardOpenOperation operation = new RefactoringWizardOpenOperation(wizard);
-            operation.run(shell, "Unmap JPA Relationships");
+            int status = operation.run(shell, "Unmap JPA Relationships");
             if (wizard.getShell() != null && !wizard.getShell().isDisposed()) {
                 wizard.getShell().setMaximized(true);
+            }
+
+            if (status == RefactoringStatus.OK) {
+                forceRebuildSystemObject();
             }
         } catch (InterruptedException e) {
             // User cancelled - no action needed
@@ -632,6 +640,33 @@ public class UnmapJpaRelationships extends ViewPart {
                                 "Compilation errors were detected in the project. Fix the errors before using this feature.");
                         }
                     });
+                }
+            }
+        });
+    }
+
+    /**
+     * Forces a complete rebuild of the SystemObject from scratch.
+     *
+     * This is necessary after applying refactorings because:
+     * 1. The cachedSystemObject contains stale AST node references from before the refactoring
+     * 2. The CompilationUnitCache contains cached parsed AST trees from before the refactoring
+     *
+     * If compilation errors are introduced by the refactoring, we set cachedSystemObject to null,
+     * forcing the user to reselect the project after fixing the errors.
+     */
+    private void forceRebuildSystemObject() throws InterruptedException, InvocationTargetException {
+        IWorkbench wb = PlatformUI.getWorkbench();
+        IProgressService ps = wb.getProgressService();
+        ps.busyCursorWhile(new IRunnableWithProgress() {
+            public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
+                try {
+                    CompilationUnitCache.getInstance().clearAffectedCompilationUnits();
+                    CompilationUnitCache.getInstance().clearCache();
+                    new ASTReader(selectedProject, monitor);
+                    cachedSystemObject = ASTReader.getSystemObject();
+                } catch (CompilationErrorDetectedException e) {
+                	cachedSystemObject = null;
                 }
             }
         });
