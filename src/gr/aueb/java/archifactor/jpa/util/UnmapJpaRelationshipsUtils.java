@@ -110,7 +110,7 @@ public class UnmapJpaRelationshipsUtils {
     
 
     public static Type createAstTypeForFieldType(AST ast, String typeName) {
-        switch (typeName.toLowerCase()) {
+        switch (typeName) {
             case "int":
                 return ast.newPrimitiveType(PrimitiveType.INT);
             case "long":
