@@ -21,6 +21,7 @@ import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodObject;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -29,6 +30,9 @@ import java.util.Iterator;
 public class EntityTransformer {
     private SystemObject systemObject;
     private Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements;
+    private Map<ICompilationUnit, CompilationUnit> astRootMap = new HashMap<>();
+    private Map<ICompilationUnit, ASTRewrite> rewriterMap = new HashMap<>();
+    private Map<ICompilationUnit, ImportRewrite> importRewriteMap = new HashMap<>();
 
     public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements) {
         this.systemObject = systemObject;
@@ -41,13 +45,26 @@ public class EntityTransformer {
             return;
         }
 
-        ASTParser parser = ASTParser.newParser(ASTReader.JLS);
-        parser.setSource(cu);
-        parser.setResolveBindings(true);
-        CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
+        CompilationUnit astRoot;
+        ASTRewrite rewriter;
+        ImportRewrite importRewrite;
+        if (astRootMap.containsKey(cu)) {
+            astRoot = astRootMap.get(cu);
+            rewriter = rewriterMap.get(cu);
+            importRewrite = importRewriteMap.get(cu);
+        } else {
+            ASTParser parser = ASTParser.newParser(ASTReader.JLS);
+            parser.setSource(cu);
+            parser.setResolveBindings(true);
+            astRoot = (CompilationUnit) parser.createAST(null);
 
-        ASTRewrite rewriter = ASTRewrite.create(astRoot.getAST());
-        ImportRewrite importRewrite = ImportRewrite.create(astRoot, true);
+            rewriter = ASTRewrite.create(astRoot.getAST());
+            importRewrite = ImportRewrite.create(astRoot, true);
+
+            astRootMap.put(cu, astRoot);
+            rewriterMap.put(cu, rewriter);
+            importRewriteMap.put(cu, importRewrite);
+        }
 
         boolean hasChanges = false;
 

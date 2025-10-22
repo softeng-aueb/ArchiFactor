@@ -275,8 +275,9 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             }
 
             // 3. Transform entity classes last (so imports reference existing files)
+            EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodRequirements);
             for (RelationshipInfo relationship : relationships) {
-                createEntityTransformationChange(relationship);
+                createEntityTransformationChange(relationship, entityTransformer);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -289,8 +290,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
         return new CompositeChange("Unmap JPA Relationships", changes.toArray(new Change[changes.size()]));
     }
 
-    private void createEntityTransformationChange(RelationshipInfo relationship) throws Exception {
-        EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodRequirements);
+    private void createEntityTransformationChange(RelationshipInfo relationship, EntityTransformer entityTransformer) throws Exception {
         ClassObject fromEntity = entityMap.get(relationship.getFromEntity());
         if (fromEntity == null) {
             throw new IllegalStateException("Entity not found: " + relationship.getFromEntity());
