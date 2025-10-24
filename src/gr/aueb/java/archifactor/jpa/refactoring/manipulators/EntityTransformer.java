@@ -608,7 +608,16 @@ public class EntityTransformer {
         combined.setLeftOperand(fieldIsEmptyCall);
         combined.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
         combined.setRightOperand(notEmpty);
-        return combined;
+
+        MethodInvocation isContainerAvailableCall = ast.newMethodInvocation();
+        isContainerAvailableCall.setExpression(ast.newName("ServiceFactory"));
+        isContainerAvailableCall.setName(ast.newSimpleName("isContainerAvailable"));
+
+        InfixExpression finalCondition = ast.newInfixExpression();
+        finalCondition.setLeftOperand(combined);
+        finalCondition.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
+        finalCondition.setRightOperand(isContainerAvailableCall);
+        return finalCondition;
     }
 
     private Expression buildNonOwningCondition(AST ast, String fieldName, ClassObject entity, JpaAnnotationExtractorUtils jpaAnnotationExtractor) {
@@ -628,7 +637,16 @@ public class EntityTransformer {
         combined.setLeftOperand(fieldIsEmptyCall);
         combined.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
         combined.setRightOperand(idNotNullCheck);
-        return combined;
+
+        MethodInvocation isContainerAvailableCall = ast.newMethodInvocation();
+        isContainerAvailableCall.setExpression(ast.newName("ServiceFactory"));
+        isContainerAvailableCall.setName(ast.newSimpleName("isContainerAvailable"));
+
+        InfixExpression finalCondition = ast.newInfixExpression();
+        finalCondition.setLeftOperand(combined);
+        finalCondition.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
+        finalCondition.setRightOperand(isContainerAvailableCall);
+        return finalCondition;
     }
 
     private VariableDeclarationStatement createServiceVariableDeclaration(AST ast, String serviceName, String serviceClassName) {
@@ -690,8 +708,17 @@ public class EntityTransformer {
         combinedCondition.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
         combinedCondition.setRightOperand(fkNotNullCheck);
 
+        MethodInvocation isContainerAvailableCall = ast.newMethodInvocation();
+        isContainerAvailableCall.setExpression(ast.newName("ServiceFactory"));
+        isContainerAvailableCall.setName(ast.newSimpleName("isContainerAvailable"));
+
+        InfixExpression finalCondition = ast.newInfixExpression();
+        finalCondition.setLeftOperand(combinedCondition);
+        finalCondition.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
+        finalCondition.setRightOperand(isContainerAvailableCall);
+
         IfStatement lazyLoadIf = ast.newIfStatement();
-        lazyLoadIf.setExpression(combinedCondition);
+        lazyLoadIf.setExpression(finalCondition);
 
         VariableDeclarationFragment serviceVarFragment = ast.newVariableDeclarationFragment();
         serviceVarFragment.setName(ast.newSimpleName(serviceName));

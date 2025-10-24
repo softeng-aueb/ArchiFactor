@@ -27,6 +27,14 @@ public class QuarkusServiceFactoryGenerator extends BaseServiceFactoryGenerator 
 		}
 		content.append("\n");
 		content.append("public class ServiceFactory {\n\n");
+		content.append("    public static boolean isContainerAvailable() {\n");
+		content.append("        try {\n");
+		content.append("            CDI.current();\n");
+		content.append("            return true;\n");
+		content.append("        } catch (IllegalStateException e) {\n");
+		content.append("            return false;\n");
+		content.append("        }\n");
+		content.append("    }\n\n");
 		for (String entityName : entityNames) {
 			String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
 			String serviceName = simpleEntityName + "Service";

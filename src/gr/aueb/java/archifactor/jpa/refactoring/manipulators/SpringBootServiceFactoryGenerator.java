@@ -36,6 +36,9 @@ public class SpringBootServiceFactoryGenerator extends BaseServiceFactoryGenerat
 		content.append("    public void setApplicationContext(ApplicationContext context) throws BeansException {\n");
 		content.append("        applicationContext = context;\n");
 		content.append("    }\n\n");
+		content.append("    public static boolean isContainerAvailable() {\n");
+		content.append("        return applicationContext != null;\n");
+		content.append("    }\n\n");
 		for (String entityName : entityNames) {
 			String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
 			String serviceName = simpleEntityName + "Service";
