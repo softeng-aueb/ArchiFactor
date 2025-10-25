@@ -267,22 +267,44 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
 
             // 1. Create ServiceFactory first (so entity imports can reference it)
             BaseServiceFactoryGenerator factoryGenerator = ServiceFactoryGeneratorFactory.createGenerator(frameworkType, project, systemObject);
-            String factoryPackage = UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap);
-            factoryGenerator.createOrUpdateServiceFactory(entitiesNeedingServices, factoryPackage, compilationUnitChanges, createCompilationUnitChanges);
+            factoryGenerator.createOrUpdateServiceFactory(
+                entitiesNeedingServices, 
+                UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap), 
+                compilationUnitChanges, 
+                createCompilationUnitChanges
+            );
 
             // 2. Create service interfaces and implementations (only required methods)
+            ServiceInterfaceGenerator interfaceGenerator = new ServiceInterfaceGenerator(project, systemObject);
+            BaseServiceImplementationGenerator implementationGenerator = ServiceImplementationGeneratorFactory.createGenerator(frameworkType, project, systemObject);
             for (Map.Entry<String, List<ServiceMethodRequirementInfo>> entry : serviceMethodRequirements.entrySet()) {
                 String entityName = entry.getKey();
                 List<ServiceMethodRequirementInfo> requirements = entry.getValue();
 
-                createServiceInterfaceChange(entityName, requirements);
-                createServiceImplementationChange(entityName, requirements);
+                interfaceGenerator.createOrUpdateServiceInterface(
+                    entityName,
+                    requirements,
+                    UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)),
+                    compilationUnitChanges,
+                    createCompilationUnitChanges
+                );
+                implementationGenerator.createOrUpdateServiceImplementation(
+                    entityName,
+                    requirements,
+                    UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)),
+                    compilationUnitChanges,
+                    createCompilationUnitChanges
+                );
             }
 
             // 3. Transform entity classes last (so imports reference existing files)
             EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodRequirements);
             for (RelationshipInfo relationship : relationships) {
-                createEntityTransformationChange(relationship, entityTransformer);
+                entityTransformer.transformFromEntity(
+                	entityMap.get(relationship.getFromEntity()), 
+                    relationship, 
+                    compilationUnitChanges
+                );
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -293,36 +315,5 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
         changes.addAll(compilationUnitChanges.values());
         changes.addAll(createCompilationUnitChanges.values());
         return new CompositeChange("Unmap JPA Relationships", changes.toArray(new Change[changes.size()]));
-    }
-
-    private void createEntityTransformationChange(RelationshipInfo relationship, EntityTransformer entityTransformer) throws Exception {
-        ClassObject fromEntity = entityMap.get(relationship.getFromEntity());
-        if (fromEntity == null) {
-            throw new IllegalStateException("Entity not found: " + relationship.getFromEntity());
-        }
-
-        entityTransformer.transformFromEntity(fromEntity, relationship, compilationUnitChanges);
-    }
-
-    private void createServiceInterfaceChange(String entityName, List<ServiceMethodRequirementInfo> requirements) throws Exception {
-        ServiceInterfaceGenerator generator = new ServiceInterfaceGenerator(project, systemObject);
-        generator.createOrUpdateServiceInterface(
-            entityName, 
-            requirements, 
-            UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)),
-            compilationUnitChanges, 
-            createCompilationUnitChanges
-        );
-    }
-
-    private void createServiceImplementationChange(String entityName, List<ServiceMethodRequirementInfo> requirements) throws Exception {
-        BaseServiceImplementationGenerator generator = ServiceImplementationGeneratorFactory.createGenerator(frameworkType, project, systemObject);
-        generator.createOrUpdateServiceImplementation(
-            entityName, 
-            requirements, 
-            UnmapJpaRelationshipsUtils.getPackageNameFromClass(entityMap.get(entityName)), 
-            compilationUnitChanges, 
-            createCompilationUnitChanges
-        );
     }
 }
