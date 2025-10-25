@@ -223,6 +223,11 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             return status;
         }
         
+        if (frameworkType == null) {
+        	status.addFatalError("No framework selected");
+            return status;
+        }
+        
         if (relationships == null || relationships.isEmpty()) {
             status.addFatalError("No relationships to unmap");
             return status;
