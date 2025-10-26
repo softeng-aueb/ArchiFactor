@@ -472,9 +472,20 @@ public class UnmapJpaRelationships extends ViewPart {
                             joinTableJoinColumns = joinTableInfo.getJoinColumns();
                             joinTableInverseJoinColumns = joinTableInfo.getInverseJoinColumns();
                         }
-                        RelationshipInfo relInfo = new RelationshipInfo(sourceEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
-                                                                        joinColumnName, fieldObject.getName(), originPkType, referencedPkType, referencedPkName,
-                                                                        joinTableName, joinTableJoinColumns, joinTableInverseJoinColumns);
+                        RelationshipInfo relInfo = RelationshipInfo.builder()
+                            .fromEntity(sourceEntity.getName())
+                            .relationshipType(relationshipType)
+                            .toEntity(fieldTypeName)
+                            .isOwningSide(isOwningSide)
+                            .joinColumnName(joinColumnName)
+                            .fieldName(fieldObject.getName())
+                            .originPkType(originPkType)
+                            .referencedPkType(referencedPkType)
+                            .referencedPkName(referencedPkName)
+                            .joinTableName(joinTableName)
+                            .joinTableJoinColumns(joinTableJoinColumns)
+                            .joinTableInverseJoinColumns(joinTableInverseJoinColumns)
+                            .build();
                         detectedRelationships.add(relInfo);
                     }
                 }
