@@ -9,6 +9,7 @@ public class RelationshipInfo {
     private boolean isOwningSide;
     private String joinColumnName;
     private String fieldName;
+    private String originPkType;
     private String referencedPkType;
     private String referencedPkName;
     private String joinTableName;
@@ -16,7 +17,7 @@ public class RelationshipInfo {
     private String joinTableInverseJoinColumns;
 
     public RelationshipInfo(String fromEntity, JpaRelationshipType relationshipType, String toEntity, boolean isOwningSide,
-                            String joinColumnName, String fieldName, String referencedPkType, String referencedPkName,
+                            String joinColumnName, String fieldName, String originPkType, String referencedPkType, String referencedPkName,
                             String joinTableName, String joinTableJoinColumns, String joinTableInverseJoinColumns) {
         this.fromEntity = fromEntity;
         this.relationshipType = relationshipType;
@@ -24,6 +25,7 @@ public class RelationshipInfo {
         this.isOwningSide = isOwningSide;
         this.joinColumnName = joinColumnName;
         this.fieldName = fieldName;
+        this.originPkType = originPkType;
         this.referencedPkType = referencedPkType;
         this.referencedPkName = referencedPkName;
         this.joinTableName = joinTableName;
@@ -54,7 +56,11 @@ public class RelationshipInfo {
     public String getFieldName() {
         return fieldName;
     }
-    
+
+    public String getOriginPkType() {
+        return originPkType;
+    }
+
     public String getReferencedPkType() {
         return referencedPkType;
     }

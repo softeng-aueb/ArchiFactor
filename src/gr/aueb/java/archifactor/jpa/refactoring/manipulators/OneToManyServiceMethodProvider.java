@@ -1,9 +1,7 @@
 package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.dom.*;
-import gr.uom.java.ast.SystemObject;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
-import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import java.util.Set;
 
@@ -17,13 +15,11 @@ public class OneToManyServiceMethodProvider extends AbstractServiceMethodProvide
 		this.fkFieldName = fkFieldName;
 	}
 
-	public static OneToManyServiceMethodProvider fromRelationship(RelationshipInfo relationship, SystemObject systemObject) {
+	public static OneToManyServiceMethodProvider fromRelationship(RelationshipInfo relationship) {
 		String toEntity = relationship.getToEntity();
 		String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
 
-		JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(systemObject);
-		String fromEntity = relationship.getFromEntity();
-		String fromEntityIdType = jpaExtractor.extractIdFieldType(fromEntity);
+		String fromEntityIdType = relationship.getOriginPkType();
 		String fromEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(fromEntityIdType);
 
 		String fkFieldName = relationship.getJoinColumnName();

@@ -460,8 +460,9 @@ public class UnmapJpaRelationships extends ViewPart {
 
                     if (relationshipType != null) {
                         String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject);
-                        String idFieldType = jpaExtractor.extractIdFieldType(fieldTypeName);
-                        String idFieldName = jpaExtractor.extractIdFieldName(fieldTypeName);
+                        String originPkType = jpaExtractor.extractIdFieldType(sourceEntity.getName());
+                        String referencedPkType = jpaExtractor.extractIdFieldType(fieldTypeName);
+                        String referencedPkName = jpaExtractor.extractIdFieldName(fieldTypeName);
                         String joinTableName = null;
                         String joinTableJoinColumns = null;
                         String joinTableInverseJoinColumns = null;
@@ -472,7 +473,7 @@ public class UnmapJpaRelationships extends ViewPart {
                             joinTableInverseJoinColumns = joinTableInfo.getInverseJoinColumns();
                         }
                         RelationshipInfo relInfo = new RelationshipInfo(sourceEntity.getName(), relationshipType, fieldTypeName, isOwningSide,
-                                                                        joinColumnName, fieldObject.getName(), idFieldType, idFieldName,
+                                                                        joinColumnName, fieldObject.getName(), originPkType, referencedPkType, referencedPkName,
                                                                         joinTableName, joinTableJoinColumns, joinTableInverseJoinColumns);
                         detectedRelationships.add(relInfo);
                     }

@@ -1,9 +1,7 @@
 package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.dom.*;
-import gr.uom.java.ast.SystemObject;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
-import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import java.util.Set;
 
@@ -17,14 +15,13 @@ public class ManyToManyNonOwningServiceMethodProvider extends AbstractServiceMet
 		this.joinFieldName = joinTableInverseJoinColumns + "s";
 	}
 
-	public static ManyToManyNonOwningServiceMethodProvider fromRelationship(RelationshipInfo relationship, SystemObject systemObject) {
+	public static ManyToManyNonOwningServiceMethodProvider fromRelationship(RelationshipInfo relationship) {
 		String toEntity = relationship.getToEntity();
 		String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
 		String fromEntity = relationship.getFromEntity();
 		String fromEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(fromEntity);
 
-		JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(systemObject);
-		String fromEntityIdType = jpaExtractor.extractIdFieldType(fromEntity);
+		String fromEntityIdType = relationship.getOriginPkType();
 		String fromEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(fromEntityIdType);
 
 		String methodName = "get" + toEntitySimple + "sBy" + fromEntitySimple + "Id";

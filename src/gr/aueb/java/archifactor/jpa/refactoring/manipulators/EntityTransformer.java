@@ -553,7 +553,7 @@ public class EntityTransformer {
         importRewrite.addImport(servicePackage + "." + serviceClassName);
         importRewrite.addImport(servicePackage + ".ServiceFactory");
 
-		ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship, systemObject);
+		ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship);
         if (provider == null) {
             throw new IllegalStateException("No service method provider found for the " + relationship.getRelationshipType()
             	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
@@ -680,7 +680,7 @@ public class EntityTransformer {
         String serviceName = UnmapJpaRelationshipsUtils.decapitalize(simpleTargetEntityName) + "Service";
         String serviceClassName = simpleTargetEntityName + "Service";
 
-        ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship, systemObject);
+        ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship);
         if (provider == null) {
             throw new IllegalStateException("No service method provider found for the " + relationship.getRelationshipType()
             	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());

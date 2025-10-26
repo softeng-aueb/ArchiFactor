@@ -67,7 +67,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
 
     private void identifyRequiredServiceMethods() {
         for (RelationshipInfo relationship : relationships) {
-			ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship, systemObject);
+			ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship);
             if (provider != null) {
                 addMethodRequirement(provider.getToEntityName(), provider);
             }
