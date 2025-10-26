@@ -19,8 +19,6 @@ import org.eclipse.jface.text.Document;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
-import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
-import gr.aueb.java.archifactor.jpa.model.ServiceMethodRequirementInfo;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
 
@@ -42,7 +40,7 @@ public class ServiceInterfaceGenerator {
 
     public void createOrUpdateServiceInterface(
 		String entityName, 
-		List<ServiceMethodRequirementInfo> requirements, 
+		List<ServiceMethodProvider> providers, 
 		String servicePackage,
         Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges,
         Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
@@ -58,16 +56,16 @@ public class ServiceInterfaceGenerator {
 
         ICompilationUnit existingCU = packageFragment.getCompilationUnit(serviceFileName);
         if (existingCU.exists()) {
-            updateExistingServiceInterface(existingCU, entityName, requirements, compilationUnitChanges);
+            updateExistingServiceInterface(existingCU, entityName, providers, compilationUnitChanges);
         } else {
-            createNewServiceInterface(packageFragment, entityName, requirements, servicePackage, createCompilationUnitChanges);
+            createNewServiceInterface(packageFragment, entityName, providers, servicePackage, createCompilationUnitChanges);
         }
     }
 
     private void createNewServiceInterface(
 		IPackageFragment packageFragment, 
 		String entityName, 
-		List<ServiceMethodRequirementInfo> requirements,
+		List<ServiceMethodProvider> providers,
         String servicePackage, 
         Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
     ) throws JavaModelException {
@@ -86,7 +84,7 @@ public class ServiceInterfaceGenerator {
         }
 
         ICompilationUnit serviceCompilationUnit = JavaCore.createCompilationUnitFrom(serviceFile);
-        String serviceInterfaceContent = generateServiceInterfaceContent(entityName, requirements, servicePackage);
+        String serviceInterfaceContent = generateServiceInterfaceContent(entityName, providers, servicePackage);
         Document document = new Document(serviceInterfaceContent);
 
         try {
@@ -100,7 +98,7 @@ public class ServiceInterfaceGenerator {
     private void updateExistingServiceInterface(
 		ICompilationUnit existingCU, 
 		String entityName, 
-		List<ServiceMethodRequirementInfo> requirements,
+		List<ServiceMethodProvider> providers,
         Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges
     ) throws JavaModelException, IllegalArgumentException {
         ASTParser parser = ASTParser.newParser(ASTReader.JLS);
@@ -109,7 +107,7 @@ public class ServiceInterfaceGenerator {
         CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
 
         Set<String> existingMethodSignatures = extractExistingMethodSignatures(astRoot);
-        List<ServiceMethodRequirementInfo> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
+        List<ServiceMethodProvider> missingMethods = findMissingMethods(providers, existingMethodSignatures);
         if (missingMethods.isEmpty()) {
             return;
         }
@@ -120,13 +118,8 @@ public class ServiceInterfaceGenerator {
         ListRewrite methodsRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
 
         Set<String> neededImports = new TreeSet<>();
-        for (ServiceMethodRequirementInfo requirement : missingMethods) {
-            if (requirement.getReturnType().contains("List")) {
-                neededImports.add("java.util.List");
-            }
-            if (requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
-                neededImports.add("java.util.Collection");
-            }
+        for (ServiceMethodProvider provider : missingMethods) {
+            neededImports.addAll(provider.getRequiredImports());
         }
 
         ListRewrite importsRewrite = rewriter.getListRewrite(astRoot, CompilationUnit.IMPORTS_PROPERTY);
@@ -139,8 +132,8 @@ public class ServiceInterfaceGenerator {
             }
         }
 
-        for (ServiceMethodRequirementInfo requirement : missingMethods) {
-            MethodDeclaration methodDecl = generateMethodDeclaration(ast, requirement);
+        for (ServiceMethodProvider provider : missingMethods) {
+            MethodDeclaration methodDecl = generateMethodDeclaration(ast, provider);
             methodsRewrite.insertLast(methodDecl, new TextEditGroup("Add missing service method"));
         }
 
@@ -191,17 +184,17 @@ public class ServiceInterfaceGenerator {
         return methodName + "(" + paramType + " " + paramName + ")";
     }
 
-    private List<ServiceMethodRequirementInfo> findMissingMethods(List<ServiceMethodRequirementInfo> requirements, Set<String> existingSignatures) {
-        List<ServiceMethodRequirementInfo> missing = new ArrayList<>();
-        for (ServiceMethodRequirementInfo requirement : requirements) {
-            if (!existingSignatures.contains(requirement.getMethodSignature())) {
-                missing.add(requirement);
+    private List<ServiceMethodProvider> findMissingMethods(List<ServiceMethodProvider> providers, Set<String> existingSignatures) {
+        List<ServiceMethodProvider> missing = new ArrayList<>();
+        for (ServiceMethodProvider provider : providers) {
+            if (!existingSignatures.contains(provider.getMethodSignature())) {
+                missing.add(provider);
             }
         }
         return missing;
     }
 
-    private String generateServiceInterfaceContent(String entityName, List<ServiceMethodRequirementInfo> requirements, String packageName) {
+    private String generateServiceInterfaceContent(String entityName, List<ServiceMethodProvider> providers, String packageName) {
         Set<String> imports = new TreeSet<>();
 
         StringBuilder content = new StringBuilder();
@@ -212,13 +205,8 @@ public class ServiceInterfaceGenerator {
             imports.add(entityName);
         }
 
-        for (ServiceMethodRequirementInfo requirement : requirements) {
-            if (requirement.getReturnType().contains("List")) {
-                imports.add("java.util.List");
-            }
-            if (requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
-                imports.add("java.util.Collection");
-            }
+        for (ServiceMethodProvider provider : providers) {
+            imports.addAll(provider.getRequiredImports());
         }
 
         for (String imp : imports) {
@@ -228,25 +216,25 @@ public class ServiceInterfaceGenerator {
         String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
         content.append("\npublic interface ").append(simpleEntityName).append("Service {\n");
 
-        for (ServiceMethodRequirementInfo requirement : requirements) {
-            content.append("    ").append(requirement.getMethodDeclaration()).append(";\n");
+        for (ServiceMethodProvider provider : providers) {
+            content.append("    ").append(provider.getMethodDeclaration()).append(";\n");
         }
 
         content.append("}\n");
         return content.toString();
     }
 
-    private MethodDeclaration generateMethodDeclaration(AST ast, ServiceMethodRequirementInfo requirement) {
+    private MethodDeclaration generateMethodDeclaration(AST ast, ServiceMethodProvider provider) {
         MethodDeclaration method = ast.newMethodDeclaration();
-        method.setName(ast.newSimpleName(requirement.getMethodName()));
+        method.setName(ast.newSimpleName(provider.getMethodName()));
 
-        Type returnType = createTypeFromString(ast, requirement.getReturnType());
+        Type returnType = createTypeFromString(ast, provider.getReturnType());
         method.setReturnType2(returnType);
 
         SingleVariableDeclaration param = ast.newSingleVariableDeclaration();
-        Type paramType = createTypeFromString(ast, requirement.getParameterTypeString());
+        Type paramType = createTypeFromString(ast, provider.getParameterTypeString());
         param.setType(paramType);
-        param.setName(ast.newSimpleName(requirement.getParameterName()));
+        param.setName(ast.newSimpleName(provider.getParameterName()));
         method.parameters().add(param);
         return method;
     }

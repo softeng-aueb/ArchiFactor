@@ -19,8 +19,6 @@ import org.eclipse.jface.text.Document;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
-import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
-import gr.aueb.java.archifactor.jpa.model.ServiceMethodRequirementInfo;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
 
@@ -46,7 +44,7 @@ public abstract class BaseServiceImplementationGenerator {
 
 	public void createOrUpdateServiceImplementation(
 		String entityName, 
-		List<ServiceMethodRequirementInfo> requirements, 
+		List<ServiceMethodProvider> providers,
 		String servicePackage,
 		Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges,
 		Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
@@ -62,16 +60,16 @@ public abstract class BaseServiceImplementationGenerator {
 
 		ICompilationUnit existingCU = packageFragment.getCompilationUnit(serviceImplFileName);
 		if (existingCU.exists()) {
-			updateExistingServiceImplementation(existingCU, entityName, requirements, compilationUnitChanges);
+			updateExistingServiceImplementation(existingCU, entityName, providers, compilationUnitChanges);
 		} else {
-			createNewServiceImplementation(packageFragment, entityName, requirements, servicePackage, createCompilationUnitChanges);
+			createNewServiceImplementation(packageFragment, entityName, providers, servicePackage, createCompilationUnitChanges);
 		}
 	}
 
 	private void createNewServiceImplementation(
 		IPackageFragment packageFragment, 
 		String entityName, 
-		List<ServiceMethodRequirementInfo> requirements,
+		List<ServiceMethodProvider> providers,
 		String servicePackage, 
 		Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges
 	) throws JavaModelException {
@@ -90,7 +88,7 @@ public abstract class BaseServiceImplementationGenerator {
 		}
 
 		ICompilationUnit serviceImplCompilationUnit = JavaCore.createCompilationUnitFrom(serviceImplFile);
-		String serviceImplContent = generateServiceImplementationContent(entityName, requirements, servicePackage);
+		String serviceImplContent = generateServiceImplementationContent(entityName, providers, servicePackage);
 		Document document = new Document(serviceImplContent);
 
 		try {
@@ -104,7 +102,7 @@ public abstract class BaseServiceImplementationGenerator {
 	private void updateExistingServiceImplementation(
 		ICompilationUnit existingCU, 
 		String entityName, 
-		List<ServiceMethodRequirementInfo> requirements,
+		List<ServiceMethodProvider> providers,
 		Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges
 	) throws JavaModelException, IllegalArgumentException {
 		ASTParser parser = ASTParser.newParser(ASTReader.JLS);
@@ -113,7 +111,7 @@ public abstract class BaseServiceImplementationGenerator {
 		CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
 
 		Set<String> existingMethodSignatures = extractExistingMethodSignatures(astRoot);
-		List<ServiceMethodRequirementInfo> missingMethods = findMissingMethods(requirements, existingMethodSignatures);
+		List<ServiceMethodProvider> missingMethods = findMissingMethods(providers, existingMethodSignatures);
 		if (missingMethods.isEmpty()) {
 			return;
 		}
@@ -124,13 +122,8 @@ public abstract class BaseServiceImplementationGenerator {
 		ListRewrite methodsRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
 
 		Set<String> neededImports = new TreeSet<>();
-		for (ServiceMethodRequirementInfo requirement : missingMethods) {
-			if (requirement.getReturnType().contains("List")) {
-				neededImports.add("java.util.List");
-			}
-			if (requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
-				neededImports.add("java.util.Collection");
-			}
+		for (ServiceMethodProvider provider : missingMethods) {
+			neededImports.addAll(provider.getRequiredImports());
 		}
 
 		ListRewrite importsRewrite = rewriter.getListRewrite(astRoot, CompilationUnit.IMPORTS_PROPERTY);
@@ -143,8 +136,8 @@ public abstract class BaseServiceImplementationGenerator {
 			}
 		}
 
-		for (ServiceMethodRequirementInfo requirement : missingMethods) {
-			MethodDeclaration methodDecl = generateMethodImplementation(ast, requirement, entityName);
+		for (ServiceMethodProvider provider : missingMethods) {
+			MethodDeclaration methodDecl = generateMethodImplementation(ast, provider);
 			methodsRewrite.insertLast(methodDecl, new TextEditGroup("Add missing service method implementation"));
 		}
 
@@ -196,17 +189,17 @@ public abstract class BaseServiceImplementationGenerator {
 		return methodName + "(" + paramType + " " + paramName + ")";
 	}
 
-	private List<ServiceMethodRequirementInfo> findMissingMethods(List<ServiceMethodRequirementInfo> requirements, Set<String> existingSignatures) {
-		List<ServiceMethodRequirementInfo> missing = new ArrayList<>();
-		for (ServiceMethodRequirementInfo requirement : requirements) {
-			if (!existingSignatures.contains(requirement.getMethodSignature())) {
-				missing.add(requirement);
+	private List<ServiceMethodProvider> findMissingMethods(List<ServiceMethodProvider> providers, Set<String> existingSignatures) {
+		List<ServiceMethodProvider> missing = new ArrayList<>();
+		for (ServiceMethodProvider provider : providers) {
+			if (!existingSignatures.contains(provider.getMethodSignature())) {
+				missing.add(provider);
 			}
 		}
 		return missing;
 	}
 
-	protected String generateServiceImplementationContent(String entityName, List<ServiceMethodRequirementInfo> requirements, String packageName) {
+	protected String generateServiceImplementationContent(String entityName, List<ServiceMethodProvider> providers, String packageName) {
 		Set<String> imports = new TreeSet<>();
 
 		StringBuilder content = new StringBuilder();
@@ -220,13 +213,8 @@ public abstract class BaseServiceImplementationGenerator {
 		imports.addAll(getFrameworkImports());
 		imports.add("jakarta.persistence.EntityManager");
 
-		for (ServiceMethodRequirementInfo requirement : requirements) {
-			if (requirement.getReturnType().contains("List")) {
-				imports.add("java.util.List");
-			}
-			if (requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
-				imports.add("java.util.Collection");
-			}
+		for (ServiceMethodProvider provider : providers) {
+			imports.addAll(provider.getRequiredImports());
 		}
 
 		for (String imp : imports) {
@@ -242,8 +230,8 @@ public abstract class BaseServiceImplementationGenerator {
 		content.append("    ").append(getEntityManagerFieldAnnotation()).append("\n");
 		content.append("    private EntityManager entityManager;\n\n");
 
-		for (ServiceMethodRequirementInfo requirement : requirements) {
-			content.append(generateMethodImplementationString(requirement, entityName));
+		for (ServiceMethodProvider provider : providers) {
+			content.append(provider.generateMethodImplementationString());
 			content.append("\n");
 		}
 
@@ -251,240 +239,27 @@ public abstract class BaseServiceImplementationGenerator {
 		return content.toString();
 	}
 
-	private String generateMethodImplementationString(ServiceMethodRequirementInfo requirement, String entityName) {
-		StringBuilder impl = new StringBuilder();
-		impl.append("    @Override\n");
-		impl.append("    public ").append(requirement.getReturnType()).append(" ").append(requirement.getMethodName()).append("(");
-
-		String paramName = requirement.getParameterName();
-		impl.append(requirement.getParameterTypeString()).append(" ").append(paramName).append(") {\n");
-
-		String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
-		switch (requirement.getMethodType()) {
-			case GET_BY_ID:
-				impl.append("        return entityManager.find(").append(simpleEntityName).append(".class, ").append(paramName).append(");\n");
-				break;
-			case GET_BY_FOREIGN_KEY:
-				String paramType = requirement.getParameterType();
-				boolean isPrimitive = paramType.equals("int") || paramType.equals("long");
-				if (!isPrimitive) {
-					impl.append("        if (").append(paramName).append(" == null) {\n");
-					impl.append("            return ").append(getEmptyReturnValue(requirement.getReturnType())).append(";\n");
-					impl.append("        }\n");
-				}
-				impl.append("        return entityManager.createQuery(\"SELECT e FROM ").append(simpleEntityName).append(" e WHERE e.")
-				   .append(requirement.getForeignKeyFieldName()).append(" = :").append(paramName).append("\", ").append(simpleEntityName).append(".class)\n");
-				impl.append("                .setParameter(\"").append(paramName).append("\", ").append(paramName).append(")\n");
-				impl.append("                .getResultList();\n");
-				break;
-			case GET_BY_MANY_TO_MANY_OWNING:
-				impl.append("        if (").append(paramName).append(" == null || ").append(paramName).append(".isEmpty()) {\n");
-				impl.append("            return ").append(getEmptyReturnValue(requirement.getReturnType())).append(";\n");
-				impl.append("        }\n");
-				impl.append("        return entityManager.createQuery(\"SELECT e FROM ").append(simpleEntityName).append(" e WHERE e.")
-				   .append(requirement.getToEntityIdFieldName()).append(" IN :ids\", ")
-				   .append(simpleEntityName).append(".class)\n");
-				impl.append("                .setParameter(\"ids\", ").append(paramName).append(")\n");
-				impl.append("                .getResultList();\n");
-				break;
-			case GET_BY_MANY_TO_MANY_NON_OWNING:
-				String joinFieldName = requirement.getJoinTableInverseJoinColumns() + "s";
-				impl.append("        if (").append(paramName).append(" == null) {\n");
-				impl.append("            return ").append(getEmptyReturnValue(requirement.getReturnType())).append(";\n");
-				impl.append("        }\n");
-				impl.append("        return entityManager.createQuery(\"SELECT e FROM ").append(simpleEntityName)
-				   .append(" e JOIN e.").append(joinFieldName).append(" ec WHERE ec = :id\", ")
-				   .append(simpleEntityName).append(".class)\n");
-				impl.append("                .setParameter(\"id\", ").append(paramName).append(")\n");
-				impl.append("                .getResultList();\n");
-				break;
-		}
-
-		impl.append("    }\n");
-		return impl.toString();
-	}
-
-	private String getEmptyReturnValue(String returnType) {
-		if (returnType.contains("List")) {
-			return "List.of()";
-		}
-		return "null";
-	}
-
-	private MethodDeclaration generateMethodImplementation(AST ast, ServiceMethodRequirementInfo requirement, String entityName) {
+	private MethodDeclaration generateMethodImplementation(AST ast, ServiceMethodProvider provider) {
 		MethodDeclaration method = ast.newMethodDeclaration();
-		method.setName(ast.newSimpleName(requirement.getMethodName()));
+		method.setName(ast.newSimpleName(provider.getMethodName()));
 
 		MarkerAnnotation overrideAnnotation = ast.newMarkerAnnotation();
 		overrideAnnotation.setTypeName(ast.newName("Override"));
 		method.modifiers().add(overrideAnnotation);
 		method.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 
-		Type returnType = createTypeFromString(ast, requirement.getReturnType());
+		Type returnType = createTypeFromString(ast, provider.getReturnType());
 		method.setReturnType2(returnType);
 
 		SingleVariableDeclaration param = ast.newSingleVariableDeclaration();
-		Type paramType = createTypeFromString(ast, requirement.getParameterTypeString());
+		Type paramType = createTypeFromString(ast, provider.getParameterTypeString());
 		param.setType(paramType);
-		param.setName(ast.newSimpleName(requirement.getParameterName()));
+		param.setName(ast.newSimpleName(provider.getParameterName()));
 		method.parameters().add(param);
 
-		Block body = createMethodBody(ast, requirement, entityName);
+		Block body = provider.createMethodBody(ast);
 		method.setBody(body);
 		return method;
-	}
-
-	private Block createMethodBody(AST ast, ServiceMethodRequirementInfo requirement, String entityName) {
-		Block body = ast.newBlock();
-		String paramName = requirement.getParameterName();
-		String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
-
-		switch (requirement.getMethodType()) {
-			case GET_BY_ID:
-				createGetByIdBody(ast, body, simpleEntityName, paramName);
-				break;
-			case GET_BY_FOREIGN_KEY:
-				createForeignKeyQueryBody(ast, body, simpleEntityName, paramName, requirement.getForeignKeyFieldName(), requirement.getParameterType());
-				break;
-			case GET_BY_MANY_TO_MANY_OWNING:
-				createManyToManyOwningQueryBody(ast, body, simpleEntityName, paramName, requirement.getToEntityIdFieldName());
-				break;
-			case GET_BY_MANY_TO_MANY_NON_OWNING:
-				createManyToManyNonOwningQueryBody(ast, body, simpleEntityName, requirement.getJoinTableInverseJoinColumns(), paramName);
-				break;
-		}
-
-		return body;
-	}
-
-	private void createGetByIdBody(AST ast, Block body, String entityName, String paramName) {
-		MethodInvocation findCall = ast.newMethodInvocation();
-		findCall.setExpression(ast.newSimpleName("entityManager"));
-		findCall.setName(ast.newSimpleName("find"));
-
-		TypeLiteral typeLiteral = ast.newTypeLiteral();
-		typeLiteral.setType(ast.newSimpleType(ast.newName(entityName)));
-		findCall.arguments().add(typeLiteral);
-		findCall.arguments().add(ast.newSimpleName(paramName));
-
-		ReturnStatement returnStmt = ast.newReturnStatement();
-		returnStmt.setExpression(findCall);
-		body.statements().add(returnStmt);
-	}
-
-	private void createForeignKeyQueryBody(AST ast, Block body, String entityName, String paramName, String fkFieldName, String paramType) {
-		boolean isPrimitive = paramType.equals("int") || paramType.equals("long");
-		if (!isPrimitive) {
-			InfixExpression nullCheck = ast.newInfixExpression();
-			nullCheck.setLeftOperand(ast.newSimpleName(paramName));
-			nullCheck.setOperator(InfixExpression.Operator.EQUALS);
-			nullCheck.setRightOperand(ast.newNullLiteral());
-
-			IfStatement nullCheckIf = ast.newIfStatement();
-			nullCheckIf.setExpression(nullCheck);
-
-			Block thenBlock = ast.newBlock();
-			ReturnStatement emptyReturn = ast.newReturnStatement();
-			MethodInvocation listOf = ast.newMethodInvocation();
-			listOf.setExpression(ast.newName("List"));
-			listOf.setName(ast.newSimpleName("of"));
-			emptyReturn.setExpression(listOf);
-			thenBlock.statements().add(emptyReturn);
-			nullCheckIf.setThenStatement(thenBlock);
-			body.statements().add(nullCheckIf);
-		}
-
-		ReturnStatement queryReturn = ast.newReturnStatement();
-		queryReturn.setExpression(createJPQLQuery(ast, entityName, "SELECT e FROM " + entityName + " e WHERE e." + fkFieldName + " = :" + paramName, paramName, paramName));
-		body.statements().add(queryReturn);
-	}
-
-	private void createManyToManyOwningQueryBody(AST ast, Block body, String entityName, String paramName, String idFieldName) {
-		InfixExpression nullCheck = ast.newInfixExpression();
-		nullCheck.setLeftOperand(ast.newSimpleName(paramName));
-		nullCheck.setOperator(InfixExpression.Operator.EQUALS);
-		nullCheck.setRightOperand(ast.newNullLiteral());
-
-		MethodInvocation isEmptyCall = ast.newMethodInvocation();
-		isEmptyCall.setExpression(ast.newSimpleName(paramName));
-		isEmptyCall.setName(ast.newSimpleName("isEmpty"));
-
-		InfixExpression combinedCheck = ast.newInfixExpression();
-		combinedCheck.setLeftOperand(nullCheck);
-		combinedCheck.setOperator(InfixExpression.Operator.CONDITIONAL_OR);
-		combinedCheck.setRightOperand(isEmptyCall);
-
-		IfStatement checkIf = ast.newIfStatement();
-		checkIf.setExpression(combinedCheck);
-
-		Block thenBlock = ast.newBlock();
-		ReturnStatement emptyReturn = ast.newReturnStatement();
-		MethodInvocation listOf = ast.newMethodInvocation();
-		listOf.setExpression(ast.newName("List"));
-		listOf.setName(ast.newSimpleName("of"));
-		emptyReturn.setExpression(listOf);
-		thenBlock.statements().add(emptyReturn);
-		checkIf.setThenStatement(thenBlock);
-		body.statements().add(checkIf);
-
-		ReturnStatement queryReturn = ast.newReturnStatement();
-		queryReturn.setExpression(createJPQLQuery(ast, entityName, "SELECT e FROM " + entityName + " e WHERE e." + idFieldName + " IN :ids", "ids", paramName));
-		body.statements().add(queryReturn);
-	}
-
-	private void createManyToManyNonOwningQueryBody(AST ast, Block body, String entityName, String joinTableInverseJoinColumns, String paramName) {
-		InfixExpression nullCheck = ast.newInfixExpression();
-		nullCheck.setLeftOperand(ast.newSimpleName(paramName));
-		nullCheck.setOperator(InfixExpression.Operator.EQUALS);
-		nullCheck.setRightOperand(ast.newNullLiteral());
-
-		IfStatement nullCheckIf = ast.newIfStatement();
-		nullCheckIf.setExpression(nullCheck);
-
-		Block thenBlock = ast.newBlock();
-		ReturnStatement emptyReturn = ast.newReturnStatement();
-		MethodInvocation listOf = ast.newMethodInvocation();
-		listOf.setExpression(ast.newName("List"));
-		listOf.setName(ast.newSimpleName("of"));
-		emptyReturn.setExpression(listOf);
-		thenBlock.statements().add(emptyReturn);
-		nullCheckIf.setThenStatement(thenBlock);
-		body.statements().add(nullCheckIf);
-
-		String joinFieldName = joinTableInverseJoinColumns + "s";
-		String jpql = "SELECT e FROM " + entityName + " e JOIN e." + joinFieldName + " ec WHERE ec = :id";
-		ReturnStatement queryReturn = ast.newReturnStatement();
-		queryReturn.setExpression(createJPQLQuery(ast, entityName, jpql, "id", paramName));
-		body.statements().add(queryReturn);
-	}
-
-	private Expression createJPQLQuery(AST ast, String entityName, String jpql, String paramName, String paramValue) {
-		MethodInvocation createQuery = ast.newMethodInvocation();
-		createQuery.setExpression(ast.newSimpleName("entityManager"));
-		createQuery.setName(ast.newSimpleName("createQuery"));
-
-		StringLiteral queryString = ast.newStringLiteral();
-		queryString.setLiteralValue(jpql);
-		createQuery.arguments().add(queryString);
-
-		TypeLiteral typeLiteral = ast.newTypeLiteral();
-		typeLiteral.setType(ast.newSimpleType(ast.newName(entityName)));
-		createQuery.arguments().add(typeLiteral);
-
-		MethodInvocation setParameter = ast.newMethodInvocation();
-		setParameter.setExpression(createQuery);
-		setParameter.setName(ast.newSimpleName("setParameter"));
-
-		StringLiteral paramNameLiteral = ast.newStringLiteral();
-		paramNameLiteral.setLiteralValue(paramName);
-		setParameter.arguments().add(paramNameLiteral);
-		setParameter.arguments().add(ast.newSimpleName(paramValue));
-
-		MethodInvocation getResultList = ast.newMethodInvocation();
-		getResultList.setExpression(setParameter);
-		getResultList.setName(ast.newSimpleName("getResultList"));
-
-		return getResultList;
 	}
 
 	private Type createTypeFromString(AST ast, String typeString) {

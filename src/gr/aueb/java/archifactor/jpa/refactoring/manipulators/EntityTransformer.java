@@ -11,9 +11,7 @@ import org.eclipse.text.edits.TextEditGroup;
 import gr.uom.java.ast.SystemObject;
 import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
-import gr.aueb.java.archifactor.jpa.enums.ServiceMethodType;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
-import gr.aueb.java.archifactor.jpa.model.ServiceMethodRequirementInfo;
 import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
@@ -29,14 +27,12 @@ import java.util.Iterator;
 
 public class EntityTransformer {
     private SystemObject systemObject;
-    private Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements;
     private Map<ICompilationUnit, CompilationUnit> astRootMap = new HashMap<>();
     private Map<ICompilationUnit, ASTRewrite> rewriterMap = new HashMap<>();
     private Map<ICompilationUnit, ImportRewrite> importRewriteMap = new HashMap<>();
 
-    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodRequirementInfo>> serviceMethodRequirements) {
+    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodProvider>> serviceMethodRequirements) {
         this.systemObject = systemObject;
-        this.serviceMethodRequirements = serviceMethodRequirements;
     }
 
     public void transformFromEntity(ClassObject entity, RelationshipInfo relationship, Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges) throws Exception {
@@ -557,12 +553,12 @@ public class EntityTransformer {
         importRewrite.addImport(servicePackage + "." + serviceClassName);
         importRewrite.addImport(servicePackage + ".ServiceFactory");
 
-        ServiceMethodRequirementInfo requirement = findServiceMethodRequirement(targetEntityName, relationship);
-        if (requirement == null) {
-            throw new IllegalStateException("No service method requirement found for the " + relationship.getRelationshipType()
+		ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship, systemObject);
+        if (provider == null) {
+            throw new IllegalStateException("No service method provider found for the " + relationship.getRelationshipType()
             	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
         }
-        String serviceMethodName = requirement.getMethodName();
+        String serviceMethodName = provider.getMethodName();
 
         Expression condition;
         String serviceMethodArgument;
@@ -684,12 +680,12 @@ public class EntityTransformer {
         String serviceName = UnmapJpaRelationshipsUtils.decapitalize(simpleTargetEntityName) + "Service";
         String serviceClassName = simpleTargetEntityName + "Service";
 
-        ServiceMethodRequirementInfo requirement = findServiceMethodRequirement(targetEntityName, relationship);
-        if (requirement == null) {
-            throw new IllegalStateException("No service method requirement found for the " + relationship.getRelationshipType() 
+        ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship, systemObject);
+        if (provider == null) {
+            throw new IllegalStateException("No service method provider found for the " + relationship.getRelationshipType()
             	+ " relationship: " + relationship.getFromEntity() + " -> " + relationship.getToEntity());
         }
-        String serviceMethodName = requirement.getMethodName();
+        String serviceMethodName = provider.getMethodName();
 
         InfixExpression fieldNullCheck = ast.newInfixExpression();
         fieldNullCheck.setLeftOperand(ast.newSimpleName(fieldName));
@@ -756,33 +752,6 @@ public class EntityTransformer {
         importRewrite.addImport(servicePackage + ".ServiceFactory");
 
         return newBody;
-    }
-
-    private ServiceMethodRequirementInfo findServiceMethodRequirement(String targetEntityName, RelationshipInfo relationship) {
-        if (!serviceMethodRequirements.containsKey(targetEntityName)) {
-            return null;
-        }
-
-        JpaRelationshipType relationshipType = relationship.getRelationshipType();
-        List<ServiceMethodRequirementInfo> requirements = serviceMethodRequirements.get(targetEntityName);
-        for (ServiceMethodRequirementInfo requirement : requirements) {
-            if (relationshipType == JpaRelationshipType.MANY_TO_ONE && requirement.getMethodType() == ServiceMethodType.GET_BY_ID) {
-                return requirement;
-            } else if (relationshipType == JpaRelationshipType.ONE_TO_MANY
-            		&& requirement.getMethodType() == ServiceMethodType.GET_BY_FOREIGN_KEY
-            		&& requirement.getForeignKeyFieldName() != null
-                    && requirement.getForeignKeyFieldName().equals(relationship.getJoinColumnName())) {
-                return requirement;
-            } else if (relationshipType == JpaRelationshipType.MANY_TO_MANY) {
-                if (relationship.isOwningSide() && requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_OWNING) {
-                    return requirement;
-                } else if (!relationship.isOwningSide() && requirement.getMethodType() == ServiceMethodType.GET_BY_MANY_TO_MANY_NON_OWNING) {
-                    return requirement;
-                }
-            }
-        }
-
-        return null;
     }
 
     private boolean replaceFieldAccessesWithMethodCalls(
