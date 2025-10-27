@@ -20,10 +20,9 @@ import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
+import gr.aueb.java.archifactor.jpa.util.ServiceMethodUtils;
 import gr.uom.java.ast.ASTReader;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -110,8 +109,8 @@ public abstract class BaseServiceImplementationGenerator {
 		parser.setResolveBindings(true);
 		CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
 
-		Set<String> existingMethodSignatures = extractExistingMethodSignatures(astRoot);
-		List<ServiceMethodProvider> missingMethods = findMissingMethods(providers, existingMethodSignatures);
+		Set<String> existingMethodSignatures = ServiceMethodUtils.extractExistingMethodSignatures(astRoot);
+		List<ServiceMethodProvider> missingMethods = ServiceMethodUtils.findMissingMethods(providers, existingMethodSignatures);
 		if (missingMethods.isEmpty()) {
 			return;
 		}
@@ -127,7 +126,7 @@ public abstract class BaseServiceImplementationGenerator {
 		}
 
 		ListRewrite importsRewrite = rewriter.getListRewrite(astRoot, CompilationUnit.IMPORTS_PROPERTY);
-		Set<String> existingImports = extractExistingImports(astRoot);
+		Set<String> existingImports = ServiceMethodUtils.extractExistingImports(astRoot);
 		for (String importName : neededImports) {
 			if (!existingImports.contains(importName)) {
 				ImportDeclaration importDecl = ast.newImportDeclaration();
@@ -144,59 +143,6 @@ public abstract class BaseServiceImplementationGenerator {
 		CompilationUnitChange change = new CompilationUnitChange("Update " + existingCU.getElementName(), existingCU);
 		change.setEdit(rewriter.rewriteAST());
 		compilationUnitChanges.put(existingCU, change);
-	}
-
-	private Set<String> extractExistingImports(CompilationUnit astRoot) {
-		Set<String> imports = new HashSet<>();
-		for (Object obj : astRoot.imports()) {
-			if (obj instanceof ImportDeclaration) {
-				ImportDeclaration importDecl = (ImportDeclaration) obj;
-				imports.add(importDecl.getName().getFullyQualifiedName());
-			}
-		}
-		return imports;
-	}
-
-	private Set<String> extractExistingMethodSignatures(CompilationUnit astRoot) {
-		Set<String> signatures = new HashSet<>();
-		if (astRoot.types().isEmpty()) {
-			return signatures;
-		}
-
-		Object firstType = astRoot.types().get(0);
-		if (!(firstType instanceof TypeDeclaration)) {
-			return signatures;
-		}
-
-		TypeDeclaration typeDecl = (TypeDeclaration) firstType;
-		for (MethodDeclaration method : typeDecl.getMethods()) {
-			String signature = buildMethodSignature(method);
-			signatures.add(signature);
-		}
-		return signatures;
-	}
-
-	private String buildMethodSignature(MethodDeclaration method) {
-		String methodName = method.getName().getIdentifier();
-
-		if (method.parameters().isEmpty()) {
-			return methodName + "()";
-		}
-
-		SingleVariableDeclaration param = (SingleVariableDeclaration) method.parameters().get(0);
-		String paramType = param.getType().toString();
-		String paramName = param.getName().getIdentifier();
-		return methodName + "(" + paramType + " " + paramName + ")";
-	}
-
-	private List<ServiceMethodProvider> findMissingMethods(List<ServiceMethodProvider> providers, Set<String> existingSignatures) {
-		List<ServiceMethodProvider> missing = new ArrayList<>();
-		for (ServiceMethodProvider provider : providers) {
-			if (!existingSignatures.contains(provider.getMethodSignature())) {
-				missing.add(provider);
-			}
-		}
-		return missing;
 	}
 
 	protected String generateServiceImplementationContent(String entityName, List<ServiceMethodProvider> providers, String packageName) {
@@ -248,11 +194,11 @@ public abstract class BaseServiceImplementationGenerator {
 		method.modifiers().add(overrideAnnotation);
 		method.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PUBLIC_KEYWORD));
 
-		Type returnType = createTypeFromString(ast, provider.getReturnType());
+		Type returnType = ServiceMethodUtils.createTypeFromString(ast, provider.getReturnType());
 		method.setReturnType2(returnType);
 
 		SingleVariableDeclaration param = ast.newSingleVariableDeclaration();
-		Type paramType = createTypeFromString(ast, provider.getParameterTypeString());
+		Type paramType = ServiceMethodUtils.createTypeFromString(ast, provider.getParameterTypeString());
 		param.setType(paramType);
 		param.setName(ast.newSimpleName(provider.getParameterName()));
 		method.parameters().add(param);
@@ -260,17 +206,5 @@ public abstract class BaseServiceImplementationGenerator {
 		Block body = provider.createMethodBody(ast);
 		method.setBody(body);
 		return method;
-	}
-
-	private Type createTypeFromString(AST ast, String typeString) {
-		if (typeString.contains("<") && typeString.contains(">")) {
-			String[] parts = typeString.split("[<>]");
-			String containerType = parts[0];
-			String elementType = parts[1];
-			ParameterizedType paramType = ast.newParameterizedType(ast.newSimpleType(ast.newName(containerType)));
-			paramType.typeArguments().add(ast.newSimpleType(ast.newName(elementType)));
-			return paramType;
-		}
-		return ast.newSimpleType(ast.newName(typeString));
 	}
 }
