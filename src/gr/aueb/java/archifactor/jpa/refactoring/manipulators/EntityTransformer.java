@@ -154,6 +154,8 @@ public class EntityTransformer {
                 System.out.println("[DEBUG] Adding FK field for single reference: " + entity.getName() + "." + relationship.getFieldName());
                 hasChanges |= addForeignKeyField(fieldDecl, relationship, rewriter, importRewrite, ast, editGroup);
             }
+        } else {
+            hasChanges |= ensureCollectionInitialization(fieldDecl, relationship, rewriter, importRewrite, ast, editGroup);
         }
         return hasChanges;
     }
@@ -309,6 +311,54 @@ public class EntityTransformer {
         ListRewrite fieldsRewrite = rewriter.getListRewrite(parentType, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
         fieldsRewrite.insertAfter(fkField, originalField, editGroup);
         return true;
+    }
+
+    private boolean ensureCollectionInitialization(
+        FieldDeclaration fieldDecl,
+        RelationshipInfo relationship,
+        ASTRewrite rewriter,
+        ImportRewrite importRewrite,
+        AST ast,
+        TextEditGroup editGroup
+    ) {
+        Type fieldType = fieldDecl.getType();
+        if (!(fieldType instanceof ParameterizedType)) {
+            return false;
+        }
+
+        ParameterizedType paramType = (ParameterizedType) fieldType;
+        Type rawType = paramType.getType();
+        if (!(rawType instanceof SimpleType)) {
+            return false;
+        }
+
+        String typeName = ((SimpleType) rawType).getName().getFullyQualifiedName();
+        if (!typeName.equals("Set") && !typeName.equals("List")) {
+            return false;
+        }
+
+        for (Object fragment : fieldDecl.fragments()) {
+            if (fragment instanceof VariableDeclarationFragment) {
+                VariableDeclarationFragment vdf = (VariableDeclarationFragment) fragment;
+                if (vdf.getName().getIdentifier().equals(relationship.getFieldName())) {
+                    if (vdf.getInitializer() == null) {
+                        ClassInstanceCreation init = ast.newClassInstanceCreation();
+                        ParameterizedType initType;
+                        if (typeName.equals("Set")) {
+                            initType = ast.newParameterizedType(ast.newSimpleType(ast.newName("HashSet")));
+                            importRewrite.addImport("java.util.HashSet");
+                        } else {
+                            initType = ast.newParameterizedType(ast.newSimpleType(ast.newName("ArrayList")));
+                            importRewrite.addImport("java.util.ArrayList");
+                        }
+                        init.setType(initType);
+                        rewriter.set(vdf, VariableDeclarationFragment.INITIALIZER_PROPERTY, init, editGroup);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private boolean transformMethodsInSameAST(
