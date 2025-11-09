@@ -21,6 +21,7 @@ public class SpringBootServiceFactoryGenerator extends BaseServiceFactoryGenerat
 		content.append("import org.springframework.beans.BeansException;\n");
 		content.append("import org.springframework.context.ApplicationContext;\n");
 		content.append("import org.springframework.context.ApplicationContextAware;\n");
+		content.append("import org.springframework.context.ConfigurableApplicationContext;");
 		content.append("import org.springframework.stereotype.Component;\n");
 		content.append("\n");
 		for (String entityName : entityNames) {
@@ -31,13 +32,13 @@ public class SpringBootServiceFactoryGenerator extends BaseServiceFactoryGenerat
 		content.append("\n");
 		content.append("@Component\n");
 		content.append("public class ServiceFactory implements ApplicationContextAware {\n");
-		content.append("    private static ApplicationContext applicationContext;\n\n");
+		content.append("    private static ConfigurableApplicationContext applicationContext;\n\n");
 		content.append("    @Override\n");
 		content.append("    public void setApplicationContext(ApplicationContext context) throws BeansException {\n");
-		content.append("        applicationContext = context;\n");
+		content.append("        applicationContext = (ConfigurableApplicationContext) context;\n");
 		content.append("    }\n\n");
 		content.append("    public static boolean isContainerAvailable() {\n");
-		content.append("        return applicationContext != null;\n");
+		content.append("        return applicationContext != null && applicationContext.isActive();\n");
 		content.append("    }\n\n");
 		for (String entityName : entityNames) {
 			String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
