@@ -453,13 +453,20 @@ public class UnmapJpaRelationships extends ViewPart {
                         if (JpaRelationshipType.isRelationshipType(annotationName)) {
                             relationshipType = JpaRelationshipType.fromAnnotationName(annotationName);
                             //checkForDangerousCascading(sourceEntity, fieldObject, annotation);
-                        } else if (JpaJoinType.isJoinType(annotationName)) {
-                            isOwningSide = true;
                         }
                     }
 
                     if (relationshipType != null) {
-                        String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject);
+                        if (relationshipType == JpaRelationshipType.MANY_TO_ONE) {
+                            isOwningSide = true;
+                        } else if (relationshipType == JpaRelationshipType.ONE_TO_MANY) {
+                            isOwningSide = false;
+                        } else if (relationshipType == JpaRelationshipType.ONE_TO_ONE || relationshipType == JpaRelationshipType.MANY_TO_MANY) {
+                        	String mappedBy = jpaExtractor.extractMappedByFromRelationship(fieldObject);
+                        	isOwningSide = mappedBy == null;
+                        }
+
+                        String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject, isOwningSide);
                         String originPkType = jpaExtractor.extractIdFieldType(sourceEntity.getName());
                         String referencedPkType = jpaExtractor.extractIdFieldType(fieldTypeName);
                         String referencedPkName = jpaExtractor.extractIdFieldName(fieldTypeName);

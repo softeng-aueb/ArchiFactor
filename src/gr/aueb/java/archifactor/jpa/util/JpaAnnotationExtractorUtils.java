@@ -26,48 +26,72 @@ public class JpaAnnotationExtractorUtils {
         this.systemObject = systemObject;
     }
 
-    public String extractJoinColumnName(FieldObject field) {
-        // First check if this field has a direct @JoinColumn annotation
-        for (Annotation annotation : field.getAnnotations()) {
-            String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (JpaJoinType.fromAnnotationName(annotationType) == JpaJoinType.JOIN_COLUMN) {
-                String columnName = extractAnnotationStringProperty(annotation, "name");
-                if (columnName != null) {
-                    return columnName;
-                }
-            }
+    public String extractJoinColumnName(FieldObject field, boolean isOwningSide) {
+        if (isOwningSide) {
+            return extractJoinColumnNameForOwningSide(field);
+        } else {
+            return extractJoinColumnNameForInverseSide(field);
         }
-        
-        // Check if this is a mappedBy relationship (@OneToOne(mappedBy="...") or @OneToMany(mappedBy="..."))
-        String mappedByFieldName = extractMappedByProperty(field);
-        if (mappedByFieldName != null) {
-            // Find the referenced field in the target entity and get its @JoinColumn
-            String targetEntityType = field.getType().getGenericType();
-            if (targetEntityType != null) {
-                targetEntityType = targetEntityType.replaceAll("[<>]", "").trim();
-            } else {
-                targetEntityType = field.getType().getClassType();
-            }
-            
-            ClassObject targetEntity = findEntityByTypeName(targetEntityType);
-            if (targetEntity != null) {
-                FieldObject referencedField = findFieldInEntity(targetEntity, mappedByFieldName);
-                if (referencedField != null) {
-                    String joinColumnName = extractDirectJoinColumnName(referencedField);
-                    if (joinColumnName != null) {
-                        return joinColumnName;
-                    }
-                }
-            }
+    }
+
+    private String extractJoinColumnNameForOwningSide(FieldObject field) {
+        String joinColumnName = extractDirectJoinColumnName(field);
+        if (joinColumnName != null) {
+            return joinColumnName;
         }
+
+        String referencedEntityType = getEntityTypeFromField(field);
+        String referencedPkColumnName = extractIdColumnName(referencedEntityType);
+        if (referencedPkColumnName != null) {
+            return field.getName() + "_" + referencedPkColumnName;
+        }
+
         return null;
     }
 
-    private String extractMappedByProperty(FieldObject field) {
+    private String extractJoinColumnNameForInverseSide(FieldObject field) {
+        String mappedByFieldName = extractMappedByFromRelationship(field);
+        if (mappedByFieldName == null) {
+            return null;
+        }
+
+        String entityWithOwningFieldType = getEntityTypeFromField(field);
+        ClassObject entityWithOwningField = findEntityByTypeName(entityWithOwningFieldType);
+        if (entityWithOwningField == null) {
+            return null;
+        }
+
+        FieldObject owningField = findFieldInEntity(entityWithOwningField, mappedByFieldName);
+        if (owningField == null) {
+            return null;
+        }
+
+        String joinColumnName = extractDirectJoinColumnName(owningField);
+        if (joinColumnName != null) {
+            return joinColumnName;
+        }
+
+        String inputFieldEntityType = getEntityTypeFromField(owningField);
+        String referencedPkColumnName = extractIdColumnName(inputFieldEntityType);
+        if (referencedPkColumnName != null) {
+            return owningField.getName() + "_" + referencedPkColumnName;
+        }
+
+        return null;
+    }
+
+    private String getEntityTypeFromField(FieldObject field) {
+        String entityType = field.getType().getGenericType();
+        if (entityType != null) {
+            return entityType.replaceAll("[<>]", "").trim();
+        }
+        return field.getType().getClassType();
+    }
+
+    public String extractMappedByFromRelationship(FieldObject field) {
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            JpaRelationshipType relType = JpaRelationshipType.fromAnnotationName(annotationType);
-            if (relType == JpaRelationshipType.ONE_TO_MANY || relType == JpaRelationshipType.ONE_TO_ONE) {
+            if (JpaRelationshipType.isRelationshipType(annotationType)) {
                 String mappedBy = extractAnnotationStringProperty(annotation, "mappedBy");
                 if (mappedBy != null) {
                     return mappedBy;
@@ -141,6 +165,37 @@ public class JpaAnnotationExtractorUtils {
                     if (hasIdAnnotation(field)) {
                         return field.getName();
                     }
+                }
+            }
+        }
+        return null;
+    }
+
+    public String extractIdColumnName(String entityName) {
+        ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
+        while (classIterator.hasNext()) {
+            ClassObject classObj = classIterator.next();
+            if (entityName.equals(classObj.getName())) {
+                Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
+                while (fieldIterator.hasNext()) {
+                    FieldObject field = fieldIterator.next();
+                    if (hasIdAnnotation(field)) {
+                        String columnName = extractColumnName(field);
+                        return columnName != null ? columnName : field.getName();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private String extractColumnName(FieldObject field) {
+        for (Annotation annotation : field.getAnnotations()) {
+            String annotationType = annotation.getTypeName().getFullyQualifiedName();
+            if (annotationType.equals("Column")) {
+                String columnName = extractAnnotationStringProperty(annotation, "name");
+                if (columnName != null) {
+                    return columnName;
                 }
             }
         }
