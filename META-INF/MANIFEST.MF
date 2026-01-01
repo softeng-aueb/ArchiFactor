@@ -5,6 +5,8 @@ Bundle-SymbolicName: gr.aueb.java.archifactor;singleton:=true
 Bundle-Version: 1.0.0
 Bundle-Activator: gr.uom.java.jdeodorant.refactoring.Activator
 Bundle-Localization: plugin
+Bundle-ClassPath: .,
+ libs/jsqlparser-4.9.jar
 Require-Bundle: org.eclipse.ui,
  org.eclipse.core.runtime,
  org.eclipse.jdt.core,
