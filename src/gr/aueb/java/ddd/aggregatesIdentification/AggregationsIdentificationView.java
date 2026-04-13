@@ -1,105 +1,104 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
+import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
+import gr.uom.java.ast.CompilationErrorDetectedException;
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.ast.association.Association;
 import gr.uom.java.ast.association.AssociationDetection;
+import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
-import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.jdt.core.IJavaProject;
-import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.JavaModelException;
-import org.eclipse.jdt.core.dom.Annotation;
-import org.eclipse.jdt.core.dom.IAnnotationBinding;
-import org.eclipse.jface.viewers.ArrayContentProvider;
-import org.eclipse.jface.viewers.ComboViewer;
-import org.eclipse.swt.SWT;
-import org.eclipse.swt.layout.GridData;
-import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.widgets.*;
-import org.eclipse.ui.part.ViewPart;
-
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.Annotation;
+import org.eclipse.jdt.core.dom.IAnnotationBinding;
+import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.jface.operation.IRunnableWithProgress;
+import org.eclipse.jface.viewers.ArrayContentProvider;
+import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.LabelProvider;
+import org.eclipse.jface.viewers.SelectionChangedEvent;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.*;
+import org.eclipse.ui.IWorkbench;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.part.ViewPart;
+import org.eclipse.ui.progress.IProgressService;
+
 public class AggregationsIdentificationView extends ViewPart {
     public static final String ID = "gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView";
 
-    private Text text;
     private ComboViewer projectComboViewer;
+    private IJavaProject selectedProject;
+    private SystemObject cachedSystemObject;
     private Boolean strictAggregates;
     private Boolean displayLogs;
-    @SuppressWarnings("unused")
-    private int createWeight;
-    @SuppressWarnings("unused")
-	private int writeWeight;
-    @SuppressWarnings("unused")
-    private int readWeight;
-    
+    private Text text;
 
     @Override
     public void createPartControl(Composite parent) {
-        // 1) Setup layout with spacing/margins
+        // Grid layout:
+        // 1) Row 1 | Column 1: Label ("Select project:")
+        // 2) Row 1 | Column 2: ComboViewer (dropdown)
+        // 3) Row 2 | Columns 1+2: Strict Aggregates checkbox
+        // 4) Row 3 | Columns 1+2: Display Logs checkbox
+        // 5) Row 4 | Columns 1+2: Run button
+        // 6) Row 5 | Columns 1+2: Text area
         GridLayout layout = new GridLayout(2, false);
-        layout.verticalSpacing = 10;   // Space between rows
-        layout.horizontalSpacing = 10; // Space between columns
-        layout.marginWidth = 10;       // Left/right margin
-        layout.marginHeight = 10;      // Top/bottom margin
+        layout.verticalSpacing = 10;
+        layout.horizontalSpacing = 10;
+        layout.marginWidth = 10;
+        layout.marginHeight = 10;
         parent.setLayout(layout);
 
-        // Row 1: "Choose project" label + Combo
+        // Project selection dropdown
         Label projectLabel = new Label(parent, SWT.NONE);
-        projectLabel.setText("Choose project:");
+        projectLabel.setText("Select project:");
 
         projectComboViewer = new ComboViewer(parent, SWT.READ_ONLY);
         projectComboViewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         projectComboViewer.setContentProvider(ArrayContentProvider.getInstance());
-
-        // Populate combo
-        List<String> projectNames = new ArrayList<String>();
-        try {
-            IJavaProject[] javaProjects = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProjects();
-            for (IJavaProject jp : javaProjects) {
-                projectNames.add(jp.getElementName());
+        projectComboViewer.setLabelProvider(new LabelProvider() {
+            @Override
+            public String getText(Object element) {
+                return ((IJavaProject) element).getElementName();
             }
-        } catch (JavaModelException e) {
-            e.printStackTrace();
-        }
-        projectComboViewer.setInput(projectNames);
-        if (!projectNames.isEmpty()) {
-            projectComboViewer.getCombo().select(0);
-        }
+        });
 
-        // Row 2: "Strict Aggregates" checkbox
+        populateProjectCombo();
+
+        // Strict Aggregates checkbox
         final Button strictCheck = new Button(parent, SWT.CHECK);
         strictCheck.setText("Use Strict Aggregates");
         strictCheck.setSelection(false);
-        // Make the checkbox span 2 columns if you want it on its own row:
         GridData strictCheckGD = new GridData(SWT.LEFT, SWT.CENTER, true, false, 2, 1);
         strictCheck.setLayoutData(strictCheckGD);
 
-        // Row 3: "Display Logs" checkbox
+        // Display Logs checkbox
         final Button logsCheck = new Button(parent, SWT.CHECK);
         logsCheck.setText("Display Logs");
         logsCheck.setSelection(false);
-        // Also span 2 columns if desired:
         GridData logsCheckGD = new GridData(SWT.LEFT, SWT.CENTER, true, false, 2, 1);
         logsCheck.setLayoutData(logsCheckGD);
 
-        // Row 4: Centered "Run" button spanning 2 columns
+        // Run button
         Button runButton = new Button(parent, SWT.PUSH);
         runButton.setText("Run Aggregation Identification");
         GridData buttonGridData = new GridData(SWT.CENTER, SWT.CENTER, true, false, 2, 1);
         runButton.setLayoutData(buttonGridData);
-
-        // Row 5: Text area (spanning 2 columns)
-        text = new Text(parent, SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI);
-        GridData textLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1);
-        text.setLayoutData(textLayoutData);
-
-        // 2) Assign checkbox selections to class fields on click
         runButton.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
             	strictAggregates = strictCheck.getSelection();
@@ -107,18 +106,99 @@ public class AggregationsIdentificationView extends ViewPart {
                 runAggregationIdentification();
             }
         });
+
+        // Text area
+        text = new Text(parent, SWT.READ_ONLY | SWT.V_SCROLL | SWT.H_SCROLL | SWT.MULTI);
+        GridData textLayoutData = new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1);
+        text.setLayoutData(textLayoutData);
+
+        // Do the heavy-lifting of creating the SystemObject in the beginning
+        if (!projectComboViewer.getSelection().isEmpty()) {
+            onProjectSelectedBuildSystemObject();
+        }
+
+        projectComboViewer.addSelectionChangedListener(new ISelectionChangedListener() {
+            @Override
+            public void selectionChanged(SelectionChangedEvent event) {
+                onProjectSelectedBuildSystemObject();
+            }
+        });
+        
+        JavaCore.addElementChangedListener(ElementChangedListener.getInstance());
+    }
+    
+
+    private void populateProjectCombo() {
+        try {
+            List<IJavaProject> projects = new ArrayList<IJavaProject>();
+            for (IJavaProject project : JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProjects()) {
+                projects.add(project);
+            }
+
+            projectComboViewer.setInput(projects);
+            if (!projects.isEmpty()) {
+                projectComboViewer.getCombo().select(0);
+            }
+        } catch (JavaModelException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void onProjectSelectedBuildSystemObject() {
+        Shell shell = getSite().getShell();
+
+        IStructuredSelection selection = (IStructuredSelection) projectComboViewer.getSelection();
+        IJavaProject project = (IJavaProject) selection.getFirstElement();
+        if (selectedProject != null && selectedProject.equals(project)) {
+            return;
+        }
+
+        selectedProject = project;
+
+        try {
+            IWorkbench wb = PlatformUI.getWorkbench();
+            IProgressService ps = wb.getProgressService();
+            if (ASTReader.getSystemObject() != null && project.equals(ASTReader.getExaminedProject())) {
+                new ASTReader(project, ASTReader.getSystemObject(), null);
+            } else {
+                ps.busyCursorWhile(new IRunnableWithProgress() {
+                    public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
+                        try {
+                            new ASTReader(project, monitor);
+                        } catch (CompilationErrorDetectedException e) {
+                            Display.getDefault().asyncExec(new Runnable() {
+                                public void run() {
+                                    MessageDialog.openInformation(shell, "Compilation Errors",
+                                        "Compilation errors were detected in the project. Fix the errors before using this feature.");
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            cachedSystemObject = ASTReader.getSystemObject();
+        } catch (InterruptedException e) {
+            cachedSystemObject = null;
+        } catch (InvocationTargetException e) {
+            cachedSystemObject = null;
+            MessageDialog.openError(shell, "Error Loading Project",
+                "Error loading project structure: " + e.getTargetException().getMessage());
+        } catch (CompilationErrorDetectedException e) {
+            cachedSystemObject = null;
+            MessageDialog.openInformation(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell(), "Compilation Errors",
+                "Compilation errors were detected in the project. Fix the errors before using this feature.");
+        }
     }
 
     private void runAggregationIdentification() {
-        String selectedProject = projectComboViewer.getCombo().getText();
+        if (selectedProject == null || cachedSystemObject == null) {
+            MessageDialog.openError(getSite().getShell(), "Project Not Loaded", "Project structure is not loaded. Please reselect the project and try again.");
+            return;
+        }
+
         try {
-        	
-        	// Detect project
-            IJavaProject javaProject = JavaCore.create(ResourcesPlugin.getWorkspace().getRoot()).getJavaProject(selectedProject);
-			SystemObject sysObj = SystemObjectProvider.getSystemObject(javaProject);
-            
 			// Build call graphs using your existing CallGraphBuilder
-	        List<CallGraph> callGraphs = new CallGraphBuilder(javaProject, sysObj).buildCallGraphs();
+	        List<CallGraph> callGraphs = new CallGraphBuilder(selectedProject, cachedSystemObject).buildCallGraphs();
 	        
 	        // Initialize clustering graph (using our new ClusteringGraph with typed edges)
 	        ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
@@ -129,14 +209,14 @@ public class AggregationsIdentificationView extends ViewPart {
 	        }
 	        
 	        // Create associations mapping using static analysis
-	        AssociationDetection associationsMapper = new AssociationDetection(sysObj);
+	        AssociationDetection associationsMapper = new AssociationDetection(cachedSystemObject);
 	        // Add static association edges:
 	        Set<ClassObject> vertices = new HashSet<ClassObject>();
 	        vertices.addAll(clusteringGraph.getVertices());
 	        for (ClassObject vertex : vertices) {
 	            List<Association> associations = associationsMapper.getAssociationsOfClass(vertex);
 	            for (Association association : associations) {
-	                ClassObject toVertex = sysObj.getClassObject(association.getTo());
+	                ClassObject toVertex = cachedSystemObject.getClassObject(association.getTo());
 	                if (!clusteringGraph.hasEdge(vertex, toVertex)) {
 	                    // Decide edge type based on static information:
 	                    ClusteringGraph.EdgeType type = ClusteringGraph.EdgeType.REFERENCE;
