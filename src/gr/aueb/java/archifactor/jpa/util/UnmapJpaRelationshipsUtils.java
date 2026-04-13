@@ -1,8 +1,6 @@
 package gr.aueb.java.archifactor.jpa.util;
 
-import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +15,7 @@ import org.eclipse.jdt.core.dom.NumberLiteral;
 import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.Type;
 
+import gr.aueb.java.archifactor.util.PackageUtils;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.SystemObject;
 
@@ -67,25 +66,7 @@ public class UnmapJpaRelationshipsUtils {
                 packages.add(getPackageNameFromClass(entity));
             }
         }
-        return findCommonAncestorPackage(packages);
-    }
-
-    private static String findCommonAncestorPackage(Set<String> packages) {
-        Iterator<String> it = packages.iterator();
-        String[] prefix = it.next().split("\\.");
-        while (it.hasNext()) {
-            String[] current = it.next().split("\\.");
-            int minLength = Math.min(prefix.length, current.length);
-            int i = 0;
-            while (i < minLength && prefix[i].equals(current[i])) {
-                i++;
-            }
-            prefix = Arrays.copyOf(prefix, i); // shrink the prefix
-            if (prefix.length == 0) {
-                return null; // no common ancestor
-            }
-        }
-        return String.join(".", prefix);
+        return PackageUtils.findCommonAncestorPackage(packages);
     }
 
     public static IPackageFragment findOrCreatePackage(IJavaProject project, String packageName) throws JavaModelException {

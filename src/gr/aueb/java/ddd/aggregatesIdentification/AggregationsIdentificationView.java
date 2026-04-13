@@ -197,9 +197,9 @@ public class AggregationsIdentificationView extends ViewPart {
         }
 
         try {
-			// Build call graphs using your existing CallGraphBuilder
-	        List<CallGraph> callGraphs = new CallGraphBuilder(selectedProject, cachedSystemObject).buildCallGraphs();
-	        
+        	CallGraphBuilder callGraphBuilder = new CallGraphBuilder(selectedProject, cachedSystemObject);
+	        List<CallGraph> callGraphs = callGraphBuilder.buildCallGraphs();
+
 	        // Initialize clustering graph (using our new ClusteringGraph with typed edges)
 	        ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
 	        for (CallGraph callGraph : callGraphs) {

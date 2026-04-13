@@ -3,13 +3,11 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 import org.eclipse.jdt.core.*;
 import org.eclipse.jdt.core.dom.*;
 
+import gr.aueb.java.archifactor.util.PackageUtils;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
 import gr.uom.java.ast.SystemObject;
-//import gr.uom.java.ast.association.Association;
-//import gr.uom.java.ast.association.AssociationDetection;
 import gr.uom.java.ast.decomposition.cfg.AbstractVariable;
-// import gr.uom.java.ast.decomposition.cfg.PlainVariable;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -17,7 +15,6 @@ import java.util.regex.Matcher;
 
 
 public class CallGraphBuilder {
-
     private final IJavaProject javaProject;
     private final SystemObject systemObject;
     private final String projectPackagePrefix;
@@ -314,27 +311,12 @@ public class CallGraphBuilder {
     }
 
     private String determineProjectPackagePrefix(IPackageFragment[] packageFragments) throws JavaModelException {
-        List<String> packageNames = new ArrayList<String>();
+        Set<String> packageNames = new HashSet<String>();
         for (IPackageFragment packageFragment : packageFragments) {
             if (packageFragment.getKind() == IPackageFragmentRoot.K_SOURCE) {
                 packageNames.add(packageFragment.getElementName());
             }
         }
-        return commonPrefix(packageNames);
-    }
-
-    private String commonPrefix(List<String> strings) {
-        if (strings.isEmpty()) return "";
-        strings.removeAll(Arrays.asList("", null));
-        String prefix = strings.get(0);
-        for (String s : strings) {
-            while (!s.startsWith(prefix)) {
-                prefix = prefix.substring(0, prefix.length() - 1);
-                if (prefix.isEmpty()) {
-                    return "";
-                }
-            }
-        }
-        return prefix;
+        return PackageUtils.findCommonAncestorPackage(packageNames);
     }
 }
