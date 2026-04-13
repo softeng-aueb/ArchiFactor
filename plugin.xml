@@ -3,22 +3,6 @@
 <plugin>
 
    <extension
-         point="org.eclipse.ui.commands">
-      <command
-            id="gr.aueb.java.ddd.aggregatesIdentification.openView"
-            name="Open Aggregations Identification View">
-      </command>
-   </extension>
-   
-   <extension
-         point="org.eclipse.ui.handlers">
-      <handler
-            commandId="gr.aueb.java.ddd.aggregatesIdentification.openView"
-            class="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationHandler">
-      </handler>
-   </extension>
-
-   <extension
          point="org.eclipse.ui.actionSets">
       <actionSet
             label="BadSmells"
@@ -79,7 +63,6 @@
                menubarPath="BadSmellsMenu/sampleGroup"
                id="gr.uom.java.jdeodorant.actions.DuplicatedCode">
          </action>
-         <!-- New Action for Aggregations Identification -->
          <action
                label="Aggregations Identification"
                icon="icons/repair.png"
@@ -87,9 +70,6 @@
                tooltip="Aggregations Identification"
                menubarPath="BadSmellsMenu/sampleGroup"
                id="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentification">
-               <command
-                   commandId="gr.aueb.java.ddd.aggregatesIdentification.openView"
-                   style="push"/>
          </action>
       </actionSet>
    </extension>
@@ -156,7 +136,6 @@
             id="gr.uom.java.jdeodorant.views.CodeSmellPackageExplorer"
             name="Code Smell Package Explorer">
       </view>
-      <!-- Register new Aggregations Identification view -->
       <view
             category="gr.uom.java.jdeodorant"
             class="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView"
