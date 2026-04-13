@@ -337,8 +337,4 @@ public class CallGraphBuilder {
         }
         return prefix;
     }
-
-	public SystemObject getSystemObject() {
-		return systemObject;
-	}
 }
