@@ -1,5 +1,6 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
+import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.CompilationErrorDetectedException;
@@ -29,6 +30,7 @@ import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.LabelProvider;
 import org.eclipse.jface.viewers.SelectionChangedEvent;
+import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -44,6 +46,8 @@ public class AggregationsIdentificationView extends ViewPart {
     private ComboViewer projectComboViewer;
     private IJavaProject selectedProject;
     private SystemObject cachedSystemObject;
+    private ComboViewer frameworkComboViewer;
+    private FrameworkType selectedFramework = FrameworkType.QUARKUS;
     private Boolean strictAggregates;
     private Boolean displayLogs;
     private Text text;
@@ -79,6 +83,22 @@ public class AggregationsIdentificationView extends ViewPart {
         });
 
         populateProjectCombo();
+
+        // Framework selection dropdown
+        Label frameworkLabel = new Label(parent, SWT.NONE);
+        frameworkLabel.setText("Select framework:");
+
+        frameworkComboViewer = new ComboViewer(parent, SWT.READ_ONLY);
+        frameworkComboViewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        frameworkComboViewer.setContentProvider(ArrayContentProvider.getInstance());
+        frameworkComboViewer.setLabelProvider(new LabelProvider() {
+            @Override
+            public String getText(Object element) {
+                return ((FrameworkType) element).getDisplayName();
+            }
+        });
+        frameworkComboViewer.setInput(FrameworkType.values());
+        frameworkComboViewer.setSelection(new StructuredSelection(selectedFramework));
 
         // Strict Aggregates checkbox
         final Button strictCheck = new Button(parent, SWT.CHECK);
@@ -123,7 +143,17 @@ public class AggregationsIdentificationView extends ViewPart {
                 onProjectSelectedBuildSystemObject();
             }
         });
-        
+
+        frameworkComboViewer.addSelectionChangedListener(new ISelectionChangedListener() {
+            @Override
+            public void selectionChanged(SelectionChangedEvent event) {
+                IStructuredSelection selection = (IStructuredSelection) event.getSelection();
+                if (!selection.isEmpty()) {
+                    selectedFramework = (FrameworkType) selection.getFirstElement();
+                }
+            }
+        });
+
         JavaCore.addElementChangedListener(ElementChangedListener.getInstance());
     }
     
@@ -197,13 +227,13 @@ public class AggregationsIdentificationView extends ViewPart {
         }
 
         try {
-        	CallGraphBuilder callGraphBuilder = new CallGraphBuilder(selectedProject, cachedSystemObject);
+        	BaseCallGraphBuilder callGraphBuilder = CallGraphBuilderFactory.create(selectedFramework, selectedProject, cachedSystemObject);
 	        List<CallGraph> callGraphs = callGraphBuilder.buildCallGraphs();
 
 	        // Initialize clustering graph (using our new ClusteringGraph with typed edges)
 	        ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
 	        for (CallGraph callGraph : callGraphs) {
-	            for (ClassObject entity : callGraph.getRoot().allEntities) {
+	            for (ClassObject entity : callGraph.getRoot().allEntitiesObjects) {
 	                clusteringGraph.addVertex(entity);
 	            }
 	        }
@@ -295,10 +325,10 @@ public class AggregationsIdentificationView extends ViewPart {
         sb.append("\n\n Callgraphs:\n");
         for (CallGraph callGraph : callGraphs) {
             sb.append("Endpoint: ").append(callGraph.getRoot().getMethodName());
-            if(callGraph.getRoot().isReadOnly) {
+            if(callGraph.getRoot().isReadOnly()) {
             	sb.append(" [ReadOnly]");
             }
-            if(callGraph.getRoot().transactional) {
+            if(callGraph.getRoot().isTransactional) {
             	sb.append(" [Transactional]");
             }
             sb.append("\n");
@@ -332,16 +362,8 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append(indent).append(calledMethod.getMethodName());
             if(calledMethod.isEntityMethod()) {
             	sb.append(" [Entity method]");
-            	if(calledMethod.isReadOnly) {
+            	if(calledMethod.isReadOnly()) {
             		sb.append(" [ReadOnly]");
-            	}
-            	if (calledMethod.definedFields != null && calledMethod.definedFields.size() != 0) {
-                	sb.append(" [Changes: ");
-                	for (int i = 0; i < calledMethod.definedFields.size(); i++) {
-                		sb.append(calledMethod.definedFields.get(i).getVariableName());
-                		if (i != calledMethod.definedFields.size() - 1)	sb.append(", ");
-                	}
-                	sb.append("]");
             	}
             }
             sb.append("\n");

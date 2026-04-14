@@ -5,24 +5,21 @@ import java.util.HashSet;
 import java.util.List;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
-import gr.uom.java.ast.decomposition.cfg.AbstractVariable;
 
 public class CallGraphNode {
-	MethodObject methodObject;
-	ClassObject classObject;
     String methodName;
+    MethodObject methodObject;
+	ClassObject classObject;
     boolean isEntityMethod;
-    boolean isReadOnly;
-    boolean transactional;
-    HashSet<String> accessedEntities;
-    HashSet<String> definedEntities;
-    HashSet<ClassObject> allEntities;
+    boolean isTransactional;
+    HashSet<String> allEntities;
+    HashSet<ClassObject> allEntitiesObjects;
     HashSet<String> createdEntities;
     HashSet<ClassObject> createdEntitiesObjects;
+    HashSet<String> definedEntities;
     HashSet<ClassObject> definedEntitiesObjects;
+    HashSet<String> accessedEntities;
     HashSet<ClassObject> accessedEntitiesObjects;
-    HashSet<String> allEntitiesNames;
-    List<AbstractVariable> definedFields;
     List<CallGraphNode> calledMethods;
     HashSet<CreationRecord> creationRecords;
 
@@ -30,25 +27,20 @@ public class CallGraphNode {
         this.methodName = methodName;
         this.calledMethods = new ArrayList<CallGraphNode>();
         this.isEntityMethod = false;
-        this.isReadOnly = true;
-        this.transactional = false;
+        this.isTransactional = false;
         this.accessedEntities = new HashSet<String>();
         this.definedEntities = new HashSet<String>();
         this.createdEntities = new HashSet<String>();
         this.createdEntitiesObjects = new HashSet<ClassObject>();
         this.accessedEntitiesObjects = new HashSet<ClassObject>();
-        this.allEntities = new HashSet<ClassObject>();
+        this.allEntitiesObjects = new HashSet<ClassObject>();
         this.definedEntitiesObjects = new HashSet<ClassObject>();
-        this.allEntitiesNames = new HashSet<String>();
+        this.allEntities = new HashSet<String>();
         this.creationRecords = new HashSet<CreationRecord>();
     }
 
     public void addCalledMethod(CallGraphNode node) {
         this.calledMethods.add(node);
-    }
-    
-    public void setDefinedFields(List<AbstractVariable> list) {
-    	this.definedFields = list;
     }
 
     public String getMethodName() {
@@ -62,6 +54,10 @@ public class CallGraphNode {
     public boolean isEntityMethod() {
         return isEntityMethod;
     }
+
+    public boolean isReadOnly() {
+        return definedEntitiesObjects.isEmpty() && createdEntitiesObjects.isEmpty();
+    }
  
     public void setEntityMethod(boolean isEntityMethod) {
         this.isEntityMethod = isEntityMethod;
@@ -73,6 +69,10 @@ public class CallGraphNode {
     
     public void setClassObject(ClassObject classObj) {
     	this.classObject = classObj;
+    }
+
+    public void setTransactional(boolean transactional) {
+    	this.isTransactional = transactional;
     }
     
     public HashSet<ClassObject> getDefinedEntitiesObjects() {
