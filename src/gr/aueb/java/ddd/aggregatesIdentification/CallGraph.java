@@ -15,7 +15,7 @@ public class CallGraph {
         if (this.root == null) {
             this.root = node;
         }
-        nodes.put(node.getMethodName(), node);
+        nodes.put(node.methodName, node);
     }
 
     public CallGraphNode getRoot() {

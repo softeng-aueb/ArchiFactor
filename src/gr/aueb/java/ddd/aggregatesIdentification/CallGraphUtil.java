@@ -27,7 +27,7 @@ public class CallGraphUtil {
         Boolean entityIsUpdated = false;
         Boolean entityIsCreated = false;
         Boolean entityIsRead = false;
-    	if(callGraph.getRoot().getDefinedEntitiesObjects().contains(targetEntity)) {
+    	if(callGraph.getRoot().definedEntitiesObjects.contains(targetEntity)) {
     		//System.out.println("Target entity is updated");
     		entityIsUpdated = true;
         }
@@ -68,7 +68,7 @@ public class CallGraphUtil {
     	HashSet<CreationRecord> allCreationRecords = new HashSet<CreationRecord>();
     	for (CallGraph cg : callGraphs) {
             CallGraphNode root = cg.getRoot();
-            allCreationRecords.addAll(root.getCreationRecords());
+            allCreationRecords.addAll(root.creationRecords);
         }
 		return allCreationRecords;
     	

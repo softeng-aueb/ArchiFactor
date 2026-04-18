@@ -77,8 +77,8 @@ public abstract class BaseCallGraphBuilder {
 
                         String methodName = node.getName().getIdentifier() + "." + method.getName().getIdentifier();
                         CallGraphNode rootNode = new CallGraphNode(methodName);
-                        rootNode.setClassObject(controllerClassObject);
-                        rootNode.setTransactional(isTransactional(node, method, null));
+                        rootNode.classObject = controllerClassObject;
+                        rootNode.isTransactional = isTransactional(node, method, null);
                         
                         CallGraph callGraph = new CallGraph();
                         callGraph.addNode(rootNode);
@@ -195,7 +195,7 @@ public abstract class BaseCallGraphBuilder {
 
         ClassObject entityCreatedClass = systemObject.getClassObject(persistedEntityType.getQualifiedName());
         if (entityCreatedClass == null) {
-            parentNode.addCalledMethod(calledNode);
+            parentNode.calledMethods.add(calledNode);
             return;
         }
 
@@ -204,7 +204,7 @@ public abstract class BaseCallGraphBuilder {
         calledNode.createdEntities.add(entityCreatedClass.getName());
         calledNode.createdEntitiesObjects.add(entityCreatedClass);
 
-        parentNode.addCalledMethod(calledNode);
+        parentNode.calledMethods.add(calledNode);
         parentNode.allEntities.addAll(calledNode.allEntities);
         parentNode.allEntitiesObjects.addAll(calledNode.allEntitiesObjects);
         parentNode.createdEntities.addAll(calledNode.createdEntities);
@@ -214,7 +214,7 @@ public abstract class BaseCallGraphBuilder {
     private void handleUserWrittenCall(CallGraphNode parentNode, IMethodBinding methodBinding, ITypeBinding invokedMethodType, String invokedMethodTypeName, String fullMethodName, Set<String> visitedMethods) {
         CallGraphNode calledNode = new CallGraphNode(fullMethodName);
         ClassObject invokedMethodClass = systemObject.getClassObject(invokedMethodTypeName);
-        calledNode.setClassObject(invokedMethodClass);
+        calledNode.classObject = invokedMethodClass;
 
         if (isEntityType(invokedMethodType)) {
             recordEntityAccess(calledNode, invokedMethodTypeName, invokedMethodClass);
@@ -222,27 +222,27 @@ public abstract class BaseCallGraphBuilder {
 
         MethodObject calleeMethod = resolveCalleeMethod(methodBinding);
         if (calleeMethod == null) {
-            parentNode.addCalledMethod(calledNode);
+            parentNode.calledMethods.add(calledNode);
             return;
         }
 
         if (invokedMethodClass == null || invokedMethodClass.isInterface()) {
-            calledNode.setClassObject(systemObject.getClassObject(calleeMethod.getClassName()));
+            calledNode.classObject = systemObject.getClassObject(calleeMethod.getClassName());
         }
-        parentNode.addCalledMethod(calledNode);
+        parentNode.calledMethods.add(calledNode);
 
         MethodDeclaration calleeMethodDeclaration = calleeMethod.getMethodDeclaration();
         if (calleeMethodDeclaration == null) {
             return;
         }
 
-        calledNode.setTransactional(resolveTransactional(parentNode, calleeMethodDeclaration));
+        calledNode.isTransactional = resolveTransactional(parentNode, calleeMethodDeclaration);
         findMethodCalls(calledNode, calleeMethodDeclaration, visitedMethods);
         mergeCalledNodeIntoParent(parentNode, calledNode);
     }
 
     private void recordEntityAccess(CallGraphNode calledNode, String invokedMethodTypeName, ClassObject invokedMethodClass) {
-        calledNode.setEntityMethod(true);
+        calledNode.isEntityMethod = true;
         calledNode.allEntities.add(invokedMethodTypeName);
         calledNode.accessedEntities.add(invokedMethodTypeName);
         if (invokedMethodClass != null) {
@@ -317,7 +317,7 @@ public abstract class BaseCallGraphBuilder {
                 : null;
         if (parentType != null && isEntityType(parentType)) {
             CreationRecord creation = new CreationRecord(classCreated, parentNode.classObject);
-            parentNode.addCreationRecord(creation);
+            parentNode.creationRecords.add(creation);
         }
     }
 
