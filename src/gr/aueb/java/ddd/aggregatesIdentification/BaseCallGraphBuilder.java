@@ -313,7 +313,10 @@ public abstract class BaseCallGraphBuilder {
         parentNode.createdEntities.add(instantiatedType.getQualifiedName());
         parentNode.createdEntitiesObjects.add(classCreated);
 
-        if (parentNode.classObject != null) {
+        ITypeBinding parentType = parentNode.classObject != null
+                ? parentNode.classObject.getAbstractTypeDeclaration().resolveBinding()
+                : null;
+        if (parentType != null && isEntityType(parentType)) {
             CreationRecord creation = new CreationRecord(classCreated, parentNode.classObject);
             parentNode.addCreationRecord(creation);
         }
