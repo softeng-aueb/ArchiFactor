@@ -580,12 +580,17 @@ public abstract class BaseCallGraphBuilder {
     private String determineProjectPackagePrefix(IPackageFragment[] packageFragments) throws JavaModelException {
         Set<String> packageNames = new HashSet<String>();
         for (IPackageFragment packageFragment : packageFragments) {
-            if (packageFragment.getKind() == IPackageFragmentRoot.K_SOURCE) {
-                String name = packageFragment.getElementName();
-                if (name != null && !name.isEmpty()) {
-                    packageNames.add(name);
-                }
+            if (packageFragment.getKind() != IPackageFragmentRoot.K_SOURCE) {
+                continue;
             }
+            String name = packageFragment.getElementName();
+            if (name == null || name.isEmpty()) {
+                continue;
+            }
+            if (packageFragment.getCompilationUnits().length == 0) {
+                continue;
+            }
+            packageNames.add(name);
         }
         return PackageUtils.findCommonAncestorPackage(packageNames);
     }
