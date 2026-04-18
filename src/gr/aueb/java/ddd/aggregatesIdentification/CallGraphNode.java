@@ -11,8 +11,6 @@ public class CallGraphNode {
     boolean isEntityMethod;
     boolean isTransactional;
     List<CallGraphNode> calledMethods;
-    HashSet<String> allEntities;
-    HashSet<ClassObject> allEntitiesObjects;
     HashSet<String> createdEntities;
     HashSet<ClassObject> createdEntitiesObjects;
     HashSet<String> definedEntities;
@@ -26,8 +24,6 @@ public class CallGraphNode {
         this.isEntityMethod = false;
         this.isTransactional = false;
         this.calledMethods = new ArrayList<CallGraphNode>();
-        this.allEntities = new HashSet<String>();
-        this.allEntitiesObjects = new HashSet<ClassObject>();
         this.createdEntities = new HashSet<String>();
         this.createdEntitiesObjects = new HashSet<ClassObject>();
         this.definedEntities = new HashSet<String>();
@@ -39,5 +35,13 @@ public class CallGraphNode {
 
     public boolean isReadOnly() {
         return definedEntitiesObjects.isEmpty() && createdEntitiesObjects.isEmpty();
+    }
+
+    public HashSet<ClassObject> getAllEntitiesObjects() {
+        HashSet<ClassObject> allEntitiesObjects = new HashSet<ClassObject>();
+        allEntitiesObjects.addAll(createdEntitiesObjects);
+        allEntitiesObjects.addAll(definedEntitiesObjects);
+        allEntitiesObjects.addAll(accessedEntitiesObjects);
+        return allEntitiesObjects;
     }
 }

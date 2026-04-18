@@ -233,7 +233,7 @@ public class AggregationsIdentificationView extends ViewPart {
 	        // Initialize clustering graph (using our new ClusteringGraph with typed edges)
 	        ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
 	        for (CallGraph callGraph : callGraphs) {
-	            for (ClassObject entity : callGraph.getRoot().allEntitiesObjects) {
+	            for (ClassObject entity : callGraph.getRoot().getAllEntitiesObjects()) {
 	                clusteringGraph.addVertex(entity);
 	            }
 	        }

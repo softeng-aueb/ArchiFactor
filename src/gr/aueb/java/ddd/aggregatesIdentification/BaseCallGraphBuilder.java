@@ -199,14 +199,10 @@ public abstract class BaseCallGraphBuilder {
             return;
         }
 
-        calledNode.allEntities.add(entityCreatedClass.getName());
-        calledNode.allEntitiesObjects.add(entityCreatedClass);
         calledNode.createdEntities.add(entityCreatedClass.getName());
         calledNode.createdEntitiesObjects.add(entityCreatedClass);
 
         parentNode.calledMethods.add(calledNode);
-        parentNode.allEntities.addAll(calledNode.allEntities);
-        parentNode.allEntitiesObjects.addAll(calledNode.allEntitiesObjects);
         parentNode.createdEntities.addAll(calledNode.createdEntities);
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
     }
@@ -243,10 +239,8 @@ public abstract class BaseCallGraphBuilder {
 
     private void recordEntityAccess(CallGraphNode calledNode, String invokedMethodTypeName, ClassObject invokedMethodClass) {
         calledNode.isEntityMethod = true;
-        calledNode.allEntities.add(invokedMethodTypeName);
         calledNode.accessedEntities.add(invokedMethodTypeName);
         if (invokedMethodClass != null) {
-            calledNode.allEntitiesObjects.add(invokedMethodClass);
             calledNode.accessedEntitiesObjects.add(invokedMethodClass);
         }
     }
@@ -279,8 +273,6 @@ public abstract class BaseCallGraphBuilder {
         parentNode.definedEntitiesObjects.addAll(calledNode.definedEntitiesObjects);
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
         parentNode.createdEntities.addAll(calledNode.createdEntities);
-        parentNode.allEntitiesObjects.addAll(calledNode.allEntitiesObjects);
-        parentNode.allEntities.addAll(calledNode.allEntities);
         parentNode.creationRecords.addAll(calledNode.creationRecords);
         if (calledNode.isTransactional) {
             parentNode.isTransactional = true;
@@ -307,8 +299,6 @@ public abstract class BaseCallGraphBuilder {
             return;
         }
 
-        parentNode.allEntities.add(instantiatedType.getQualifiedName());
-        parentNode.allEntitiesObjects.add(classCreated);
         parentNode.createdEntities.add(instantiatedType.getQualifiedName());
         parentNode.createdEntitiesObjects.add(classCreated);
 
@@ -480,8 +470,6 @@ public abstract class BaseCallGraphBuilder {
             return;
         }
 
-        parentNode.allEntities.add(mutatedEntityFqn);
-        parentNode.allEntitiesObjects.add(mutatedEntityClass);
         parentNode.definedEntities.add(mutatedEntityFqn);
         parentNode.definedEntitiesObjects.add(mutatedEntityClass);
     }
