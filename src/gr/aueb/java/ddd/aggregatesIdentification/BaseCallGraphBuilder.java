@@ -226,7 +226,6 @@ public abstract class BaseCallGraphBuilder {
             return;
         }
 
-        calledNode.setMethodObject(calleeMethod);
         if (invokedMethodClass == null || invokedMethodClass.isInterface()) {
             calledNode.setClassObject(systemObject.getClassObject(calleeMethod.getClassName()));
         }
