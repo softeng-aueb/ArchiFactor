@@ -120,21 +120,18 @@ public class ClusteringGraph<T> {
     }
     
     public static enum EdgeType {
-        EMBEDDED,    // For value objects embedded within an entity
         COUPLED,   	 // For coupled entities relationships
         REFERENCE,   // For loose references across aggregates
-        VALUE,		 //	For ValueObjects
-        OWNERSHIP	 // For relationships where the parent owns the child
+        OWNERSHIP,	 // For relationships where the parent owns the child
+        INHERITANCE  // For JPA @Inheritance hierarchy ties
     }
-    
+
     public static double baselineFor(ClusteringGraph.EdgeType type) {
         switch (type) {
-        case EMBEDDED:
-            return 2.0;
-        case VALUE:
+        case INHERITANCE:
         	return 2.0;
         case OWNERSHIP:
-        	return 2.0;
+        	return 1.0;
         case COUPLED:
             return 1.0;
         case REFERENCE:

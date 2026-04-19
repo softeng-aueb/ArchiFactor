@@ -1,7 +1,10 @@
 package gr.aueb.java.archifactor.jpa.util;
 
 import org.eclipse.jdt.core.dom.Annotation;
+import org.eclipse.jdt.core.dom.BooleanLiteral;
 import org.eclipse.jdt.core.dom.NormalAnnotation;
+import org.eclipse.jdt.core.dom.QualifiedName;
+import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SingleMemberAnnotation;
 import org.eclipse.jdt.core.dom.MemberValuePair;
 import org.eclipse.jdt.core.dom.StringLiteral;
@@ -16,8 +19,11 @@ import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.SystemObject;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.ListIterator;
+import java.util.Set;
 
 public class JpaAnnotationExtractorUtils {
     private SystemObject systemObject;
@@ -323,5 +329,118 @@ public class JpaAnnotationExtractorUtils {
             }
         }
         return null;
+    }
+
+    public static boolean hasClassAnnotation(ClassObject classObject, String annotationSimpleName) {
+        for (Annotation annotation : classObject.getAnnotations()) {
+            if (annotationSimpleName.equals(annotation.getTypeName().getFullyQualifiedName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasFieldAnnotation(FieldObject field, String annotationSimpleName) {
+        for (Annotation annotation : field.getAnnotations()) {
+            if (annotationSimpleName.equals(annotation.getTypeName().getFullyQualifiedName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final Set<String> OWNERSHIP_CASCADE_TYPES =
+        new HashSet<String>(Arrays.asList("ALL", "PERSIST", "REMOVE", "MERGE"));
+
+    public static boolean hasOwnershipCascade(FieldObject field) {
+        for (Annotation annotation : field.getAnnotations()) {
+            String annotationType = annotation.getTypeName().getFullyQualifiedName();
+            if (!JpaRelationshipType.isRelationshipType(annotationType)) {
+                continue;
+            }
+
+            for (String cascade : extractCascadeTypes(annotation)) {
+                if (OWNERSHIP_CASCADE_TYPES.contains(cascade)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static Set<String> extractCascadeTypes(Annotation annotation) {
+        Set<String> cascadeTypes = new HashSet<String>();
+        if (!(annotation instanceof NormalAnnotation)) {
+            return cascadeTypes;
+        }
+
+        NormalAnnotation normalAnnotation = (NormalAnnotation) annotation;
+        for (Object obj : normalAnnotation.values()) {
+            MemberValuePair pair = (MemberValuePair) obj;
+            if (!"cascade".equals(pair.getName().getIdentifier())) {
+                continue;
+            }
+
+            Expression value = pair.getValue();
+            if (value instanceof ArrayInitializer) {
+                ArrayInitializer arrayInit = (ArrayInitializer) value;
+                for (Object exprObj : arrayInit.expressions()) {
+                    String cascadeName = extractCascadeEnumName((Expression) exprObj);
+                    if (cascadeName != null) {
+                        cascadeTypes.add(cascadeName);
+                    }
+                }
+            } else {
+                String cascadeName = extractCascadeEnumName(value);
+                if (cascadeName != null) {
+                    cascadeTypes.add(cascadeName);
+                }
+            }
+        }
+        return cascadeTypes;
+    }
+
+    private static String extractCascadeEnumName(Expression expression) {
+        if (expression instanceof QualifiedName) {
+            return ((QualifiedName) expression).getName().getIdentifier();
+        }
+        if (expression instanceof SimpleName) {
+            return ((SimpleName) expression).getIdentifier();
+        }
+        return null;
+    }
+
+    public static boolean hasOrphanRemoval(FieldObject field) {
+        for (Annotation annotation : field.getAnnotations()) {
+            String annotationType = annotation.getTypeName().getFullyQualifiedName();
+            if (!JpaRelationshipType.isRelationshipType(annotationType)) {
+                continue;
+            }
+
+            if (extractBooleanProperty(annotation, "orphanRemoval")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean extractBooleanProperty(Annotation annotation, String propertyName) {
+        if (!(annotation instanceof NormalAnnotation)) {
+            return false;
+        }
+
+        NormalAnnotation normalAnnotation = (NormalAnnotation) annotation;
+        for (Object obj : normalAnnotation.values()) {
+            MemberValuePair pair = (MemberValuePair) obj;
+            if (!propertyName.equals(pair.getName().getIdentifier())) {
+                continue;
+            }
+
+            Expression value = pair.getValue();
+            if (value instanceof BooleanLiteral) {
+                return ((BooleanLiteral) value).booleanValue();
+            }
+        }
+        return false;
     }
 }

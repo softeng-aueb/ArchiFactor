@@ -5,13 +5,10 @@ import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.CompilationErrorDetectedException;
 import gr.uom.java.ast.SystemObject;
-import gr.uom.java.ast.association.Association;
-import gr.uom.java.ast.association.AssociationDetection;
 import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -20,8 +17,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
-import org.eclipse.jdt.core.dom.Annotation;
-import org.eclipse.jdt.core.dom.IAnnotationBinding;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 import org.eclipse.jface.viewers.ArrayContentProvider;
@@ -230,57 +225,8 @@ public class AggregationsIdentificationView extends ViewPart {
         	BaseCallGraphBuilder callGraphBuilder = CallGraphBuilderFactory.create(selectedFramework, selectedProject, cachedSystemObject);
 	        List<CallGraph> callGraphs = callGraphBuilder.buildCallGraphs();
 
-	        // Initialize clustering graph (using our new ClusteringGraph with typed edges)
-	        ClusteringGraph<ClassObject> clusteringGraph = new ClusteringGraph<ClassObject>();
-	        for (CallGraph callGraph : callGraphs) {
-	            for (ClassObject entity : callGraph.getRoot().getAllEntitiesObjects()) {
-	                clusteringGraph.addVertex(entity);
-	            }
-	        }
-	        
-	        // Create associations mapping using static analysis
-	        AssociationDetection associationsMapper = new AssociationDetection(cachedSystemObject);
-	        // Add static association edges:
-	        Set<ClassObject> vertices = new HashSet<ClassObject>();
-	        vertices.addAll(clusteringGraph.getVertices());
-	        for (ClassObject vertex : vertices) {
-	            List<Association> associations = associationsMapper.getAssociationsOfClass(vertex);
-	            for (Association association : associations) {
-	                ClassObject toVertex = cachedSystemObject.getClassObject(association.getTo());
-	                if (!clusteringGraph.hasEdge(vertex, toVertex)) {
-	                    // Decide edge type based on static information:
-	                    ClusteringGraph.EdgeType type = ClusteringGraph.EdgeType.REFERENCE;
-	                    
-	                    List<Annotation> toVertexAnnotations = toVertex.getAnnotations();
-	                    Boolean isEmbedded = false;
-	                    for(Annotation annotation : toVertexAnnotations) {
-	                    	IAnnotationBinding annotationBinding = annotation.resolveAnnotationBinding();
-	                    	if(annotationBinding.getName().equals("Embeddable")) {
-	                    		isEmbedded = true;
-	                    	}
-	                    }
-	                    Boolean isEnumerated = false;
-	                    List<Annotation> fieldAnnotations = association.getFieldObject().getAnnotations();
-	                    for(Annotation annotation : fieldAnnotations) {
-	                    	IAnnotationBinding annotationBinding = annotation.resolveAnnotationBinding();
-	                    	if(
-	                    		annotationBinding.getName().equals("Enumerated") ||
-	                    		annotationBinding.getName().equals("Type")
-	                    	) {
-	                    		isEnumerated = true;
-	                    	}
-	                    }
-	                    
-	                    if (isEmbedded) { 
-	                        type = ClusteringGraph.EdgeType.EMBEDDED;
-	                    }
-	                    if (isEnumerated) {
-	                    	type = ClusteringGraph.EdgeType.VALUE;
-	                    }
-	                    clusteringGraph.addEdge(vertex, toVertex, ClusteringGraph.baselineFor(type), type);
-	                }
-	            }
-	        }
+	        ClusteringGraphBuilder clusteringGraphBuilder = new ClusteringGraphBuilder(callGraphs, cachedSystemObject);
+	        ClusteringGraph<ClassObject> clusteringGraph = clusteringGraphBuilder.buildClusteringGraph();
 
 	        StringBuilder graphString = new StringBuilder();
 	        graphString.append("\n\n Graph after static association:\n");
