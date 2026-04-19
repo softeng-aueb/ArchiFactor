@@ -333,7 +333,7 @@ public class JpaAnnotationExtractorUtils {
 
     public static boolean hasClassAnnotation(ClassObject classObject, String annotationSimpleName) {
         for (Annotation annotation : classObject.getAnnotations()) {
-            if (annotationSimpleName.equals(annotation.getTypeName().getFullyQualifiedName())) {
+            if (matchesAnnotationSimpleName(annotation, annotationSimpleName)) {
                 return true;
             }
         }
@@ -342,11 +342,21 @@ public class JpaAnnotationExtractorUtils {
 
     public static boolean hasFieldAnnotation(FieldObject field, String annotationSimpleName) {
         for (Annotation annotation : field.getAnnotations()) {
-            if (annotationSimpleName.equals(annotation.getTypeName().getFullyQualifiedName())) {
+            if (matchesAnnotationSimpleName(annotation, annotationSimpleName)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean matchesAnnotationSimpleName(Annotation annotation, String annotationSimpleName) {
+        String fqn = annotation.getTypeName().getFullyQualifiedName();
+        if (fqn == null) {
+            return false;
+        }
+        int lastDot = fqn.lastIndexOf('.');
+        String simpleName = lastDot >= 0 ? fqn.substring(lastDot + 1) : fqn;
+        return annotationSimpleName.equals(simpleName);
     }
 
     private static final Set<String> OWNERSHIP_CASCADE_TYPES =
