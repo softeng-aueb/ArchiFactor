@@ -13,12 +13,12 @@ public class CallGraphUtil {
      * Returns a list of CallEdge objects representing outgoing calls
      * from the given entity (a ClassObject) in the given call graph.
      */
-    public static List<CallEdge> getOutgoingEdges(Object entity, CallGraph callGraph) {
+    public static List<CallGraphEdge> getOutgoingEdges(Object entity, CallGraph callGraph) {
         // check if it is entity
     	if (!(entity instanceof ClassObject))
             return Collections.emptyList();
         	
-        List<CallEdge> edges = new ArrayList<CallEdge>();
+        List<CallGraphEdge> edges = new ArrayList<CallGraphEdge>();
         ClassObject targetEntity = (ClassObject) entity;
         
         //System.out.println("Entity: " + targetEntity.getName() + " for " + callGraph.getRoot().methodName + " -> Edges: ");
@@ -42,14 +42,14 @@ public class CallGraphUtil {
         CallGraphNode root = callGraph.getRoot();
         for(ClassObject updatedEntity : root.definedEntitiesObjects) {
         	if(updatedEntity != targetEntity) {
-        		CallEdge edge = new CallEdge(entity, updatedEntity, entityIsUpdated, entityIsCreated, entityIsRead);
+        		CallGraphEdge edge = new CallGraphEdge(entity, updatedEntity, entityIsUpdated, entityIsCreated, entityIsRead);
         		//System.out.println("\t update " + updatedEntity.getName());
                 edges.add(edge);
         	}
         }
         for(ClassObject createdEntity : root.createdEntitiesObjects) {
         	if(createdEntity != targetEntity) {
-        		CallEdge edge = new CallEdge(entity, createdEntity, entityIsUpdated, entityIsCreated, entityIsRead);
+        		CallGraphEdge edge = new CallGraphEdge(entity, createdEntity, entityIsUpdated, entityIsCreated, entityIsRead);
         		//System.out.println("\t create " + createdEntity.getName());
                 edges.add(edge);
         	}

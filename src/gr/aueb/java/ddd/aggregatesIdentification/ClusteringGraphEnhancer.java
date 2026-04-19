@@ -7,7 +7,7 @@ import java.util.List;
 
 import gr.uom.java.ast.ClassObject;
 
-public class GraphEnhancer<T> {
+public class ClusteringGraphEnhancer<T> {
     
     private double creationMultiplier = 1.0; // This will be calibrated dynamically
 
@@ -19,9 +19,9 @@ public class GraphEnhancer<T> {
         
         for (T vertex : graph.getVertices()) {
             for (CallGraph cg : callGraphs) {
-                List<CallEdge> edges = CallGraphUtil.getOutgoingEdges(vertex, cg);
+                List<CallGraphEdge> edges = CallGraphUtil.getOutgoingEdges(vertex, cg);
                 if (edges == null) continue;
-                for (CallEdge edge : edges) {
+                for (CallGraphEdge edge : edges) {
                     if (edge.isInUpdateTransaction()) {
                         totalUpdateEvents++;
                     }
@@ -44,13 +44,13 @@ public class GraphEnhancer<T> {
         double childParentCalls = 0.0;
         
         for (CallGraph cg : callGraphs) {
-            List<CallEdge> parentEdges = CallGraphUtil.getOutgoingEdges(parent, cg);
-            List<CallEdge> childEdges = CallGraphUtil.getOutgoingEdges(child, cg);
+            List<CallGraphEdge> parentEdges = CallGraphUtil.getOutgoingEdges(parent, cg);
+            List<CallGraphEdge> childEdges = CallGraphUtil.getOutgoingEdges(child, cg);
             if (parentEdges == null || childEdges == null) continue;
             totalParentCalls += parentEdges.size();
             totalChildCalls += childEdges.size();
             
-            for (CallEdge edge : parentEdges) {
+            for (CallGraphEdge edge : parentEdges) {
             	if (edge.getTarget() != null && edge.getTarget().equals(child)) {
             		childParentCalls += (edge.isInUpdateTransaction() | edge.isCreationEvent() ) ? 1.0 : 0.0;
                 }
@@ -89,8 +89,8 @@ public class GraphEnhancer<T> {
             for (ClusteringGraph.Edge<T> edge : graph.getNeighbors(parent)) {
             	for(CreationRecord record : allCreationRecords) {
             		if(record.getCreatedBy() == parent && record.getCreated() ==  edge.getTarget()) {
-            			edge.setType(ClusteringGraph.EdgeType.OWNERSHIP);
-            			edge.setWeight(ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.OWNERSHIP));
+            			edge.setType(EdgeType.OWNERSHIP);
+            			edge.setWeight(EdgeType.OWNERSHIP.getBaseline());
             			graph.setEdge(edge.getTarget(), parent, edge);
             		}
         		}
@@ -103,7 +103,7 @@ public class GraphEnhancer<T> {
         
         for (T parent : graph.getVertices()) {
             for (ClusteringGraph.Edge<T> edge : graph.getNeighbors(parent)) {
-            	if(edge.getType() != ClusteringGraph.EdgeType.REFERENCE) {
+            	if(edge.getType() != EdgeType.REFERENCE) {
             		continue;
             	}
                 double score = computeCouplingScore(parent, edge.getTarget(), callGraphs);
@@ -112,10 +112,10 @@ public class GraphEnhancer<T> {
                 if(score != 0.0) edge.setWeight(score);
                 
                 // Promote an edge from REFERENCE to COUPLED if coupling is strong.
-                if (edge.getType() == ClusteringGraph.EdgeType.REFERENCE && score >= threshold) {
+                if (edge.getType() == EdgeType.REFERENCE && score >= threshold) {
                 	 System.out.println("Upgrading REFERENCE to COUPLED: " + parent.getClass().getName() + " -> " + edge.getTarget().getClass().getName());
-                    edge.setType(ClusteringGraph.EdgeType.COUPLED);
-                    edge.setWeight(ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.COUPLED));
+                    edge.setType(EdgeType.COUPLED);
+                    edge.setWeight(EdgeType.COUPLED.getBaseline());
                 }
                 graph.setEdge(parent, edge.getTarget(), edge);
             }

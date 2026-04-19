@@ -48,13 +48,13 @@ public class ClusteringGraphBuilder {
                 if (targetVertex == null || graph.hasEdge(sourceVertex, targetVertex)) {
                     continue;
                 }
-                ClusteringGraph.EdgeType edgeType = resolveEdgeType(association, targetVertex);
-                graph.addEdge(sourceVertex, targetVertex, ClusteringGraph.baselineFor(edgeType), edgeType);
+                EdgeType edgeType = resolveEdgeType(association, targetVertex);
+                graph.addEdge(sourceVertex, targetVertex, edgeType.getBaseline(), edgeType);
             }
         }
     }
 
-    private ClusteringGraph.EdgeType resolveEdgeType(Association association, ClassObject targetVertex) {
+    private EdgeType resolveEdgeType(Association association, ClassObject targetVertex) {
         FieldObject field = association.getFieldObject();
 
         if (JpaAnnotationExtractorUtils.hasClassAnnotation(targetVertex, "Embeddable")
@@ -62,18 +62,18 @@ public class ClusteringGraphBuilder {
                 || JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "Type")
                 || JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "ElementCollection")
                 || JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "MapsId")) {
-            return ClusteringGraph.EdgeType.OWNERSHIP;
+            return EdgeType.OWNERSHIP;
         }
 
         if (JpaAnnotationExtractorUtils.hasOwnershipCascade(field)) {
-            return ClusteringGraph.EdgeType.OWNERSHIP;
+            return EdgeType.OWNERSHIP;
         }
 
         if (JpaAnnotationExtractorUtils.hasOrphanRemoval(field)) {
-            return ClusteringGraph.EdgeType.OWNERSHIP;
+            return EdgeType.OWNERSHIP;
         }
 
-        return ClusteringGraph.EdgeType.REFERENCE;
+        return EdgeType.REFERENCE;
     }
 
     private void addInheritanceEdges(ClusteringGraph<ClassObject> graph) {
@@ -120,18 +120,18 @@ public class ClusteringGraphBuilder {
     }
 
     private void promoteOrAddInheritanceEdge(ClusteringGraph<ClassObject> graph, ClassObject vertexA, ClassObject vertexB) {
-        double inheritanceWeight = ClusteringGraph.baselineFor(ClusteringGraph.EdgeType.INHERITANCE);
+        double inheritanceWeight = EdgeType.INHERITANCE.getBaseline();
         if (!graph.hasEdge(vertexA, vertexB)) {
-            graph.addEdge(vertexA, vertexB, inheritanceWeight, ClusteringGraph.EdgeType.INHERITANCE);
+            graph.addEdge(vertexA, vertexB, inheritanceWeight, EdgeType.INHERITANCE);
             return;
         }
 
         ClusteringGraph.Edge<ClassObject> existingEdge = graph.getEdge(vertexA, vertexB);
-        if (existingEdge == null || existingEdge.getType() == ClusteringGraph.EdgeType.INHERITANCE) {
+        if (existingEdge == null || existingEdge.getType() == EdgeType.INHERITANCE) {
             return;
         }
 
-        existingEdge.setType(ClusteringGraph.EdgeType.INHERITANCE);
+        existingEdge.setType(EdgeType.INHERITANCE);
         existingEdge.setWeight(inheritanceWeight);
         graph.setEdge(vertexB, vertexA, existingEdge);
     }

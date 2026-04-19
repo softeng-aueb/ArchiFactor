@@ -235,7 +235,7 @@ public class AggregationsIdentificationView extends ViewPart {
 	        
 	        
 	        // Enhance the graph: adjust weights/promote edges using dynamic coupling data
-	        GraphEnhancer<ClassObject> enhancer = new GraphEnhancer<ClassObject>();
+	        ClusteringGraphEnhancer<ClassObject> enhancer = new ClusteringGraphEnhancer<ClassObject>();
 	        enhancer.enhanceGraph(clusteringGraph, callGraphs);
 	        
 	        StringBuilder graphString2 = new StringBuilder();

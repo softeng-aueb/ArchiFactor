@@ -2,8 +2,6 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 
 import java.util.*;
 
-import gr.aueb.java.ddd.aggregatesIdentification.ClusteringGraph.EdgeType;
-
 public class StrictAggregateClustering<T> {
 
     /**
