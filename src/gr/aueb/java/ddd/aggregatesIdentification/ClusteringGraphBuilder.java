@@ -47,12 +47,11 @@ public class ClusteringGraphBuilder {
                 ClassObject targetVertex = systemObject.getClassObject(association.getTo());
                 if (targetVertex == null
                         || !JpaAnnotationExtractorUtils.hasClassAnnotation(targetVertex, "Entity")
-                        || sourceVertex.equals(targetVertex)
-                        || graph.hasEdge(sourceVertex, targetVertex)) {
+                        || sourceVertex.equals(targetVertex)) {
                     continue;
                 }
                 EdgeType edgeType = resolveEdgeType(association, targetVertex);
-                graph.addEdge(sourceVertex, targetVertex, edgeType.getBaseline(), edgeType);
+                addOrUpgradeEdge(graph, sourceVertex, targetVertex, edgeType);
             }
         }
     }
@@ -83,7 +82,7 @@ public class ClusteringGraphBuilder {
                 if (!initialVertices.contains(ancestor)) {
                     graph.addVertex(ancestor);
                 }
-                promoteOrAddInheritanceEdge(graph, entity, ancestor);
+                addOrUpgradeEdge(graph, entity, ancestor, EdgeType.INHERITANCE);
             }
         }
     }
@@ -118,20 +117,19 @@ public class ClusteringGraphBuilder {
         return ancestorChain;
     }
 
-    private void promoteOrAddInheritanceEdge(ClusteringGraph<ClassObject> graph, ClassObject vertexA, ClassObject vertexB) {
-        double inheritanceWeight = EdgeType.INHERITANCE.getBaseline();
+    private void addOrUpgradeEdge(ClusteringGraph<ClassObject> graph, ClassObject vertexA, ClassObject vertexB, EdgeType newType) {
         if (!graph.hasEdge(vertexA, vertexB)) {
-            graph.addEdge(vertexA, vertexB, inheritanceWeight, EdgeType.INHERITANCE);
+            graph.addEdge(vertexA, vertexB, newType.getBaseline(), newType);
             return;
         }
 
         ClusteringGraph.Edge<ClassObject> existingEdge = graph.getEdge(vertexA, vertexB);
-        if (existingEdge == null || existingEdge.getType() == EdgeType.INHERITANCE) {
+        if (existingEdge == null || newType.getBaseline() <= existingEdge.getType().getBaseline()) {
             return;
         }
 
-        existingEdge.setType(EdgeType.INHERITANCE);
-        existingEdge.setWeight(inheritanceWeight);
+        existingEdge.setType(newType);
+        existingEdge.setWeight(newType.getBaseline());
         graph.setEdge(vertexB, vertexA, existingEdge);
     }
 }
