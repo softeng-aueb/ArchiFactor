@@ -45,7 +45,10 @@ public class ClusteringGraphBuilder {
             List<Association> associations = associationsDetector.getAssociationsOfClass(sourceVertex);
             for (Association association : associations) {
                 ClassObject targetVertex = systemObject.getClassObject(association.getTo());
-                if (targetVertex == null || sourceVertex.equals(targetVertex) || graph.hasEdge(sourceVertex, targetVertex)) {
+                if (targetVertex == null
+                        || !JpaAnnotationExtractorUtils.hasClassAnnotation(targetVertex, "Entity")
+                        || sourceVertex.equals(targetVertex)
+                        || graph.hasEdge(sourceVertex, targetVertex)) {
                     continue;
                 }
                 EdgeType edgeType = resolveEdgeType(association, targetVertex);
@@ -57,12 +60,8 @@ public class ClusteringGraphBuilder {
     private EdgeType resolveEdgeType(Association association, ClassObject targetVertex) {
         FieldObject field = association.getFieldObject();
 
-        if (JpaAnnotationExtractorUtils.hasClassAnnotation(targetVertex, "Embeddable")
-        		|| JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "Enumerated")
-                || JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "Type")
-                || JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "ElementCollection")
-                || JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "MapsId")) {
-            return EdgeType.OWNERSHIP;
+        if (JpaAnnotationExtractorUtils.hasFieldAnnotation(field, "MapsId")) {
+            return EdgeType.IDENTITY;
         }
 
         if (JpaAnnotationExtractorUtils.hasOwnershipCascade(field)) {
