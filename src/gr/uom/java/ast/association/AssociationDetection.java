@@ -7,8 +7,11 @@ import gr.uom.java.ast.MethodObject;
 import gr.uom.java.ast.SystemObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 
 import javax.swing.tree.DefaultMutableTreeNode;
 
@@ -65,8 +68,10 @@ public class AssociationDetection {
 				if(acceptableOriginClassNames.contains(type)) {
 					String genericType = fieldObject.getType().getGenericType();
 					if(genericType != null) {
+						Set<String> typeArguments = new HashSet<String>(Arrays.asList(genericType.split("<|>|,|\\s")));
+						typeArguments.remove("");
 						for(String className : systemObject.getClassNames()) {
-							if(genericType.contains(className)) {
+							if(typeArguments.contains(className)) {
 								Association association = new Association(fieldObject, classObject.getName(), className);
 								association.setContainer(true);
 								if(!associationList.contains(association))

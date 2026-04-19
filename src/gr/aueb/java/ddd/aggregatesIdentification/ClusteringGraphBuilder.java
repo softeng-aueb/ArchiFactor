@@ -45,7 +45,7 @@ public class ClusteringGraphBuilder {
             List<Association> associations = associationsDetector.getAssociationsOfClass(sourceVertex);
             for (Association association : associations) {
                 ClassObject targetVertex = systemObject.getClassObject(association.getTo());
-                if (targetVertex == null || graph.hasEdge(sourceVertex, targetVertex)) {
+                if (targetVertex == null || sourceVertex.equals(targetVertex) || graph.hasEdge(sourceVertex, targetVertex)) {
                     continue;
                 }
                 EdgeType edgeType = resolveEdgeType(association, targetVertex);
