@@ -7,10 +7,10 @@ public class LouvainClustering<T> {
     private static final int LOUVAIN_ITERATIONS = 5;
 
     public List<Set<T>> louvainClustering(ClusteringGraph<T> graph) {
-        Map<List<Set<T>>, Integer> clusteringCounts = new HashMap<List<Set<T>>, Integer>();
+        Map<Set<Set<T>>, Integer> clusteringCounts = new HashMap<Set<Set<T>>, Integer>();
 
         for (int i = 0; i < LOUVAIN_ITERATIONS; i++) {
-            List<Set<T>> clustering = singleLouvainRun(graph);
+            Set<Set<T>> clustering = new HashSet<Set<T>>(singleLouvainRun(graph));
             if (clusteringCounts.containsKey(clustering)) {
                 clusteringCounts.put(clustering, clusteringCounts.get(clustering) + 1);
             } else {
@@ -112,16 +112,16 @@ public class LouvainClustering<T> {
         return totalWeight;
     }
 
-    private List<Set<T>> getMostFrequentClustering(Map<List<Set<T>>, Integer> clusteringCounts) {
-        List<Set<T>> bestClustering = null;
+    private List<Set<T>> getMostFrequentClustering(Map<Set<Set<T>>, Integer> clusteringCounts) {
+        Set<Set<T>> bestClustering = null;
         int maxCount = 0;
 
-        for (Map.Entry<List<Set<T>>, Integer> entry : clusteringCounts.entrySet()) {
+        for (Map.Entry<Set<Set<T>>, Integer> entry : clusteringCounts.entrySet()) {
             if (entry.getValue() > maxCount) {
                 maxCount = entry.getValue();
                 bestClustering = entry.getKey();
             }
         }
-        return bestClustering;
+        return new ArrayList<Set<T>>(bestClustering);
     }
 }
