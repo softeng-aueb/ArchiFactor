@@ -2,16 +2,10 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 
 import java.util.*;
 
-public class StrictAggregateClustering<T> {
+public class UnionFindClustering<T> {
 
-    /**
-     * Performs clustering by grouping nodes that are connected
-     * via OWNERSHIP, INHERITANCE or IDENTITY edges.
-     *
-     * @param graph the clustering graph with typed edges
-     * @return a list of clusters (each a set of nodes)
-     */
-    public List<Set<T>> cluster(ClusteringGraph<T> graph) {
+	// Performs clustering by grouping nodes that are connected via OWNERSHIP, INHERITANCE or IDENTITY edges.
+    public List<Set<T>> unionFindClustering(ClusteringGraph<T> graph) {
         // Define strong edge types for aggregation.
         Set<EdgeType> strongTypes = new HashSet<EdgeType>();
         strongTypes.add(EdgeType.OWNERSHIP);

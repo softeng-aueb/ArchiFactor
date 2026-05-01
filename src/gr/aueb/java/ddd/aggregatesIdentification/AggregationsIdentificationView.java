@@ -244,8 +244,8 @@ public class AggregationsIdentificationView extends ViewPart {
 
 	        List<Set<ClassObject>> clusters;
 	        if (strictAggregates) {
-	        	StrictAggregateClustering<ClassObject> clustering = new StrictAggregateClustering<ClassObject>();
-		        clusters = clustering.cluster(clusteringGraph);
+	        	UnionFindClustering<ClassObject> clustering = new UnionFindClustering<ClassObject>();
+		        clusters = clustering.unionFindClustering(clusteringGraph);
 	        } else {
 		        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>();
 		        clusters = clustering.louvainClustering(clusteringGraph);	        	
