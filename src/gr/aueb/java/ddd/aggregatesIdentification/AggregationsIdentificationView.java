@@ -43,7 +43,8 @@ public class AggregationsIdentificationView extends ViewPart {
     private SystemObject cachedSystemObject;
     private ComboViewer frameworkComboViewer;
     private FrameworkType selectedFramework = FrameworkType.QUARKUS;
-    private Boolean strictAggregates;
+    private ComboViewer algorithmComboViewer;
+    private ClusteringAlgorithm selectedAlgorithm = ClusteringAlgorithm.LOUVAIN;
     private Boolean displayLogs;
     private Text text;
 
@@ -95,12 +96,21 @@ public class AggregationsIdentificationView extends ViewPart {
         frameworkComboViewer.setInput(FrameworkType.values());
         frameworkComboViewer.setSelection(new StructuredSelection(selectedFramework));
 
-        // Strict Aggregates checkbox
-        final Button strictCheck = new Button(parent, SWT.CHECK);
-        strictCheck.setText("Use Strict Aggregates");
-        strictCheck.setSelection(false);
-        GridData strictCheckGD = new GridData(SWT.LEFT, SWT.CENTER, true, false, 2, 1);
-        strictCheck.setLayoutData(strictCheckGD);
+        // Clustering algorithm dropdown
+        Label algorithmLabel = new Label(parent, SWT.NONE);
+        algorithmLabel.setText("Select clustering algorithm:");
+
+        algorithmComboViewer = new ComboViewer(parent, SWT.READ_ONLY);
+        algorithmComboViewer.getCombo().setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        algorithmComboViewer.setContentProvider(ArrayContentProvider.getInstance());
+        algorithmComboViewer.setLabelProvider(new LabelProvider() {
+            @Override
+            public String getText(Object element) {
+                return ((ClusteringAlgorithm) element).getDisplayName();
+            }
+        });
+        algorithmComboViewer.setInput(ClusteringAlgorithm.values());
+        algorithmComboViewer.setSelection(new StructuredSelection(selectedAlgorithm));
 
         // Display Logs checkbox
         final Button logsCheck = new Button(parent, SWT.CHECK);
@@ -116,7 +126,7 @@ public class AggregationsIdentificationView extends ViewPart {
         runButton.setLayoutData(buttonGridData);
         runButton.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
-            	strictAggregates = strictCheck.getSelection();
+            	selectedAlgorithm = (ClusteringAlgorithm) ((IStructuredSelection) algorithmComboViewer.getSelection()).getFirstElement();
                 displayLogs = logsCheck.getSelection();
                 runAggregationIdentification();
             }
@@ -243,12 +253,12 @@ public class AggregationsIdentificationView extends ViewPart {
 	        text.append(enhancedGraphString.toString());
 
 	        List<Set<ClassObject>> clusters;
-	        if (strictAggregates) {
+	        if (selectedAlgorithm == ClusteringAlgorithm.UNION_FIND) {
 	        	UnionFindClustering<ClassObject> clustering = new UnionFindClustering<ClassObject>();
 		        clusters = clustering.unionFindClustering(clusteringGraph);
 	        } else {
 		        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>();
-		        clusters = clustering.louvainClustering(clusteringGraph);	        	
+		        clusters = clustering.louvainClustering(clusteringGraph);
 	        }
 
 	        if (displayLogs) {
