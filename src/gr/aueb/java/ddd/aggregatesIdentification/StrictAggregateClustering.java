@@ -6,7 +6,7 @@ public class StrictAggregateClustering<T> {
 
     /**
      * Performs clustering by grouping nodes that are connected
-     * via OWNERSHIP or INHERITANCE edges.
+     * via OWNERSHIP, INHERITANCE or IDENTITY edges.
      *
      * @param graph the clustering graph with typed edges
      * @return a list of clusters (each a set of nodes)
@@ -16,6 +16,7 @@ public class StrictAggregateClustering<T> {
         Set<EdgeType> strongTypes = new HashSet<EdgeType>();
         strongTypes.add(EdgeType.OWNERSHIP);
         strongTypes.add(EdgeType.INHERITANCE);
+        strongTypes.add(EdgeType.IDENTITY);
 
         // Union-Find (Disjoint Set) to group connected nodes
         Map<T, T> parent = new HashMap<T, T>();
