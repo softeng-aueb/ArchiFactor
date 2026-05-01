@@ -234,28 +234,24 @@ public class AggregationsIdentificationView extends ViewPart {
 	        text.append(graphString.toString());
 	        
 	        
-	        // Enhance the graph: adjust weights/promote edges using dynamic coupling data
 	        ClusteringGraphEnhancer<ClassObject> enhancer = new ClusteringGraphEnhancer<ClassObject>();
 	        enhancer.enhanceGraph(clusteringGraph, callGraphs);
 	        
-	        StringBuilder graphString2 = new StringBuilder();
-	        graphString2.append("\n\n Graph after enhancement:\n");
-	        graphString2.append(clusteringGraph.printGraph());
-	        text.append(graphString2.toString());
-	        
-	        
-	        // Perform clustering on the enhanced graph
+	        StringBuilder enhancedGraphString = new StringBuilder();
+	        enhancedGraphString.append("\n\n Graph after enhancement:\n");
+	        enhancedGraphString.append(clusteringGraph.printGraph());
+	        text.append(enhancedGraphString.toString());
+
 	        List<Set<ClassObject>> clusters;
-	        if(strictAggregates) {
+	        if (strictAggregates) {
 	        	StrictAggregateClustering<ClassObject> clustering = new StrictAggregateClustering<ClassObject>();
 		        clusters = clustering.cluster(clusteringGraph);
 	        } else {
 		        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>();
 		        clusters = clustering.louvainClustering(clusteringGraph);	        	
 	        }
-	        
-			
-	        if(displayLogs) {
+
+	        if (displayLogs) {
 	        	displayCallGraphs(callGraphs);
 	        }
 	        displayClusters(clusters);
@@ -264,8 +260,7 @@ public class AggregationsIdentificationView extends ViewPart {
             text.setText("Error: " + e.getMessage());
         }
     }
-    
-    
+
     private void displayCallGraphs(List<CallGraph> callGraphs) {
         StringBuilder sb = new StringBuilder();
         sb.append("\n\n Callgraphs:\n");
@@ -291,9 +286,8 @@ public class AggregationsIdentificationView extends ViewPart {
         text.append(sb.toString());
     }
     
-    private void displayClusters( List<Set<ClassObject>> clusters) {
+    private void displayClusters(List<Set<ClassObject>> clusters) {
         StringBuilder sb = new StringBuilder();
-        
         for (Set<ClassObject> cluster : clusters) {
         	sb.append("\nCluster:\n");
             for (ClassObject entityClass : cluster) {

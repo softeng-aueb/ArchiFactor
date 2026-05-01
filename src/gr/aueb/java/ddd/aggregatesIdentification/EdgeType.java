@@ -4,7 +4,6 @@ public enum EdgeType {
     INHERITANCE(1.5),
     IDENTITY(1.5),
     OWNERSHIP(0.75),
-    COUPLED(0.1),
     REFERENCE(0.1);
 
     private final double baseline;
