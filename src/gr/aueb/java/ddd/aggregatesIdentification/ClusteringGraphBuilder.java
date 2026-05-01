@@ -3,6 +3,7 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 
 import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
@@ -31,9 +32,11 @@ public class ClusteringGraphBuilder {
     }
 
     private void addVertices(ClusteringGraph<ClassObject> graph) {
-        for (CallGraph callGraph : callGraphs) {
-            for (ClassObject entity : callGraph.getRoot().getAllEntitiesObjects()) {
-                graph.addVertex(entity);
+        ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
+        while (classIterator.hasNext()) {
+            ClassObject classObject = classIterator.next();
+            if (JpaAnnotationExtractorUtils.hasClassAnnotation(classObject, "Entity")) {
+                graph.addVertex(classObject);
             }
         }
     }
