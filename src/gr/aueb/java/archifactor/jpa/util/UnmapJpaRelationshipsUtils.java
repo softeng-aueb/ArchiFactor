@@ -59,12 +59,21 @@ public class UnmapJpaRelationshipsUtils {
     }
 
     public static String determineServiceFactoryPackage(Set<String> servicesToCreate, Map<String, ClassObject> entityMap) {
-        Set<String> packages = new HashSet<>();
+        Set<String> entityFqns = new HashSet<>();
         for (String entityName : servicesToCreate) {
             ClassObject entity = entityMap.get(entityName);
             if (entity != null) {
-                packages.add(getPackageNameFromClass(entity));
+                entityFqns.add(entity.getName());
             }
+        }
+        return determineServiceFactoryPackage(entityFqns);
+    }
+
+    public static String determineServiceFactoryPackage(Set<String> entityFqns) {
+        Set<String> packages = new HashSet<>();
+        for (String entityFqn : entityFqns) {
+            int lastDot = entityFqn.lastIndexOf('.');
+            packages.add(lastDot >= 0 ? entityFqn.substring(0, lastDot) : "");
         }
         return PackageUtils.findCommonAncestorPackage(packages);
     }

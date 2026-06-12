@@ -59,6 +59,7 @@ import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
 import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
 import gr.aueb.java.archifactor.jpa.exceptions.AggregateViolationException;
+import gr.aueb.java.archifactor.jpa.manifest.UnmapManifestGenerator;
 import gr.aueb.java.archifactor.jpa.exceptions.CompositeKeyException;
 import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
@@ -631,6 +632,7 @@ public class UnmapJpaRelationships extends ViewPart {
             }
 
             if (status == RefactoringStatus.OK) {
+                writeRefactoringManifest(shell);
                 forceRebuildSystemObject();
             }
         } catch (InterruptedException e) {
@@ -662,6 +664,20 @@ public class UnmapJpaRelationships extends ViewPart {
                 }
             }
         });
+    }
+
+    /**
+     * Writes the refactoring manifest to the project root after the refactoring has been applied. 
+     * A failure here must not break the flow, since the refactoring itself has already succeeded.
+     */
+    private void writeRefactoringManifest(Shell shell) {
+        try {
+            String json = UnmapManifestGenerator.generateJson(detectedRelationships, selectedFramework);
+            UnmapManifestGenerator.writeToProject(selectedProject, json);
+        } catch (Exception e) {
+            MessageDialog.openWarning(shell, "Manifest Not Written",
+                "The refactoring was applied, but writing " + UnmapManifestGenerator.MANIFEST_FILE_NAME + " failed: " + e.getMessage());
+        }
     }
 
     /**
