@@ -12,8 +12,10 @@ import org.eclipse.swt.layout.GridData;
 import org.eclipse.jface.action.*;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.window.Window;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jface.operation.IRunnableWithProgress;
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.swt.widgets.Display;
@@ -65,6 +67,8 @@ import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
 import gr.aueb.java.archifactor.jpa.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
 import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
+import gr.aueb.java.archifactor.util.GitResult;
+import gr.aueb.java.archifactor.util.GitUtils;
 import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 
@@ -623,6 +627,11 @@ public class UnmapJpaRelationships extends ViewPart {
         try {
             refreshSystemObjectToMatchCurrentCode(shell);
 
+            GitPreflightOutcome gitOutcome = performGitPreflight(shell);
+            if (gitOutcome == GitPreflightOutcome.CANCELLED) {
+                return;
+            }
+
             UnmapJpaRelationshipsRefactoring refactoring = new UnmapJpaRelationshipsRefactoring(selectedProject, detectedRelationships, cachedSystemObject, selectedFramework);
             MyRefactoringWizard wizard = new MyRefactoringWizard(refactoring, null);
             RefactoringWizardOpenOperation operation = new RefactoringWizardOpenOperation(wizard);
@@ -633,6 +642,9 @@ public class UnmapJpaRelationships extends ViewPart {
 
             if (status == RefactoringStatus.OK) {
                 writeRefactoringManifest(shell);
+                if (gitOutcome == GitPreflightOutcome.READY) {
+                    commitRefactoringChanges(shell);
+                }
                 forceRebuildSystemObject();
             }
         } catch (InterruptedException e) {
@@ -666,8 +678,78 @@ public class UnmapJpaRelationships extends ViewPart {
         });
     }
 
+    private enum GitPreflightOutcome {
+        READY,
+        SKIP_COMMIT,
+        CANCELLED
+    }
+
+    private GitPreflightOutcome performGitPreflight(Shell shell) {
+        if (!GitUtils.isGitAvailable()) {
+            return askProceedWithoutGit(shell, "Git was not found on the system PATH.");
+        }
+
+        File projectDirectory = getProjectDirectory();
+        if (projectDirectory == null || !GitUtils.isGitRepository(projectDirectory)) {
+            return askProceedWithoutGit(shell, "The project is not inside a git repository.");
+        }
+
+        if (GitUtils.hasUncommittedChanges(projectDirectory)) {
+            MessageDialog dialog = new MessageDialog(
+            	shell, 
+            	"Uncommitted Changes", 
+            	null,
+                "The project has uncommitted changes. Committing the refactoring separately requires a clean working tree.\n\n"
+                + "Choose how to handle the existing changes:",
+                MessageDialog.QUESTION,
+                new String[] {"Commit Current State", "Include in Refactoring Commit", "Cancel"}, 
+                0
+            );
+
+            int choice = dialog.open();
+            if (choice == 0) {
+                GitResult result = GitUtils.commitAll(projectDirectory, "ArchiFactor: pre-refactoring state");
+                if (!result.isSuccess()) {
+                    MessageDialog.openError(shell, "Git Commit Failed",
+                        "Failed to commit the current state:\n" + result.getOutput());
+                    return GitPreflightOutcome.CANCELLED;
+                }
+            } else if (choice != 1) {
+                return GitPreflightOutcome.CANCELLED;
+            }
+        }
+
+        return GitPreflightOutcome.READY;
+    }
+
+    private GitPreflightOutcome askProceedWithoutGit(Shell shell, String reason) {
+        boolean proceed = MessageDialog.openQuestion(shell, "Git Not Available",
+            reason 
+            + " The refactoring can still be applied, but no commit will be created to separate "
+            + "the deterministic changes from later work.\n\nProceed without committing?");
+        return proceed ? GitPreflightOutcome.SKIP_COMMIT : GitPreflightOutcome.CANCELLED;
+    }
+
     /**
-     * Writes the refactoring manifest to the project root after the refactoring has been applied. 
+     * Commits the applied refactoring, including the manifest, so the deterministic changes 
+     * are separated from any subsequent work. A failure here must not break the flow, since 
+     * the refactoring itself has already succeeded.
+     */
+    private void commitRefactoringChanges(Shell shell) {
+        GitResult result = GitUtils.commitAll(getProjectDirectory(), "ArchiFactor: Unmap JPA Relationships (deterministic phase)");
+        if (!result.isSuccess()) {
+            MessageDialog.openWarning(shell, "Git Commit Failed",
+                "The refactoring was applied, but the git commit failed:\n" + result.getOutput());
+        }
+    }
+
+    private File getProjectDirectory() {
+        IPath location = selectedProject.getProject().getLocation();
+        return location != null ? location.toFile() : null;
+    }
+
+    /**
+     * Writes the refactoring manifest to the project root after the refactoring has been applied.
      * A failure here must not break the flow, since the refactoring itself has already succeeded.
      */
     private void writeRefactoringManifest(Shell shell) {
