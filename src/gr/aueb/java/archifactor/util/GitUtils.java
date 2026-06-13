@@ -47,6 +47,15 @@ public class GitUtils {
         return run(directory, "commit", "-m", message);
     }
 
+    public static String getHeadCommit(File directory) {
+        if (directory == null) {
+            return null;
+        }
+
+        GitResult result = run(directory, "rev-parse", "HEAD");
+        return result.isSuccess() ? result.getOutput() : null;
+    }
+
     private static GitResult run(File workingDirectory, String... args) {
         List<String> command = new ArrayList<>();
         command.add("git");
