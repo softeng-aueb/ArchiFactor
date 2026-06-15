@@ -127,8 +127,9 @@ public class CodexRepairAgent implements RepairAgent {
 
     /**
      * Waits for the process, polling so the user can cancel. On cancellation the
-     * whole process tree is destroyed: "cmd /c codex" spawns node, so destroying
-     * only the launched process would leave node running.
+     * whole process tree is destroyed: the launched process spawns children (on
+     * Windows "cmd /c" wraps the CLI, which in turn runs the agent's commands), so
+     * destroying only the top process would leave them running.
      */
     private boolean awaitOrCancel(Process process, IProgressMonitor monitor) {
         try {
