@@ -16,5 +16,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
  * agent harness means adding another implementation and changing nothing else.
  */
 public interface RepairAgent {
+    boolean isAvailable();
+
     AgentOutcome run(String prompt, int maxTurns, File workingDirectory, Consumer<String> outputListener, IProgressMonitor monitor);
 }

@@ -22,13 +22,19 @@ import org.eclipse.core.runtime.IProgressMonitor;
  * and {@link AgentOutcome}.
  */
 public class CodexRepairAgent implements RepairAgent {
-    private static final String MODEL = "gpt-5.5";
     private static final long POLL_SECONDS = 2;
+
+    private final String model;
+
+    public CodexRepairAgent(String model) {
+        this.model = model;
+    }
 
     /**
      * Quick preflight: whether the {@code codex} CLI can be launched at all.
      */
-    public static boolean isAvailable() {
+    @Override
+    public boolean isAvailable() {
         try {
             List<String> command = new ArrayList<>();
             if (isWindows()) {
@@ -85,7 +91,7 @@ public class CodexRepairAgent implements RepairAgent {
         command.add("codex");
         command.add("exec");
         command.add("--model");
-        command.add(MODEL);
+        command.add(model);
         command.add("--sandbox");
         command.add("workspace-write");
         command.add("-c");

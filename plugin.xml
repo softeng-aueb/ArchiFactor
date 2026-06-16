@@ -24,6 +24,14 @@
                id="gr.aueb.java.jdeodorant.actions.UnmapJpaRelationships">
          </action>
          <action
+               label="Repair JPQL Queries"
+               icon="icons/repair.png"
+               class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
+               tooltip="Repair JPQL Queries"
+               menubarPath="BadSmellsMenu/sampleGroup"
+               id="gr.aueb.java.jdeodorant.actions.RepairJpqlQueries">
+         </action>
+         <action
                class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
                icon="icons/repair.png"
                id="gr.uom.java.jdeodorant.actions.FeatureEnvy"
@@ -86,6 +94,13 @@
             icon="icons/repair.png"
             id="gr.aueb.java.jdeodorant.views.UnmapJpaRelationships"
             name="Unmap JPA Relationships">
+      </view>
+      <view
+            category="gr.uom.java.jdeodorant"
+            class="gr.aueb.java.archifactor.jpa.refactoring.views.RepairJpqlQueriesView"
+            icon="icons/repair.png"
+            id="gr.aueb.java.jdeodorant.views.RepairJpqlQueries"
+            name="Repair JPQL Queries">
       </view>
       <view
             name="Feature Envy"
@@ -151,6 +166,15 @@
             targetID="org.eclipse.ui.resourcePerspective">
          <view
                id="gr.aueb.java.jdeodorant.views.UnmapJpaRelationships"
+               ratio="0.5"
+               relationship="right"
+               relative="org.eclipse.ui.views.TaskList">
+         </view>
+      </perspectiveExtension>
+      <perspectiveExtension
+            targetID="org.eclipse.ui.resourcePerspective">
+         <view
+               id="gr.aueb.java.jdeodorant.views.RepairJpqlQueries"
                ratio="0.5"
                relationship="right"
                relative="org.eclipse.ui.views.TaskList">

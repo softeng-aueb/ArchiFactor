@@ -22,7 +22,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
  * and {@link AgentOutcome}.
  */
 public class ClaudeRepairAgent implements RepairAgent {
-    private static final String MODEL = "opus";
     private static final long POLL_SECONDS = 2;
 
     // Bash is allowed broadly so the agent can run whatever command the project
@@ -36,10 +35,17 @@ public class ClaudeRepairAgent implements RepairAgent {
         + "Bash(git commit:*),Bash(git reset:*),Bash(git checkout:*),"
         + "Bash(git rebase:*),Bash(git stash:*),Bash(git push:*)";
 
+    private final String model;
+
+    public ClaudeRepairAgent(String model) {
+        this.model = model;
+    }
+
     /**
      * Quick preflight: whether the {@code claude} CLI can be launched at all.
      */
-    public static boolean isAvailable() {
+    @Override
+    public boolean isAvailable() {
         try {
             List<String> command = new ArrayList<>();
             if (isWindows()) {
@@ -99,7 +105,7 @@ public class ClaudeRepairAgent implements RepairAgent {
         command.add("stream-json"); // one JSON event per line, so progress is visible live
         command.add("--verbose");
         command.add("--model");
-        command.add(MODEL);
+        command.add(model);
         command.add("--max-turns");
         command.add(String.valueOf(maxTurns));
         command.add("--permission-mode");

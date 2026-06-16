@@ -16,7 +16,6 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jface.operation.IRunnableWithProgress;
 import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import org.eclipse.ui.progress.IProgressService;
 import org.eclipse.swt.widgets.Display;
@@ -63,9 +62,6 @@ import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
 import gr.aueb.java.archifactor.jpa.exceptions.AggregateViolationException;
 import gr.aueb.java.archifactor.jpa.manifest.UnmapManifestGenerator;
-import gr.aueb.java.archifactor.jpa.agent.AgentPromptBuilder;
-import gr.aueb.java.archifactor.jpa.agent.ClaudeRepairAgent;
-import gr.aueb.java.archifactor.jpa.agent.JpqlRepairAgentRunner;
 import gr.aueb.java.archifactor.jpa.exceptions.CompositeKeyException;
 import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
@@ -77,6 +73,8 @@ import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 
 public class UnmapJpaRelationships extends ViewPart {
+    public static final String DETERMINISTIC_COMMIT_MESSAGE = "ArchiFactor: Unmap JPA Relationships (deterministic phase)";
+
     private TableViewer tableViewer;
     private Action selectEntitiesAction;
     private Action previewAndApplyAction;
@@ -645,18 +643,11 @@ public class UnmapJpaRelationships extends ViewPart {
             }
 
             if (status == RefactoringStatus.OK) {
-                String manifestJson = writeRefactoringManifest(shell);
-                boolean committed = false;
+                writeRefactoringManifest(shell);
                 if (gitOutcome == GitPreflightOutcome.READY) {
-                    committed = commitRefactoringChanges(shell);
+                    commitRefactoringChanges(shell);
                 }
                 forceRebuildSystemObject();
-                if (committed && manifestJson != null) {
-                    String baselineCommit = GitUtils.getHeadCommit(getProjectDirectory());
-                    if (baselineCommit != null) {
-                        offerAgentRepair(shell, manifestJson, baselineCommit);
-                    }
-                }
             }
         } catch (InterruptedException e) {
             // User cancelled - no action needed
@@ -747,7 +738,7 @@ public class UnmapJpaRelationships extends ViewPart {
      * the refactoring itself has already succeeded.
      */
     private boolean commitRefactoringChanges(Shell shell) {
-        GitResult result = GitUtils.commitAll(getProjectDirectory(), "ArchiFactor: Unmap JPA Relationships (deterministic phase)");
+        GitResult result = GitUtils.commitAll(getProjectDirectory(), DETERMINISTIC_COMMIT_MESSAGE);
         if (!result.isSuccess()) {
             MessageDialog.openWarning(shell, "Git Commit Failed",
                 "The refactoring was applied, but the git commit failed:\n" + result.getOutput());
@@ -774,42 +765,6 @@ public class UnmapJpaRelationships extends ViewPart {
                 "The refactoring was applied, but writing " + UnmapManifestGenerator.MANIFEST_FILE_NAME + " failed: " + e.getMessage());
             return null;
         }
-    }
-
-    private static final int AGENT_MAX_TURNS = 40;
-
-    /**
-     * Offers to run the repair agent after the deterministic phase has been committed.
-     * The agent's edits are left uncommitted on top of the baseline commit for review.
-     */
-    private void offerAgentRepair(Shell shell, String manifestJson, String baselineCommit) {
-        boolean run = MessageDialog.openQuestion(shell, "Repair Broken Queries",
-            "The deterministic refactoring has been committed. Object-model queries (JPQL, Criteria, "
-            + "derived query methods) that traversed the unmapped relationships may now be broken.\n\n"
-            + "Run the AI agent to repair them so the tests pass again? Its edits will be left "
-            + "uncommitted for you to review.");
-        if (!run) {
-            return;
-        }
-
-        if (!ClaudeRepairAgent.isAvailable()) {
-            MessageDialog.openError(shell, "Agent Not Available",
-                "Could not run 'claude'. Make sure the Claude Code CLI is installed and on the PATH "
-                + "visible to Eclipse.");
-            return;
-        }
-
-        String prompt;
-        try {
-            prompt = AgentPromptBuilder.build(manifestJson, baselineCommit);
-        } catch (IOException e) {
-            MessageDialog.openError(shell, "Agent Prompt Error", "Could not build the agent prompt: " + e.getMessage());
-            return;
-        }
-
-        JpqlRepairAgentRunner job = new JpqlRepairAgentRunner(
-            selectedProject.getProject(), getProjectDirectory(), prompt, AGENT_MAX_TURNS, new ClaudeRepairAgent());
-        job.schedule();
     }
 
     /**

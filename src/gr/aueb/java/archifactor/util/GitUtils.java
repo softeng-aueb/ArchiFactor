@@ -56,6 +56,15 @@ public class GitUtils {
         return result.isSuccess() ? result.getOutput() : null;
     }
 
+    public static String getCommitByMessage(File directory, String message) {
+        if (directory == null) {
+            return null;
+        }
+
+        GitResult result = run(directory, "log", "--grep=" + message, "--fixed-strings", "-n", "1", "--format=%H");
+        return result.isSuccess() && !result.getOutput().isEmpty() ? result.getOutput() : null;
+    }
+
     private static GitResult run(File workingDirectory, String... args) {
         List<String> command = new ArrayList<>();
         command.add("git");
