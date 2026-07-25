@@ -188,11 +188,20 @@ public class JpaAnnotationExtractorUtils {
 
     private FieldObject findIdField(String entityName) {
         for (ClassObject classObj : getMappedHierarchy(entityName)) {
+            // With @IdClass the primary key is spread over several @Id fields, so returning the
+            // first one would produce a foreign key and a lookup based on only part of the key.
+            if (hasClassAnnotation(classObj, "IdClass")) {
+                throw new CompositeKeyException("Entity " + entityName + " has a composite primary key (@IdClass), which is not supported.");
+            }
+
             Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
             while (fieldIterator.hasNext()) {
                 FieldObject field = fieldIterator.next();
                 if (hasFieldAnnotation(field, "Id")) {
                     return field;
+                }
+                if (hasFieldAnnotation(field, "EmbeddedId")) {
+                    throw new CompositeKeyException("Entity " + entityName + " has a composite primary key (@EmbeddedId), which is not supported.");
                 }
             }
         }
