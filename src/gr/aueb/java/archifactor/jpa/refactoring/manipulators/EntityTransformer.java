@@ -63,14 +63,13 @@ public class EntityTransformer {
             importRewriteMap.put(cu, importRewrite);
         }
 
-        boolean hasChanges = false;
-
         // 1. Transform field declaration
         FieldDeclaration fieldDecl = findFieldDeclaration(astRoot, relationship.getFieldName());
-        if (fieldDecl != null) {
-            System.out.println("[DEBUG] Found field declaration for: " + relationship.getFieldName() + " in " + entity.getName());
-            hasChanges = transformFieldDeclaration(fieldDecl, relationship, rewriter, importRewrite, astRoot.getAST(), entity);
+        if (fieldDecl == null) {
+            throw new IllegalStateException("Field " + relationship.getFieldName() + " not found in " + entity.getName() + ". No changes were applied.");
         }
+        System.out.println("[DEBUG] Found field declaration for: " + relationship.getFieldName() + " in " + entity.getName());
+        boolean hasChanges = transformFieldDeclaration(fieldDecl, relationship, rewriter, importRewrite, astRoot.getAST(), entity);
 
         // 2. Transform methods in the SAME AST operation
         hasChanges |= transformMethodsInSameAST(astRoot, entity, relationship, relationship.getFieldName(), rewriter, importRewrite);
@@ -1045,11 +1044,11 @@ public class EntityTransformer {
         // JPA allows at most one callback method per lifecycle event per class,
         // so reuse existing callbacks instead of adding a second one
         if (prePersistHost != null) {
-            appendStatementToCallback(prePersistHost, createFKSyncStatement(ast, relationship), rewriter);
+            prependStatementToCallback(prePersistHost, createFKSyncStatement(ast, relationship), rewriter);
             System.out.println("[DEBUG] Added FK sync to existing @PrePersist callback: " + prePersistHost.getName().getIdentifier());
         }
         if (preUpdateHost != null && preUpdateHost != prePersistHost) {
-            appendStatementToCallback(preUpdateHost, createFKSyncStatement(ast, relationship), rewriter);
+            prependStatementToCallback(preUpdateHost, createFKSyncStatement(ast, relationship), rewriter);
             System.out.println("[DEBUG] Added FK sync to existing @PreUpdate callback: " + preUpdateHost.getName().getIdentifier());
         }
         if (prePersistHost != null && preUpdateHost != null) {
@@ -1084,9 +1083,10 @@ public class EntityTransformer {
         return null;
     }
 
-    private void appendStatementToCallback(MethodDeclaration callback, Statement statement, ASTRewrite rewriter) {
+    // Insert at the top of the callback so an early return in the existing body cannot skip the sync
+    private void prependStatementToCallback(MethodDeclaration callback, Statement statement, ASTRewrite rewriter) {
         ListRewrite statementsRewrite = rewriter.getListRewrite(callback.getBody(), Block.STATEMENTS_PROPERTY);
-        statementsRewrite.insertLast(statement, new TextEditGroup("Add FK sync to lifecycle callback"));
+        statementsRewrite.insertFirst(statement, new TextEditGroup("Add FK sync to lifecycle callback"));
     }
 
     private MethodDeclaration createFKSyncCallbackMethod(
@@ -1122,12 +1122,16 @@ public class EntityTransformer {
         return method;
     }
 
-    // Create: if (field != null) { this.fkField = field.getPkMethod(); }
+    // Create: if (this.field != null) { this.fkField = this.field.getPkMethod(); }
     // Reads the field directly (not the getter) so the callback never triggers a lazy load,
-    // and never nulls the FK: a null reference can also mean "not loaded"
+    // and never nulls the FK: a null reference can also mean "not loaded".
+    // Reads are this-qualified so local variables in a pre-existing callback cannot shadow the field.
     private Statement createFKSyncStatement(AST ast, RelationshipInfo relationship) {
         InfixExpression fieldNotNull = ast.newInfixExpression();
-        fieldNotNull.setLeftOperand(ast.newSimpleName(relationship.getFieldName()));
+        FieldAccess thisFieldGuard = ast.newFieldAccess();
+        thisFieldGuard.setExpression(ast.newThisExpression());
+        thisFieldGuard.setName(ast.newSimpleName(relationship.getFieldName()));
+        fieldNotNull.setLeftOperand(thisFieldGuard);
         fieldNotNull.setOperator(InfixExpression.Operator.NOT_EQUALS);
         fieldNotNull.setRightOperand(ast.newNullLiteral());
 
@@ -1138,7 +1142,10 @@ public class EntityTransformer {
         fkAssignment.setLeftHandSide(thisFkField);
 
         MethodInvocation getPkCall = ast.newMethodInvocation();
-        getPkCall.setExpression(ast.newSimpleName(relationship.getFieldName()));
+        FieldAccess thisFieldRead = ast.newFieldAccess();
+        thisFieldRead.setExpression(ast.newThisExpression());
+        thisFieldRead.setName(ast.newSimpleName(relationship.getFieldName()));
+        getPkCall.setExpression(thisFieldRead);
         String pkGetterName = "get" + UnmapJpaRelationshipsUtils.capitalize(relationship.getReferencedPkName());
         getPkCall.setName(ast.newSimpleName(pkGetterName));
         fkAssignment.setRightHandSide(getPkCall);
