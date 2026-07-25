@@ -51,9 +51,12 @@ public class UnmapJpaRelationshipsUtils {
     }
 
     public static String getPackageNameFromClass(ClassObject classObj) {
-        String fullName = classObj.getName();
-        if (fullName != null && fullName.contains(".")) {
-            return fullName.substring(0, fullName.lastIndexOf("."));
+        return getPackageName(classObj.getName());
+    }
+
+    public static String getPackageName(String fullyQualifiedName) {
+        if (fullyQualifiedName != null && fullyQualifiedName.contains(".")) {
+            return fullyQualifiedName.substring(0, fullyQualifiedName.lastIndexOf("."));
         }
         return ""; // Default package
     }
@@ -72,8 +75,7 @@ public class UnmapJpaRelationshipsUtils {
     public static String determineServiceFactoryPackage(Set<String> entityFqns) {
         Set<String> packages = new HashSet<>();
         for (String entityFqn : entityFqns) {
-            int lastDot = entityFqn.lastIndexOf('.');
-            packages.add(lastDot >= 0 ? entityFqn.substring(0, lastDot) : "");
+            packages.add(getPackageName(entityFqn));
         }
         return PackageUtils.findCommonAncestorPackage(packages);
     }

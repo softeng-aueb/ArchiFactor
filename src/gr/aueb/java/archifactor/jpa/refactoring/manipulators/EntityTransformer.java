@@ -6,6 +6,7 @@ import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
 import org.eclipse.jdt.core.refactoring.CompilationUnitChange;
+import org.eclipse.text.edits.MultiTextEdit;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
@@ -22,25 +23,30 @@ import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodObject;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Iterator;
 
 public class EntityTransformer {
     private SystemObject systemObject;
     private PersistenceNamespace persistenceNamespace;
+    private String serviceFactoryPackage;
     private Map<ICompilationUnit, CompilationUnit> astRootMap = new HashMap<>();
     private Map<ICompilationUnit, ASTRewrite> rewriterMap = new HashMap<>();
     private Map<ICompilationUnit, ImportRewrite> importRewriteMap = new HashMap<>();
     private Map<CompilationUnit, MethodDeclaration> fkSyncMethodMap = new HashMap<>();
+    private Set<ICompilationUnit> changedCompilationUnits = new LinkedHashSet<>();
 
-    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodProvider>> serviceMethodRequirements, PersistenceNamespace persistenceNamespace) {
+    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodProvider>> serviceMethodRequirements, PersistenceNamespace persistenceNamespace, String serviceFactoryPackage) {
         this.systemObject = systemObject;
         this.persistenceNamespace = persistenceNamespace;
+        this.serviceFactoryPackage = serviceFactoryPackage;
     }
 
-    public void transformFromEntity(ClassObject entity, RelationshipInfo relationship, Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges) throws Exception {
+    public void transformFromEntity(ClassObject entity, RelationshipInfo relationship) throws Exception {
         ICompilationUnit cu = (ICompilationUnit) entity.getITypeRoot();
         if (cu == null) {
             return;
@@ -90,18 +96,29 @@ public class EntityTransformer {
             hasChanges |= addForeignKeyFlushSync(astRoot, relationship, rewriter, importRewrite, astRoot.getAST());
         }
 
-        if (!hasChanges) {
-            return;
+        if (hasChanges) {
+            changedCompilationUnits.add(cu);
         }
-
-        CompilationUnitChange change = new CompilationUnitChange(cu.getElementName(), cu);
-        change.setEdit(rewriter.rewriteAST());
-        if (importRewrite.hasRecordedChanges()) {
-            change.addEdit(importRewrite.rewriteImports(null));
-        }
-        compilationUnitChanges.put(cu, change);
     }
-    
+
+    // Rewrite each file once, after all of its relationships have been transformed.
+    // Rewriting once per relationship makes the second's pass imports clash with the first's.
+    public void collectChanges(Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges) throws Exception {
+        for (ICompilationUnit cu : changedCompilationUnits) {
+            MultiTextEdit edits = new MultiTextEdit();
+            edits.addChild(rewriterMap.get(cu).rewriteAST());
+
+            ImportRewrite importRewrite = importRewriteMap.get(cu);
+            if (importRewrite.hasRecordedChanges()) {
+                edits.addChild(importRewrite.rewriteImports(null));
+            }
+
+            CompilationUnitChange change = new CompilationUnitChange(cu.getElementName(), cu);
+            change.setEdit(edits);
+            compilationUnitChanges.put(cu, change);
+        }
+    }
+
     private FieldDeclaration findFieldDeclaration(CompilationUnit astRoot, String fieldName) {
         for (TypeDeclaration type : (List<TypeDeclaration>) astRoot.types()) {
             for (FieldDeclaration field : type.getFields()) {
@@ -592,7 +609,7 @@ public class EntityTransformer {
         if (genericType != null && !genericType.isEmpty()) {
             newMethodBody = createCollectionLazyLoadingBlock(ast, fieldName, entity, relationship, importRewrite);
         } else {
-            newMethodBody = createSimpleTypeLazyLoadingBlock(ast, fieldName, entity, relationship, importRewrite);
+            newMethodBody = createSimpleTypeLazyLoadingBlock(ast, fieldName, relationship, importRewrite);
         }
 
         // Replace the method body
@@ -608,10 +625,9 @@ public class EntityTransformer {
         String simpleTargetEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(targetEntityName);
         String serviceName = UnmapJpaRelationshipsUtils.decapitalize(simpleTargetEntityName) + "Service";
         String serviceClassName = simpleTargetEntityName + "Service";
-        
-        String servicePackage = UnmapJpaRelationshipsUtils.getPackageNameFromClass(entity);
-        importRewrite.addImport(servicePackage + "." + serviceClassName);
-        importRewrite.addImport(servicePackage + ".ServiceFactory");
+
+        importRewrite.addImport(UnmapJpaRelationshipsUtils.getPackageName(targetEntityName) + "." + serviceClassName);
+        importRewrite.addImport(serviceFactoryPackage + ".ServiceFactory");
 
 		ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship);
         if (provider == null) {
@@ -771,7 +787,7 @@ public class EntityTransformer {
         return ast.newExpressionStatement(addAllCall);
     }
 
-    private Block createSimpleTypeLazyLoadingBlock(AST ast, String fieldName, ClassObject entity, RelationshipInfo relationship, ImportRewrite importRewrite) {
+    private Block createSimpleTypeLazyLoadingBlock(AST ast, String fieldName, RelationshipInfo relationship, ImportRewrite importRewrite) {
         Block newBody = ast.newBlock();
 
         String targetEntityName = relationship.getToEntity();
@@ -846,9 +862,8 @@ public class EntityTransformer {
         returnStatement.setExpression(ast.newSimpleName(fieldName));
         newBody.statements().add(returnStatement);
 
-        String servicePackage = UnmapJpaRelationshipsUtils.getPackageNameFromClass(entity);
-        importRewrite.addImport(servicePackage + "." + serviceClassName);
-        importRewrite.addImport(servicePackage + ".ServiceFactory");
+        importRewrite.addImport(UnmapJpaRelationshipsUtils.getPackageName(targetEntityName) + "." + serviceClassName);
+        importRewrite.addImport(serviceFactoryPackage + ".ServiceFactory");
 
         return newBody;
     }
@@ -882,6 +897,16 @@ public class EntityTransformer {
 
         public boolean hasChanges() {
             return hasChanges;
+        }
+
+        @Override
+        public boolean visit(PackageDeclaration node) {
+            return false;
+        }
+
+        @Override
+        public boolean visit(ImportDeclaration node) {
+            return false;
         }
 
         @Override

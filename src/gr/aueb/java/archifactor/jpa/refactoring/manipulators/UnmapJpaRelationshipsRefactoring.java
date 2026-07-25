@@ -149,12 +149,14 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
         try {
             Set<String> entitiesNeedingServices = serviceMethodproviders.keySet();
 
+            String serviceFactoryPackage = UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap);
+
             // 1. Create ServiceFactory first (so entity imports can reference it)
             BaseServiceFactoryGenerator factoryGenerator = ServiceFactoryGeneratorFactory.createGenerator(frameworkType, project, systemObject, persistenceNamespace);
             factoryGenerator.createOrUpdateServiceFactory(
-                entitiesNeedingServices, 
-                UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap), 
-                compilationUnitChanges, 
+                entitiesNeedingServices,
+                serviceFactoryPackage,
+                compilationUnitChanges,
                 createCompilationUnitChanges
             );
 
@@ -182,14 +184,14 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             }
 
             // 3. Transform entity classes last (so imports reference existing files)
-            EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodproviders, persistenceNamespace);
+            EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodproviders, persistenceNamespace, serviceFactoryPackage);
             for (RelationshipInfo relationship : relationships) {
                 entityTransformer.transformFromEntity(
-                	entityMap.get(relationship.getFromEntity()), 
-                    relationship, 
-                    compilationUnitChanges
+                	entityMap.get(relationship.getFromEntity()),
+                    relationship
                 );
             }
+            entityTransformer.collectChanges(compilationUnitChanges);
         } catch (Exception e) {
             e.printStackTrace();
             throw new OperationCanceledException("Error creating changes: " + e.getMessage());
