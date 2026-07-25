@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Iterator;
+import java.util.function.Supplier;
 
 public class EntityTransformer {
     private SystemObject systemObject;
@@ -90,10 +91,13 @@ public class EntityTransformer {
             hasChanges |= addSyncingSetInnerClass(astRoot, entity, relationship, rewriter, importRewrite, astRoot.getAST());
         }
 
-        // 4. Re-sync the FK column at flush time for the owning to-one side,
+        // 4. Re-sync the unmapped foreign keys at flush time for the owning side,
         // because the setter captures the id before the referenced entity may have one
-        if (relationship.isOwningSide() && relationship.getRelationshipType() != JpaRelationshipType.MANY_TO_MANY) {
-            hasChanges |= addForeignKeyFlushSync(astRoot, relationship, rewriter, importRewrite, astRoot.getAST());
+        if (relationship.isOwningSide()) {
+            Supplier<Statement> syncStatement = relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY
+                ? () -> createElementCollectionSyncStatement(astRoot.getAST(), relationship)
+                : () -> createFKSyncStatement(astRoot.getAST(), relationship);
+            hasChanges |= addForeignKeyFlushSync(astRoot, syncStatement, rewriter, importRewrite, astRoot.getAST());
         }
 
         if (hasChanges) {
@@ -1101,7 +1105,7 @@ public class EntityTransformer {
 
     private boolean addForeignKeyFlushSync(
         CompilationUnit astRoot,
-        RelationshipInfo relationship,
+        Supplier<Statement> syncStatement,
         ASTRewrite rewriter,
         ImportRewrite importRewrite,
         AST ast
@@ -1112,11 +1116,11 @@ public class EntityTransformer {
         // JPA allows at most one callback method per lifecycle event per class,
         // so reuse existing callbacks instead of adding a second one
         if (prePersistHost != null) {
-            prependStatementToCallback(prePersistHost, createFKSyncStatement(ast, relationship), rewriter);
+            prependStatementToCallback(prePersistHost, syncStatement.get(), rewriter);
             System.out.println("[DEBUG] Added FK sync to existing @PrePersist callback: " + prePersistHost.getName().getIdentifier());
         }
         if (preUpdateHost != null && preUpdateHost != prePersistHost) {
-            prependStatementToCallback(preUpdateHost, createFKSyncStatement(ast, relationship), rewriter);
+            prependStatementToCallback(preUpdateHost, syncStatement.get(), rewriter);
             System.out.println("[DEBUG] Added FK sync to existing @PreUpdate callback: " + preUpdateHost.getName().getIdentifier());
         }
         if (prePersistHost != null && preUpdateHost != null) {
@@ -1128,7 +1132,7 @@ public class EntityTransformer {
             syncMethod = createFKSyncCallbackMethod(astRoot, ast, rewriter, importRewrite, prePersistHost == null, preUpdateHost == null);
             fkSyncMethodMap.put(astRoot, syncMethod);
         }
-        syncMethod.getBody().statements().add(createFKSyncStatement(ast, relationship));
+        syncMethod.getBody().statements().add(syncStatement.get());
         return true;
     }
 
@@ -1225,6 +1229,65 @@ public class EntityTransformer {
         ifStatement.setExpression(fieldNotNull);
         ifStatement.setThenStatement(thenBlock);
         return ifStatement;
+    }
+
+    // Create: for (Target e : this.field) { if (e.getId() != null) { this.elementCollection.add(e.getId()); } }
+    // Picks up the ids of elements that were added to the set before they had one.
+    // Reads the field and not the getter, so the callback never triggers a lazy load.
+    // It only adds: an empty set can also mean "not loaded", so removing here would delete
+    // rows that are still in the database. Removals already updated the element collection.
+    private Statement createElementCollectionSyncStatement(AST ast, RelationshipInfo relationship) {
+        String targetEntityName = relationship.getToEntity();
+        String simpleTargetEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(targetEntityName);
+        String elementCollectionFieldName = relationship.getJoinTableInverseJoinColumns() + "s";
+        // Derived exactly as the SyncingSet derives it, so both read the id the same way
+        String targetIdFieldName = new JpaAnnotationExtractorUtils(systemObject).extractIdFieldName(targetEntityName);
+        String idAccessMethod = findIdGetterName(targetEntityName, targetIdFieldName).orElse(targetIdFieldName);
+
+        MethodInvocation getIdGuard = ast.newMethodInvocation();
+        getIdGuard.setExpression(ast.newSimpleName("e"));
+        getIdGuard.setName(ast.newSimpleName(idAccessMethod));
+
+        InfixExpression idNotNull = ast.newInfixExpression();
+        idNotNull.setLeftOperand(getIdGuard);
+        idNotNull.setOperator(InfixExpression.Operator.NOT_EQUALS);
+        idNotNull.setRightOperand(ast.newNullLiteral());
+
+        MethodInvocation addId = ast.newMethodInvocation();
+        FieldAccess thisElementCollection = ast.newFieldAccess();
+        thisElementCollection.setExpression(ast.newThisExpression());
+        thisElementCollection.setName(ast.newSimpleName(elementCollectionFieldName));
+        addId.setExpression(thisElementCollection);
+        addId.setName(ast.newSimpleName("add"));
+
+        MethodInvocation getId = ast.newMethodInvocation();
+        getId.setExpression(ast.newSimpleName("e"));
+        getId.setName(ast.newSimpleName(idAccessMethod));
+        addId.arguments().add(getId);
+
+        Block thenBlock = ast.newBlock();
+        thenBlock.statements().add(ast.newExpressionStatement(addId));
+
+        IfStatement ifStatement = ast.newIfStatement();
+        ifStatement.setExpression(idNotNull);
+        ifStatement.setThenStatement(thenBlock);
+
+        Block loopBody = ast.newBlock();
+        loopBody.statements().add(ifStatement);
+
+        SingleVariableDeclaration loopVariable = ast.newSingleVariableDeclaration();
+        loopVariable.setType(ast.newSimpleType(ast.newName(simpleTargetEntityName)));
+        loopVariable.setName(ast.newSimpleName("e"));
+
+        FieldAccess thisField = ast.newFieldAccess();
+        thisField.setExpression(ast.newThisExpression());
+        thisField.setName(ast.newSimpleName(relationship.getFieldName()));
+
+        EnhancedForStatement forStatement = ast.newEnhancedForStatement();
+        forStatement.setParameter(loopVariable);
+        forStatement.setExpression(thisField);
+        forStatement.setBody(loopBody);
+        return forStatement;
     }
 
     private boolean replaceAssignmentsWithSetterCalls(
@@ -1785,25 +1848,6 @@ public class EntityTransformer {
         nullIf.setThenStatement(nullThenBlock);
         body.statements().add(nullIf);
 
-        MethodInvocation getId = ast.newMethodInvocation();
-        getId.setExpression(ast.newSimpleName("e"));
-        getId.setName(ast.newSimpleName(idAccessMethod));
-
-        InfixExpression idNullCheck = ast.newInfixExpression();
-        idNullCheck.setLeftOperand(getId);
-        idNullCheck.setOperator(InfixExpression.Operator.EQUALS);
-        idNullCheck.setRightOperand(ast.newNullLiteral());
-
-        Block idNullThenBlock = ast.newBlock();
-        ReturnStatement returnFalse2 = ast.newReturnStatement();
-        returnFalse2.setExpression(ast.newBooleanLiteral(false));
-        idNullThenBlock.statements().add(returnFalse2);
-
-        IfStatement idNullIf = ast.newIfStatement();
-        idNullIf.setExpression(idNullCheck);
-        idNullIf.setThenStatement(idNullThenBlock);
-        body.statements().add(idNullIf);
-
         VariableDeclarationFragment changedFragment = ast.newVariableDeclarationFragment();
         changedFragment.setName(ast.newSimpleName("changed"));
         MethodInvocation delegateAdd = ast.newMethodInvocation();
@@ -1819,16 +1863,16 @@ public class EntityTransformer {
         addToElementCollection.setExpression(ast.newSimpleName(elementCollectionFieldName));
         addToElementCollection.setName(ast.newSimpleName("add"));
 
-        MethodInvocation getId2 = ast.newMethodInvocation();
-        getId2.setExpression(ast.newSimpleName("e"));
-        getId2.setName(ast.newSimpleName(idAccessMethod));
-        addToElementCollection.arguments().add(getId2);
+        MethodInvocation getId = ast.newMethodInvocation();
+        getId.setExpression(ast.newSimpleName("e"));
+        getId.setName(ast.newSimpleName(idAccessMethod));
+        addToElementCollection.arguments().add(getId);
 
         Block changedThenBlock = ast.newBlock();
         changedThenBlock.statements().add(ast.newExpressionStatement(addToElementCollection));
 
         IfStatement changedIf = ast.newIfStatement();
-        changedIf.setExpression(ast.newSimpleName("changed"));
+        changedIf.setExpression(createChangedAndIdNotNullCondition(ast, idAccessMethod));
         changedIf.setThenStatement(changedThenBlock);
         body.statements().add(changedIf);
 
@@ -1885,25 +1929,6 @@ public class EntityTransformer {
         aDecl.setType(ast.newSimpleType(ast.newName(elementType)));
         body.statements().add(aDecl);
 
-        MethodInvocation getId = ast.newMethodInvocation();
-        getId.setExpression(ast.newSimpleName("e"));
-        getId.setName(ast.newSimpleName(idAccessMethod));
-
-        InfixExpression idNullCheck = ast.newInfixExpression();
-        idNullCheck.setLeftOperand(getId);
-        idNullCheck.setOperator(InfixExpression.Operator.EQUALS);
-        idNullCheck.setRightOperand(ast.newNullLiteral());
-
-        Block idNullThenBlock = ast.newBlock();
-        ReturnStatement returnFalse2 = ast.newReturnStatement();
-        returnFalse2.setExpression(ast.newBooleanLiteral(false));
-        idNullThenBlock.statements().add(returnFalse2);
-
-        IfStatement idNullIf = ast.newIfStatement();
-        idNullIf.setExpression(idNullCheck);
-        idNullIf.setThenStatement(idNullThenBlock);
-        body.statements().add(idNullIf);
-
         VariableDeclarationFragment changedFragment = ast.newVariableDeclarationFragment();
         changedFragment.setName(ast.newSimpleName("changed"));
         MethodInvocation delegateRemove = ast.newMethodInvocation();
@@ -1919,16 +1944,16 @@ public class EntityTransformer {
         removeFromElementCollection.setExpression(ast.newSimpleName(elementCollectionFieldName));
         removeFromElementCollection.setName(ast.newSimpleName("remove"));
 
-        MethodInvocation getId2 = ast.newMethodInvocation();
-        getId2.setExpression(ast.newSimpleName("e"));
-        getId2.setName(ast.newSimpleName(idAccessMethod));
-        removeFromElementCollection.arguments().add(getId2);
+        MethodInvocation getId = ast.newMethodInvocation();
+        getId.setExpression(ast.newSimpleName("e"));
+        getId.setName(ast.newSimpleName(idAccessMethod));
+        removeFromElementCollection.arguments().add(getId);
 
         Block changedThenBlock = ast.newBlock();
         changedThenBlock.statements().add(ast.newExpressionStatement(removeFromElementCollection));
 
         IfStatement changedIf = ast.newIfStatement();
-        changedIf.setExpression(ast.newSimpleName("changed"));
+        changedIf.setExpression(createChangedAndIdNotNullCondition(ast, idAccessMethod));
         changedIf.setThenStatement(changedThenBlock);
         body.statements().add(changedIf);
 
@@ -1937,6 +1962,26 @@ public class EntityTransformer {
         body.statements().add(returnStmt);
         method.setBody(body);
         return method;
+    }
+
+    // Create: changed && e.getId() != null
+    // An element without an id still belongs in the set. There is just no id to copy into
+    // the element collection yet, so the flush-time callback copies it once it has one.
+    private Expression createChangedAndIdNotNullCondition(AST ast, String idAccessMethod) {
+        MethodInvocation getId = ast.newMethodInvocation();
+        getId.setExpression(ast.newSimpleName("e"));
+        getId.setName(ast.newSimpleName(idAccessMethod));
+
+        InfixExpression idNotNull = ast.newInfixExpression();
+        idNotNull.setLeftOperand(getId);
+        idNotNull.setOperator(InfixExpression.Operator.NOT_EQUALS);
+        idNotNull.setRightOperand(ast.newNullLiteral());
+
+        InfixExpression condition = ast.newInfixExpression();
+        condition.setLeftOperand(ast.newSimpleName("changed"));
+        condition.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
+        condition.setRightOperand(idNotNull);
+        return condition;
     }
 
     private MethodDeclaration createClearMethod(AST ast, String elementCollectionFieldName) {
