@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
+import java.util.TreeSet;
 
 public class JpaAnnotationExtractorUtils {
     private SystemObject systemObject;
@@ -366,6 +367,11 @@ public class JpaAnnotationExtractorUtils {
         new HashSet<String>(Arrays.asList("ALL", "PERSIST", "REMOVE", "MERGE"));
 
     public static boolean hasOwnershipCascade(FieldObject field) {
+        return !extractOwnershipCascadeTypes(field).isEmpty();
+    }
+
+    public static Set<String> extractOwnershipCascadeTypes(FieldObject field) {
+        Set<String> ownershipCascadeTypes = new TreeSet<String>();
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();
             if (!JpaRelationshipType.isRelationshipType(annotationType)) {
@@ -374,11 +380,11 @@ public class JpaAnnotationExtractorUtils {
 
             for (String cascade : extractCascadeTypes(annotation)) {
                 if (OWNERSHIP_CASCADE_TYPES.contains(cascade)) {
-                    return true;
+                    ownershipCascadeTypes.add(cascade);
                 }
             }
         }
-        return false;
+        return ownershipCascadeTypes;
     }
 
     private static Set<String> extractCascadeTypes(Annotation annotation) {

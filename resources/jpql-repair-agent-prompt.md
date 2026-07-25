@@ -33,6 +33,21 @@ A query is broken **only if** it navigates one of the unmapped associations, eit
 expression (`alias.field...`) or a `JOIN alias.field`. Queries that touch only unchanged
 fields are fine and must be left untouched.
 
+### Not every failing test is a broken query
+
+Unmapping also drops whatever lifecycle propagation the relationship declared. Where a manifest
+entry carries a `droppedSemantics` block, that association used to cascade `PERSIST` / `MERGE` /
+`REMOVE`, or delete orphans, and the ORM no longer does any of it. The database foreign-key
+constraints are unchanged, so a parent delete can now fail or leave orphan rows, and an entity
+wired to a not-yet-persisted parent can be saved with a null foreign key.
+
+Those failures are **semantics losses, not broken queries, and they are out of scope for you.**
+They look different from query failures: expect constraint-violation or referential-integrity
+errors on delete/save, or a row that is unexpectedly still present, absent, or null after a
+flush, rather than an error naming a field that no longer maps to a column. Repairing one would
+mean adding an explicit delete or persist to application logic, which is a developer decision about
+the new module boundary. Recognize them, leave them alone, and list them in your final report.
+
 ## Your inputs
 
 - **The change manifest**: the authoritative description of exactly what changed, every
@@ -156,6 +171,11 @@ the manifest tell you where the data now lives.
 - Choose the repair shape by **where the data now lives** (see "Choosing between the shapes"):
   read a local field in place (Shape A); route a genuine cross-entity need through the generated
   service (Shape B). Do not add a service hop for data the entity already owns.
+- Do **not** try to restore dropped cascade or `orphanRemoval` behavior. When a failure traces to
+  a relationship carrying a `droppedSemantics` block, do not add cascading deletes or persists to
+  domain logic, do not re-add the mapping, and do not keep iterating on it. Report it and move on:
+  a suite left failing **only** for this reason is a `PARTIAL` result, and that is the correct
+  outcome, not a reason to keep trying.
 - Do **not** run `git commit`, `git reset`, `git checkout`, `git rebase`, or `git stash`, or any
   other history-changing command. Leave every edit **uncommitted** for human review.
 - If you exhaust reasonable attempts or reach a query you cannot safely fix, **stop and report

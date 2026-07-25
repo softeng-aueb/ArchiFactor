@@ -50,8 +50,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.stream.Collectors;
 import org.eclipse.jdt.core.dom.Annotation;
-import org.eclipse.jdt.core.dom.NormalAnnotation;
-import org.eclipse.jdt.core.dom.MemberValuePair;
 import gr.uom.java.ast.FieldObject;
 
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
@@ -60,13 +58,13 @@ import org.eclipse.ltk.ui.refactoring.RefactoringWizardOpenOperation;
 import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
 import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
-import gr.aueb.java.archifactor.jpa.exceptions.AggregateViolationException;
 import gr.aueb.java.archifactor.jpa.manifest.UnmapManifestGenerator;
 import gr.aueb.java.archifactor.jpa.exceptions.CompositeKeyException;
 import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
 import gr.aueb.java.archifactor.jpa.refactoring.manipulators.UnmapJpaRelationshipsRefactoring;
 import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
+import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.aueb.java.archifactor.util.GitResult;
 import gr.aueb.java.archifactor.util.GitUtils;
 import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
@@ -392,10 +390,6 @@ public class UnmapJpaRelationships extends ViewPart {
                 refreshSystemObjectToMatchCurrentCode(shell);
                 detectRelationships(entities);
                 tableViewer.refresh();
-            } catch (AggregateViolationException e) {
-                MessageDialog.openError(shell, "Cannot Break Relationships", 
-                    "Cannot proceed with breaking relationships:\n" + e.getMessage() + 
-                    "\n\nThese properties indicate that the entities belong to the same aggregate and should not be separated.");
             } catch (CompositeKeyException e) {
                 MessageDialog.openError(shell, "Composite Keys Not Supported",
                     "Cannot proceed with breaking relationships:\n" + e.getMessage());
@@ -459,7 +453,6 @@ public class UnmapJpaRelationships extends ViewPart {
                         String annotationName = annotation.getTypeName().getFullyQualifiedName();
                         if (JpaRelationshipType.isRelationshipType(annotationName)) {
                             relationshipType = JpaRelationshipType.fromAnnotationName(annotationName);
-                            //checkForDangerousCascading(sourceEntity, fieldObject, annotation);
                         }
                     }
 
@@ -499,6 +492,8 @@ public class UnmapJpaRelationships extends ViewPart {
                             .joinTableName(joinTableName)
                             .joinTableJoinColumns(joinTableJoinColumns)
                             .joinTableInverseJoinColumns(joinTableInverseJoinColumns)
+                            .cascadeTypes(JpaAnnotationExtractorUtils.extractOwnershipCascadeTypes(fieldObject))
+                            .orphanRemoval(JpaAnnotationExtractorUtils.hasOrphanRemoval(fieldObject))
                             .build();
                         detectedRelationships.add(relInfo);
                     }
@@ -507,24 +502,40 @@ public class UnmapJpaRelationships extends ViewPart {
         }
     }
 
-    private void checkForDangerousCascading(ClassObject entity, FieldObject field, Annotation annotation) {
-        if (annotation instanceof NormalAnnotation) {
-            NormalAnnotation normalAnnotation = (NormalAnnotation) annotation;
-            for (Object obj : normalAnnotation.values()) {
-                MemberValuePair pair = (MemberValuePair) obj;
-                String propertyName = pair.getName().getIdentifier();
-                String propertyValue = pair.getValue().toString();
-                if (propertyName.equals("cascade")) {
-                    if (propertyValue.contains("CascadeType.PERSIST") || propertyValue.contains("CascadeType.ALL")) {
-                        throw new AggregateViolationException("Entity " + entity.getName() + "." + field.getName() + " has: " + propertyName + " = " + propertyValue);
-                    }
-                } else if (propertyName.equals("orphanRemoval")) {
-                    if (propertyValue.equals("true")) {
-                        throw new AggregateViolationException("Entity " + entity.getName() + "." + field.getName() + " has: orphanRemoval=true");
-                    }
-                }
+    /**
+     * Unmapping removes the ORM mapping, so any lifecycle propagation the relationship
+     * declared is dropped: the parent no longer cascades persist/merge/remove to the
+     * child, and orphaned children are no longer deleted. The user needs to confirm
+     * that he acknowledges the semantic losses before the refactoring runs.
+     */
+    private boolean confirmDroppedSemantics(Shell shell) {
+        StringBuilder droppedSemantics = new StringBuilder();
+        for (RelationshipInfo relationship : detectedRelationships) {
+            if (!relationship.hasDroppedSemantics()) {
+                continue;
             }
+
+            droppedSemantics.append("  ")
+                .append(UnmapJpaRelationshipsUtils.getSimpleClassName(relationship.getFromEntity()))
+                .append(".").append(relationship.getFieldName())
+                .append("  @").append(relationship.getRelationshipType().getAnnotationName());
+            for (String cascadeType : relationship.getCascadeTypes()) {
+                droppedSemantics.append("  cascade=").append(cascadeType);
+            }
+            if (relationship.isOrphanRemoval()) {
+                droppedSemantics.append("  orphanRemoval=true");
+            }
+            droppedSemantics.append("\n");
         }
+
+        if (droppedSemantics.length() == 0) {
+            return true;
+        }
+
+        return MessageDialog.openConfirm(shell, "Dropped ORM Semantics",
+            "Unmapping these relationships drops lifecycle behavior the ORM used to provide:\n\n"
+            + droppedSemantics
+            + "\nProceed with the refactoring?");
     }
 
     private void populateProjectCombo() {
@@ -628,6 +639,10 @@ public class UnmapJpaRelationships extends ViewPart {
 
         try {
             refreshSystemObjectToMatchCurrentCode(shell);
+
+            if (!confirmDroppedSemantics(shell)) {
+                return;
+            }
 
             GitPreflightOutcome gitOutcome = performGitPreflight(shell);
             if (gitOutcome == GitPreflightOutcome.CANCELLED) {

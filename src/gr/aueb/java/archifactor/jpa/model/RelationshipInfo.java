@@ -1,5 +1,8 @@
 package gr.aueb.java.archifactor.jpa.model;
 
+import java.util.Collections;
+import java.util.Set;
+
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
 
 public class RelationshipInfo {
@@ -15,6 +18,8 @@ public class RelationshipInfo {
     private String joinTableName;
     private String joinTableJoinColumns;
     private String joinTableInverseJoinColumns;
+    private Set<String> cascadeTypes;
+    private boolean orphanRemoval;
 
     private RelationshipInfo(Builder builder) {
         this.fromEntity = builder.fromEntity;
@@ -29,6 +34,8 @@ public class RelationshipInfo {
         this.joinTableName = builder.joinTableName;
         this.joinTableJoinColumns = builder.joinTableJoinColumns;
         this.joinTableInverseJoinColumns = builder.joinTableInverseJoinColumns;
+        this.cascadeTypes = builder.cascadeTypes;
+        this.orphanRemoval = builder.orphanRemoval;
     }
 
     public static Builder builder() {
@@ -111,6 +118,18 @@ public class RelationshipInfo {
         this.joinTableInverseJoinColumns = joinTableInverseJoinColumns;
     }
 
+    public Set<String> getCascadeTypes() {
+        return cascadeTypes;
+    }
+
+    public boolean isOrphanRemoval() {
+        return orphanRemoval;
+    }
+
+    public boolean hasDroppedSemantics() {
+        return !cascadeTypes.isEmpty() || orphanRemoval;
+    }
+
     public static class Builder {
         private String fromEntity;
         private JpaRelationshipType relationshipType;
@@ -124,6 +143,8 @@ public class RelationshipInfo {
         private String joinTableName;
         private String joinTableJoinColumns;
         private String joinTableInverseJoinColumns;
+        private Set<String> cascadeTypes = Collections.emptySet();
+        private boolean orphanRemoval;
 
         private Builder() {
         }
@@ -185,6 +206,16 @@ public class RelationshipInfo {
 
         public Builder joinTableInverseJoinColumns(String joinTableInverseJoinColumns) {
             this.joinTableInverseJoinColumns = joinTableInverseJoinColumns;
+            return this;
+        }
+
+        public Builder cascadeTypes(Set<String> cascadeTypes) {
+            this.cascadeTypes = cascadeTypes;
+            return this;
+        }
+
+        public Builder orphanRemoval(boolean orphanRemoval) {
+            this.orphanRemoval = orphanRemoval;
             return this;
         }
 

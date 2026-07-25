@@ -39,7 +39,7 @@ public class UnmapManifestGenerator {
         sb.append("  \"tool\": \"ArchiFactor\",\n");
         sb.append("  \"manifestVersion\": 1,\n");
         sb.append("  \"refactoring\": \"Unmap JPA Relationships\",\n");
-        sb.append("  \"description\": \"The JPA relationship mappings listed below were unmapped: each association field was made @Transient and is now lazy-loaded through a generated service. Owning sides keep the relationship data in a new foreign-key or element-collection field. The database schema is unchanged, so native SQL queries are unaffected; only object-model queries (JPQL, Criteria API, derived query methods) that traverse the unmapped associations are broken.\",\n");
+        sb.append("  \"description\": \"The JPA relationship mappings listed below were unmapped: each association field was made @Transient and is now lazy-loaded through a generated service. Owning sides keep the relationship data in a new foreign-key or element-collection field. The database schema is unchanged, so native SQL queries are unaffected; only object-model queries (JPQL, Criteria API, derived query methods) that traverse the unmapped associations are broken. Relationships that declared cascade or orphanRemoval additionally lose that lifecycle propagation, recorded per relationship under 'droppedSemantics'.\",\n");
         sb.append("  \"generatedAt\": ").append(quote(Instant.now().toString())).append(",\n");
         sb.append("  \"framework\": ").append(quote(frameworkType.getDisplayName())).append(",\n");
         sb.append("  \"serviceFactoryClass\": ").append(quote(serviceFactoryClass(serviceMethodsByEntity.keySet()))).append(",\n");
@@ -108,6 +108,23 @@ public class UnmapManifestGenerator {
                 sb.append(",\n");
                 sb.append("      \"targetElementCollectionField\": ").append(quote(relationship.getJoinTableInverseJoinColumns() + "s"));
             }
+        }
+
+        if (relationship.hasDroppedSemantics()) {
+            sb.append(",\n");
+            sb.append("      \"droppedSemantics\": {\n");
+            sb.append("        \"cascade\": [");
+            int cascadeIndex = 0;
+            for (String cascadeType : relationship.getCascadeTypes()) {
+                sb.append(cascadeIndex > 0 ? ", " : "").append(quote(cascadeType));
+                cascadeIndex++;
+            }
+            sb.append("],\n");
+            sb.append("        \"orphanRemoval\": ").append(relationship.isOrphanRemoval()).append(",\n");
+            sb.append("        \"note\": ").append(quote("The ORM no longer propagates these lifecycle operations. "
+                + "The database foreign-key constraints are unchanged, so a parent delete may now fail or leave orphan rows. "
+                + "A test failing because of this is a semantics loss, not a broken query.")).append("\n");
+            sb.append("      }");
         }
 
         ServiceMethodProvider provider = ServiceMethodProviderFactory.createProvider(relationship);
