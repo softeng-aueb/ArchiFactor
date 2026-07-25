@@ -18,10 +18,13 @@ import gr.aueb.java.archifactor.jpa.model.JoinTableInfo;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.SystemObject;
+import gr.uom.java.ast.TypeObject;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
@@ -120,14 +123,40 @@ public class JpaAnnotationExtractorUtils {
     }
 
     private FieldObject findFieldInEntity(ClassObject entity, String fieldName) {
-        Iterator<FieldObject> fieldIterator = entity.getFieldIterator();
-        while (fieldIterator.hasNext()) {
-            FieldObject field = fieldIterator.next();
-            if (fieldName.equals(field.getName())) {
-                return field;
+        for (ClassObject classObj : getMappedHierarchy(entity.getName())) {
+            Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
+            while (fieldIterator.hasNext()) {
+                FieldObject field = fieldIterator.next();
+                if (fieldName.equals(field.getName())) {
+                    return field;
+                }
             }
         }
         return null;
+    }
+
+    /**
+     * The entity class plus the superclasses, so lookups also see the fields a base entity declares. 
+     * JPA only maps superclass state when the superclass is a @MappedSuperclass or an @Entity, so a plain class ends the walk.
+     */
+    public List<ClassObject> getMappedHierarchy(String entityName) {
+        List<ClassObject> hierarchy = new ArrayList<ClassObject>();
+        ClassObject classObj = systemObject.getClassObject(entityName);
+        while (classObj != null) {
+            hierarchy.add(classObj);
+
+            TypeObject superclass = classObj.getSuperclass();
+            if (superclass == null) {
+                break;
+            }
+
+            ClassObject superclassObj = systemObject.getClassObject(superclass.getClassType());
+            if (superclassObj == null || !(hasClassAnnotation(superclassObj, "MappedSuperclass") || hasClassAnnotation(superclassObj, "Entity"))) {
+                break;
+            }
+            classObj = superclassObj;
+        }
+        return hierarchy;
     }
 
     private String extractDirectJoinColumnName(FieldObject field) {
@@ -144,61 +173,36 @@ public class JpaAnnotationExtractorUtils {
     }
 
     public String extractIdFieldType(String entityName) {
-        ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
-        while (classIterator.hasNext()) {
-            ClassObject classObj = classIterator.next();
-            if (entityName.equals(classObj.getName())) {
-                Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
-                while (fieldIterator.hasNext()) {
-                    FieldObject field = fieldIterator.next();
-                    if (hasIdAnnotation(field)) {
-                        return field.getType().getClassType();
-                    }
-                }
-            }
-        }
-        return null;
+        return findIdField(entityName).getType().getClassType();
     }
 
     public String extractIdFieldName(String entityName) {
-        ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
-        while (classIterator.hasNext()) {
-            ClassObject classObj = classIterator.next();
-            if (entityName.equals(classObj.getName())) {
-                Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
-                while (fieldIterator.hasNext()) {
-                    FieldObject field = fieldIterator.next();
-                    if (hasIdAnnotation(field)) {
-                        return field.getName();
-                    }
-                }
-            }
-        }
-        return null;
+        return findIdField(entityName).getName();
     }
 
     public String extractIdColumnName(String entityName) {
-        ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
-        while (classIterator.hasNext()) {
-            ClassObject classObj = classIterator.next();
-            if (entityName.equals(classObj.getName())) {
-                Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
-                while (fieldIterator.hasNext()) {
-                    FieldObject field = fieldIterator.next();
-                    if (hasIdAnnotation(field)) {
-                        String columnName = extractColumnName(field);
-                        return columnName != null ? columnName : field.getName();
-                    }
+        FieldObject idField = findIdField(entityName);
+        String columnName = extractColumnName(idField);
+        return columnName != null ? columnName : idField.getName();
+    }
+
+    private FieldObject findIdField(String entityName) {
+        for (ClassObject classObj : getMappedHierarchy(entityName)) {
+            Iterator<FieldObject> fieldIterator = classObj.getFieldIterator();
+            while (fieldIterator.hasNext()) {
+                FieldObject field = fieldIterator.next();
+                if (hasFieldAnnotation(field, "Id")) {
+                    return field;
                 }
             }
         }
-        return null;
+
+        throw new IllegalStateException("No @Id field was found in " + entityName + " or in its mapped superclasses.");
     }
 
     private String extractColumnName(FieldObject field) {
         for (Annotation annotation : field.getAnnotations()) {
-            String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("Column")) {
+            if (matchesAnnotationSimpleName(annotation, "Column")) {
                 String columnName = extractAnnotationStringProperty(annotation, "name");
                 if (columnName != null) {
                     return columnName;
@@ -206,16 +210,6 @@ public class JpaAnnotationExtractorUtils {
             }
         }
         return null;
-    }
-
-    private boolean hasIdAnnotation(FieldObject field) {
-        for (Annotation annotation : field.getAnnotations()) {
-            String annotationType = annotation.getTypeName().getFullyQualifiedName();
-            if (annotationType.equals("Id")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private String extractAnnotationStringProperty(Annotation annotation, String propertyName) {

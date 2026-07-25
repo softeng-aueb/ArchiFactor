@@ -15,14 +15,15 @@ import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
 import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.ASTReader;
+import gr.uom.java.ast.Access;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.FieldObject;
 import gr.uom.java.ast.MethodObject;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Iterator;
 
 public class EntityTransformer {
@@ -617,14 +618,14 @@ public class EntityTransformer {
         String serviceMethodName = provider.getMethodName();
 
         Expression condition;
-        String serviceMethodArgument;
+        Expression serviceMethodArgument;
         if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY && relationship.isOwningSide()) {
             String elementCollectionFieldName = relationship.getJoinTableInverseJoinColumns() + "s";
-            serviceMethodArgument = elementCollectionFieldName;
+            serviceMethodArgument = ast.newSimpleName(elementCollectionFieldName);
             condition = buildManyToManyOwningCondition(ast, fieldName, elementCollectionFieldName);
         } else {
             JpaAnnotationExtractorUtils jpaAnnotationExtractor = new JpaAnnotationExtractorUtils(systemObject);
-            serviceMethodArgument = jpaAnnotationExtractor.extractIdFieldName(entity.getName());
+            serviceMethodArgument = createIdAccessExpression(ast, entity, jpaAnnotationExtractor.extractIdFieldName(entity.getName()));
             condition = buildNonOwningCondition(ast, fieldName, entity, jpaAnnotationExtractor);
         }
 
@@ -681,7 +682,7 @@ public class EntityTransformer {
         String idFieldType = jpaAnnotationExtractor.extractIdFieldType(entity.getName());
 
         InfixExpression idNotNullCheck = ast.newInfixExpression();
-        idNotNullCheck.setLeftOperand(ast.newSimpleName(idFieldName));
+        idNotNullCheck.setLeftOperand(createIdAccessExpression(ast, entity, idFieldName));
         idNotNullCheck.setOperator(InfixExpression.Operator.NOT_EQUALS);
         idNotNullCheck.setRightOperand(UnmapJpaRelationshipsUtils.createDefaultValueForPrimitiveType(ast, idFieldType));
 
@@ -701,6 +702,45 @@ public class EntityTransformer {
         return finalCondition;
     }
 
+    // Reads the id of the entity being transformed. An id inherited from a @MappedSuperclass can
+    // be private there, so we have to read it through its getter instead of the field.
+    private Expression createIdAccessExpression(AST ast, ClassObject entity, String idFieldName) {
+        if (getFieldFromEntity(idFieldName, entity) != null) {
+            return ast.newSimpleName(idFieldName);
+        }
+
+        Optional<String> idGetterName = findIdGetterName(entity.getName(), idFieldName);
+        if (idGetterName.isPresent()) {
+            MethodInvocation idGetterCall = ast.newMethodInvocation();
+            idGetterCall.setName(ast.newSimpleName(idGetterName.get()));
+            return idGetterCall;
+        }
+
+        if (isInheritedFieldAccessible(entity, idFieldName)) {
+            return ast.newSimpleName(idFieldName);
+        }
+
+        throw new IllegalStateException("The id of " + entity.getName() + " is inherited, but it is private and has no get" + UnmapJpaRelationshipsUtils.capitalize(idFieldName) + "() method.");
+    }
+
+    private boolean isInheritedFieldAccessible(ClassObject entity, String fieldName) {
+        JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(systemObject);
+        for (ClassObject superclass : jpaExtractor.getMappedHierarchy(entity.getName())) {
+            FieldObject field = getFieldFromEntity(fieldName, superclass);
+            if (field == null) {
+                continue;
+            }
+
+            if (field.getAccess() == Access.PUBLIC || field.getAccess() == Access.PROTECTED) {
+                return true;
+            }
+
+            return field.getAccess() == Access.NONE
+                && UnmapJpaRelationshipsUtils.getPackageNameFromClass(entity).equals(UnmapJpaRelationshipsUtils.getPackageNameFromClass(superclass));
+        }
+        return false;
+    }
+
     private VariableDeclarationStatement createServiceVariableDeclaration(AST ast, String serviceName, String serviceClassName) {
         VariableDeclarationFragment serviceVarFragment = ast.newVariableDeclarationFragment();
         serviceVarFragment.setName(ast.newSimpleName(serviceName));
@@ -715,7 +755,7 @@ public class EntityTransformer {
         return serviceVarDecl;
     }
 
-    private ExpressionStatement createAddAllStatement(AST ast, String fieldName, String serviceName, String serviceMethodName, String serviceMethodArgument) {
+    private ExpressionStatement createAddAllStatement(AST ast, String fieldName, String serviceName, String serviceMethodName, Expression serviceMethodArgument) {
         MethodInvocation addAllCall = ast.newMethodInvocation();
         addAllCall.setExpression(ast.newSimpleName(fieldName));
         addAllCall.setName(ast.newSimpleName("addAll"));
@@ -723,7 +763,7 @@ public class EntityTransformer {
         MethodInvocation serviceMethodCall = ast.newMethodInvocation();
         serviceMethodCall.setExpression(ast.newSimpleName(serviceName));
         serviceMethodCall.setName(ast.newSimpleName(serviceMethodName));
-        serviceMethodCall.arguments().add(ast.newSimpleName(serviceMethodArgument));
+        serviceMethodCall.arguments().add(serviceMethodArgument);
         addAllCall.arguments().add(serviceMethodCall);
         return ast.newExpressionStatement(addAllCall);
     }
@@ -1392,7 +1432,7 @@ public class EntityTransformer {
 
         JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(systemObject);
         String targetIdFieldName = jpaExtractor.extractIdFieldName(targetEntityName);
-        String idAccessMethod = determineIdAccessMethod(targetEntityName, targetIdFieldName);
+        String idAccessMethod = findIdGetterName(targetEntityName, targetIdFieldName).orElse(targetIdFieldName);
 
         importRewrite.addImport("java.util.AbstractSet");
         importRewrite.addImport("java.util.Collection");
@@ -1435,32 +1475,38 @@ public class EntityTransformer {
         return true;
     }
 
-    private String determineIdAccessMethod(String entityName, String idFieldName) {
+    // The id getter can be declared in a @MappedSuperclass, so we have to search the whole mapped hierarchy.
+    private Optional<String> findIdGetterName(String entityName, String idFieldName) {
         String conventionalGetterName = "get" + UnmapJpaRelationshipsUtils.capitalize(idFieldName);
 
-        ClassObject targetEntity = findEntityByName(entityName);
-        if (targetEntity != null) {
-            Iterator<MethodObject> methodIterator = targetEntity.getMethodIterator();
-            while (methodIterator.hasNext()) {
-                MethodObject method = methodIterator.next();
-                if (conventionalGetterName.equals(method.getName())) {
-                    return conventionalGetterName;
-                }
+        JpaAnnotationExtractorUtils jpaExtractor = new JpaAnnotationExtractorUtils(systemObject);
+        for (ClassObject classObj : jpaExtractor.getMappedHierarchy(entityName)) {
+            if (declaresMethod(classObj, conventionalGetterName) || generatesLombokGetter(classObj, idFieldName)) {
+                return Optional.of(conventionalGetterName);
             }
         }
 
-        return idFieldName;
+        return Optional.empty();
     }
 
-    private ClassObject findEntityByName(String entityName) {
-        ListIterator<ClassObject> classIterator = systemObject.getClassListIterator();
-        while (classIterator.hasNext()) {
-            ClassObject classObj = classIterator.next();
-            if (entityName.equals(classObj.getName())) {
-                return classObj;
+    private boolean declaresMethod(ClassObject classObj, String methodName) {
+        Iterator<MethodObject> methodIterator = classObj.getMethodIterator();
+        while (methodIterator.hasNext()) {
+            MethodObject method = methodIterator.next();
+            if (methodName.equals(method.getName())) {
+                return true;
             }
         }
-        return null;
+        return false;
+    }
+
+    // Lombok generates the getters of the class it annotates at compile time, so they are absent
+    // from the AST even though the generated code would be able to call them.
+    private boolean generatesLombokGetter(ClassObject classObj, String fieldName) {
+        if (!JpaAnnotationExtractorUtils.hasClassAnnotation(classObj, "Data") && !JpaAnnotationExtractorUtils.hasClassAnnotation(classObj, "Getter")) {
+            return false;
+        }
+        return getFieldFromEntity(fieldName, classObj) != null;
     }
 
     private MethodDeclaration createSyncingSetConstructor(AST ast, String className) {
