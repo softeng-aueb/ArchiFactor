@@ -19,7 +19,9 @@ import org.eclipse.core.runtime.CoreException;
 import gr.uom.java.ast.SystemObject;
 import gr.uom.java.ast.ClassObject;
 import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
+import gr.aueb.java.archifactor.jpa.enums.PersistenceNamespace;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
+import gr.aueb.java.archifactor.jpa.util.PersistenceNamespaceDetector;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.aueb.java.jpa.JpaModel;
 
@@ -37,6 +39,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
     private SystemObject systemObject;
     private FrameworkType frameworkType;
     private Map<String, ClassObject> entityMap;
+    private PersistenceNamespace persistenceNamespace;
     private Map<String, List<ServiceMethodProvider>> serviceMethodproviders;
     private Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges;
     private Map<ICompilationUnit, CreateCompilationUnitChange> createCompilationUnitChanges;
@@ -52,6 +55,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
         this.createCompilationUnitChanges = new LinkedHashMap<>();
 
         buildEntityMap();
+        this.persistenceNamespace = PersistenceNamespaceDetector.detect(entityMap.values());
         identifyRequiredServiceMethods();
     }
 
@@ -113,7 +117,11 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             status.addFatalError("System object not available");
             return status;
         }
-        
+
+        if (PersistenceNamespaceDetector.isMixed(entityMap.values())) {
+            status.addWarning("The project mixes javax.persistence and jakarta.persistence entities. Generated code will use " + persistenceNamespace.getPrefix() + ".* throughout.");
+        }
+
         try {
             IProject iProject = project.getProject();
             IMarker[] markers = iProject.findMarkers(IJavaModelMarker.JAVA_MODEL_PROBLEM_MARKER, true, IResource.DEPTH_INFINITE);
@@ -142,7 +150,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             Set<String> entitiesNeedingServices = serviceMethodproviders.keySet();
 
             // 1. Create ServiceFactory first (so entity imports can reference it)
-            BaseServiceFactoryGenerator factoryGenerator = ServiceFactoryGeneratorFactory.createGenerator(frameworkType, project, systemObject);
+            BaseServiceFactoryGenerator factoryGenerator = ServiceFactoryGeneratorFactory.createGenerator(frameworkType, project, systemObject, persistenceNamespace);
             factoryGenerator.createOrUpdateServiceFactory(
                 entitiesNeedingServices, 
                 UnmapJpaRelationshipsUtils.determineServiceFactoryPackage(entitiesNeedingServices, entityMap), 
@@ -152,7 +160,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
 
             // 2. Create service interfaces and implementations (only required methods)
             ServiceInterfaceGenerator interfaceGenerator = new ServiceInterfaceGenerator(project, systemObject);
-            BaseServiceImplementationGenerator implementationGenerator = ServiceImplementationGeneratorFactory.createGenerator(frameworkType, project, systemObject);
+            BaseServiceImplementationGenerator implementationGenerator = ServiceImplementationGeneratorFactory.createGenerator(frameworkType, project, systemObject, persistenceNamespace);
             for (Map.Entry<String, List<ServiceMethodProvider>> entry : serviceMethodproviders.entrySet()) {
                 String entityName = entry.getKey();
                 List<ServiceMethodProvider> providers = entry.getValue();
@@ -174,7 +182,7 @@ public class UnmapJpaRelationshipsRefactoring extends Refactoring {
             }
 
             // 3. Transform entity classes last (so imports reference existing files)
-            EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodproviders);
+            EntityTransformer entityTransformer = new EntityTransformer(systemObject, serviceMethodproviders, persistenceNamespace);
             for (RelationshipInfo relationship : relationships) {
                 entityTransformer.transformFromEntity(
                 	entityMap.get(relationship.getFromEntity()), 

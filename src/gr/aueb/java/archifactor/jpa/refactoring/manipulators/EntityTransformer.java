@@ -11,6 +11,7 @@ import org.eclipse.text.edits.TextEditGroup;
 import gr.uom.java.ast.SystemObject;
 import gr.aueb.java.archifactor.jpa.enums.JpaJoinType;
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.enums.PersistenceNamespace;
 import gr.aueb.java.archifactor.jpa.model.RelationshipInfo;
 import gr.aueb.java.archifactor.jpa.util.JpaAnnotationExtractorUtils;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
@@ -28,13 +29,15 @@ import java.util.Iterator;
 
 public class EntityTransformer {
     private SystemObject systemObject;
+    private PersistenceNamespace persistenceNamespace;
     private Map<ICompilationUnit, CompilationUnit> astRootMap = new HashMap<>();
     private Map<ICompilationUnit, ASTRewrite> rewriterMap = new HashMap<>();
     private Map<ICompilationUnit, ImportRewrite> importRewriteMap = new HashMap<>();
     private Map<CompilationUnit, MethodDeclaration> fkSyncMethodMap = new HashMap<>();
 
-    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodProvider>> serviceMethodRequirements) {
+    public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodProvider>> serviceMethodRequirements, PersistenceNamespace persistenceNamespace) {
         this.systemObject = systemObject;
+        this.persistenceNamespace = persistenceNamespace;
     }
 
     public void transformFromEntity(ClassObject entity, RelationshipInfo relationship, Map<ICompilationUnit, CompilationUnitChange> compilationUnitChanges) throws Exception {
@@ -144,7 +147,7 @@ public class EntityTransformer {
         // Add the @Transient annotation to the transformed field
         boolean hasChanges = false;
         if (removedAnnotations) {
-            importRewrite.addImport("jakarta.persistence.Transient");
+            importRewrite.addImport(persistenceNamespace.type("persistence.Transient"));
 
             MarkerAnnotation transientAnnotation = ast.newMarkerAnnotation();
             transientAnnotation.setTypeName(ast.newName("Transient"));
@@ -206,10 +209,10 @@ public class EntityTransformer {
         String elementType = relationship.getReferencedPkType();
         String simpleElementType = UnmapJpaRelationshipsUtils.getSimpleClassName(elementType);
         
-        importRewrite.addImport("jakarta.persistence.Column");
-        importRewrite.addImport("jakarta.persistence.CollectionTable");
-        importRewrite.addImport("jakarta.persistence.ElementCollection");
-        importRewrite.addImport("jakarta.persistence.JoinColumn");
+        importRewrite.addImport(persistenceNamespace.type("persistence.Column"));
+        importRewrite.addImport(persistenceNamespace.type("persistence.CollectionTable"));
+        importRewrite.addImport(persistenceNamespace.type("persistence.ElementCollection"));
+        importRewrite.addImport(persistenceNamespace.type("persistence.JoinColumn"));
         if (elementType.contains(".") && !elementType.contains("lang")) {
             importRewrite.addImport(elementType);
         }
@@ -308,7 +311,7 @@ public class EntityTransformer {
         fkField.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
 
         // Add imports
-        importRewrite.addImport("jakarta.persistence.Column");
+        importRewrite.addImport(persistenceNamespace.type("persistence.Column"));
         if (relationship.getReferencedPkType().contains(".") && !relationship.getReferencedPkType().contains("lang")) {
             importRewrite.addImport(relationship.getReferencedPkType());
         }
@@ -1140,13 +1143,13 @@ public class EntityTransformer {
         MethodDeclaration method = ast.newMethodDeclaration();
         method.setName(ast.newSimpleName("syncUnmappedForeignKeys"));
         if (onPersist) {
-            importRewrite.addImport("jakarta.persistence.PrePersist");
+            importRewrite.addImport(persistenceNamespace.type("persistence.PrePersist"));
             MarkerAnnotation prePersist = ast.newMarkerAnnotation();
             prePersist.setTypeName(ast.newName("PrePersist"));
             method.modifiers().add(prePersist);
         }
         if (onUpdate) {
-            importRewrite.addImport("jakarta.persistence.PreUpdate");
+            importRewrite.addImport(persistenceNamespace.type("persistence.PreUpdate"));
             MarkerAnnotation preUpdate = ast.newMarkerAnnotation();
             preUpdate.setTypeName(ast.newName("PreUpdate"));
             method.modifiers().add(preUpdate);

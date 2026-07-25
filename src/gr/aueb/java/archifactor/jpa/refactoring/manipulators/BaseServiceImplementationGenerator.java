@@ -19,6 +19,7 @@ import org.eclipse.jface.text.Document;
 import org.eclipse.text.edits.TextEditGroup;
 
 import gr.uom.java.ast.SystemObject;
+import gr.aueb.java.archifactor.jpa.enums.PersistenceNamespace;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.aueb.java.archifactor.jpa.util.ServiceMethodUtils;
 import gr.uom.java.ast.ASTReader;
@@ -31,10 +32,12 @@ import java.util.TreeSet;
 public abstract class BaseServiceImplementationGenerator {
 	protected IJavaProject project;
 	protected SystemObject systemObject;
+	protected PersistenceNamespace persistenceNamespace;
 
-	public BaseServiceImplementationGenerator(IJavaProject project, SystemObject systemObject) {
+	public BaseServiceImplementationGenerator(IJavaProject project, SystemObject systemObject, PersistenceNamespace persistenceNamespace) {
 		this.project = project;
 		this.systemObject = systemObject;
+		this.persistenceNamespace = persistenceNamespace;
 	}
 
 	protected abstract List<String> getFrameworkImports();
@@ -157,7 +160,7 @@ public abstract class BaseServiceImplementationGenerator {
 		}
 
 		imports.addAll(getFrameworkImports());
-		imports.add("jakarta.persistence.EntityManager");
+		imports.add(persistenceNamespace.type("persistence.EntityManager"));
 
 		for (ServiceMethodProvider provider : providers) {
 			imports.addAll(provider.getRequiredImports());

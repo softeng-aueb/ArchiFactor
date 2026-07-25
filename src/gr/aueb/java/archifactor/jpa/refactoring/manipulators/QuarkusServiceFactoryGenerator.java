@@ -3,22 +3,25 @@ package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.dom.*;
 
+import gr.aueb.java.archifactor.jpa.enums.PersistenceNamespace;
 import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import gr.uom.java.ast.SystemObject;
 
 import java.util.Set;
 
 public class QuarkusServiceFactoryGenerator extends BaseServiceFactoryGenerator {
+	private PersistenceNamespace persistenceNamespace;
 
-	public QuarkusServiceFactoryGenerator(IJavaProject project, SystemObject systemObject) {
+	public QuarkusServiceFactoryGenerator(IJavaProject project, SystemObject systemObject, PersistenceNamespace persistenceNamespace) {
 		super(project, systemObject);
+		this.persistenceNamespace = persistenceNamespace;
 	}
 
 	@Override
 	protected String generateServiceFactoryContent(Set<String> entityNames, String packageName) {
 		StringBuilder content = new StringBuilder();
 		content.append("package ").append(packageName).append(";\n\n");
-		content.append("import jakarta.enterprise.inject.spi.CDI;\n");
+		content.append("import ").append(persistenceNamespace.type("enterprise.inject.spi.CDI")).append(";\n");
 		content.append("\n");
 		for (String entityName : entityNames) {
 			String simpleEntityName = UnmapJpaRelationshipsUtils.getSimpleClassName(entityName);
