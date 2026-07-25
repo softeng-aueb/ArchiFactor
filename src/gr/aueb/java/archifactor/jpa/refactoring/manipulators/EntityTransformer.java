@@ -30,6 +30,7 @@ public class EntityTransformer {
     private Map<ICompilationUnit, CompilationUnit> astRootMap = new HashMap<>();
     private Map<ICompilationUnit, ASTRewrite> rewriterMap = new HashMap<>();
     private Map<ICompilationUnit, ImportRewrite> importRewriteMap = new HashMap<>();
+    private Map<CompilationUnit, MethodDeclaration> fkSyncMethodMap = new HashMap<>();
 
     public EntityTransformer(SystemObject systemObject, Map<String, List<ServiceMethodProvider>> serviceMethodRequirements) {
         this.systemObject = systemObject;
@@ -78,6 +79,12 @@ public class EntityTransformer {
         if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY && relationship.isOwningSide()) {
             System.out.println("[DEBUG] Adding SyncingSet inner class for ManyToMany owning side");
             hasChanges |= addSyncingSetInnerClass(astRoot, entity, relationship, rewriter, importRewrite, astRoot.getAST());
+        }
+
+        // 4. Re-sync the FK column at flush time for the owning to-one side,
+        // because the setter captures the id before the referenced entity may have one
+        if (relationship.isOwningSide() && relationship.getRelationshipType() != JpaRelationshipType.MANY_TO_MANY) {
+            hasChanges |= addForeignKeyFlushSync(astRoot, relationship, rewriter, importRewrite, astRoot.getAST());
         }
 
         if (!hasChanges) {
@@ -1023,6 +1030,126 @@ public class EntityTransformer {
 
             return ast.newExpressionStatement(fkAssignment);
         }
+    }
+
+    private boolean addForeignKeyFlushSync(
+        CompilationUnit astRoot,
+        RelationshipInfo relationship,
+        ASTRewrite rewriter,
+        ImportRewrite importRewrite,
+        AST ast
+    ) {
+        MethodDeclaration prePersistHost = findCallbackMethod(astRoot, "PrePersist");
+        MethodDeclaration preUpdateHost = findCallbackMethod(astRoot, "PreUpdate");
+
+        // JPA allows at most one callback method per lifecycle event per class,
+        // so reuse existing callbacks instead of adding a second one
+        if (prePersistHost != null) {
+            appendStatementToCallback(prePersistHost, createFKSyncStatement(ast, relationship), rewriter);
+            System.out.println("[DEBUG] Added FK sync to existing @PrePersist callback: " + prePersistHost.getName().getIdentifier());
+        }
+        if (preUpdateHost != null && preUpdateHost != prePersistHost) {
+            appendStatementToCallback(preUpdateHost, createFKSyncStatement(ast, relationship), rewriter);
+            System.out.println("[DEBUG] Added FK sync to existing @PreUpdate callback: " + preUpdateHost.getName().getIdentifier());
+        }
+        if (prePersistHost != null && preUpdateHost != null) {
+            return true;
+        }
+
+        MethodDeclaration syncMethod = fkSyncMethodMap.get(astRoot);
+        if (syncMethod == null) {
+            syncMethod = createFKSyncCallbackMethod(astRoot, ast, rewriter, importRewrite, prePersistHost == null, preUpdateHost == null);
+            fkSyncMethodMap.put(astRoot, syncMethod);
+        }
+        syncMethod.getBody().statements().add(createFKSyncStatement(ast, relationship));
+        return true;
+    }
+
+    private MethodDeclaration findCallbackMethod(CompilationUnit astRoot, String annotationName) {
+        for (TypeDeclaration type : (List<TypeDeclaration>) astRoot.types()) {
+            for (MethodDeclaration method : type.getMethods()) {
+                if (method.getBody() == null) {
+                    continue;
+                }
+                for (Object modifier : method.modifiers()) {
+                    if (modifier instanceof Annotation) {
+                        String name = ((Annotation) modifier).getTypeName().getFullyQualifiedName();
+                        if (annotationName.equals(name) || name.endsWith("." + annotationName)) {
+                            return method;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private void appendStatementToCallback(MethodDeclaration callback, Statement statement, ASTRewrite rewriter) {
+        ListRewrite statementsRewrite = rewriter.getListRewrite(callback.getBody(), Block.STATEMENTS_PROPERTY);
+        statementsRewrite.insertLast(statement, new TextEditGroup("Add FK sync to lifecycle callback"));
+    }
+
+    private MethodDeclaration createFKSyncCallbackMethod(
+        CompilationUnit astRoot,
+        AST ast,
+        ASTRewrite rewriter,
+        ImportRewrite importRewrite,
+        boolean onPersist,
+        boolean onUpdate
+    ) {
+        MethodDeclaration method = ast.newMethodDeclaration();
+        method.setName(ast.newSimpleName("syncUnmappedForeignKeys"));
+        if (onPersist) {
+            importRewrite.addImport("jakarta.persistence.PrePersist");
+            MarkerAnnotation prePersist = ast.newMarkerAnnotation();
+            prePersist.setTypeName(ast.newName("PrePersist"));
+            method.modifiers().add(prePersist);
+        }
+        if (onUpdate) {
+            importRewrite.addImport("jakarta.persistence.PreUpdate");
+            MarkerAnnotation preUpdate = ast.newMarkerAnnotation();
+            preUpdate.setTypeName(ast.newName("PreUpdate"));
+            method.modifiers().add(preUpdate);
+        }
+        method.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
+        method.setReturnType2(ast.newPrimitiveType(PrimitiveType.VOID));
+        method.setBody(ast.newBlock());
+
+        TypeDeclaration typeDecl = (TypeDeclaration) astRoot.types().get(0);
+        ListRewrite methodsRewrite = rewriter.getListRewrite(typeDecl, TypeDeclaration.BODY_DECLARATIONS_PROPERTY);
+        methodsRewrite.insertLast(method, new TextEditGroup("Add FK sync lifecycle callback"));
+        System.out.println("[DEBUG] Created FK sync lifecycle callback: syncUnmappedForeignKeys()");
+        return method;
+    }
+
+    // Create: if (field != null) { this.fkField = field.getPkMethod(); }
+    // Reads the field directly (not the getter) so the callback never triggers a lazy load,
+    // and never nulls the FK: a null reference can also mean "not loaded"
+    private Statement createFKSyncStatement(AST ast, RelationshipInfo relationship) {
+        InfixExpression fieldNotNull = ast.newInfixExpression();
+        fieldNotNull.setLeftOperand(ast.newSimpleName(relationship.getFieldName()));
+        fieldNotNull.setOperator(InfixExpression.Operator.NOT_EQUALS);
+        fieldNotNull.setRightOperand(ast.newNullLiteral());
+
+        Assignment fkAssignment = ast.newAssignment();
+        FieldAccess thisFkField = ast.newFieldAccess();
+        thisFkField.setExpression(ast.newThisExpression());
+        thisFkField.setName(ast.newSimpleName(relationship.getJoinColumnName()));
+        fkAssignment.setLeftHandSide(thisFkField);
+
+        MethodInvocation getPkCall = ast.newMethodInvocation();
+        getPkCall.setExpression(ast.newSimpleName(relationship.getFieldName()));
+        String pkGetterName = "get" + UnmapJpaRelationshipsUtils.capitalize(relationship.getReferencedPkName());
+        getPkCall.setName(ast.newSimpleName(pkGetterName));
+        fkAssignment.setRightHandSide(getPkCall);
+
+        Block thenBlock = ast.newBlock();
+        thenBlock.statements().add(ast.newExpressionStatement(fkAssignment));
+
+        IfStatement ifStatement = ast.newIfStatement();
+        ifStatement.setExpression(fieldNotNull);
+        ifStatement.setThenStatement(thenBlock);
+        return ifStatement;
     }
 
     private boolean replaceAssignmentsWithSetterCalls(
