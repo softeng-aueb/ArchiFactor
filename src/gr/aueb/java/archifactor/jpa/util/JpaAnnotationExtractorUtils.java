@@ -322,6 +322,26 @@ public class JpaAnnotationExtractorUtils {
         return null;
     }
 
+    /**
+     * The collection type the @ManyToMany owning side declares, given either side of the relationship.
+     * The element collection and the syncing set that replace the mapping both live on the owning side,
+     * so the inverse side can only be unmapped when the owning side can.
+     */
+    public String extractManyToManyOwningCollectionType(FieldObject field) {
+        String mappedByFieldName = extractManyToManyMappedByProperty(field);
+        if (mappedByFieldName == null) {
+            return field.getType().getClassType();
+        }
+
+        ClassObject owningEntity = findEntityByTypeName(getEntityTypeFromField(field));
+        if (owningEntity == null) {
+            return null;
+        }
+
+        FieldObject owningField = findFieldInEntity(owningEntity, mappedByFieldName);
+        return owningField != null ? owningField.getType().getClassType() : null;
+    }
+
     private String extractManyToManyMappedByProperty(FieldObject field) {
         for (Annotation annotation : field.getAnnotations()) {
             String annotationType = annotation.getTypeName().getFullyQualifiedName();

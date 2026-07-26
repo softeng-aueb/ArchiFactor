@@ -82,6 +82,7 @@ public class UnmapJpaRelationships extends ViewPart {
     private FrameworkType selectedFramework = FrameworkType.QUARKUS;
     private SystemObject cachedSystemObject;
     private List<RelationshipInfo> detectedRelationships = new ArrayList<RelationshipInfo>();
+    private List<String> skippedRelationships = new ArrayList<String>();
 
     class ViewContentProvider implements IStructuredContentProvider {
         public void inputChanged(Viewer v, Object oldInput, Object newInput) {
@@ -390,6 +391,7 @@ public class UnmapJpaRelationships extends ViewPart {
                 refreshSystemObjectToMatchCurrentCode(shell);
                 detectRelationships(entities);
                 tableViewer.refresh();
+                reportSkippedRelationships(shell);
             } catch (CompositeKeyException e) {
                 MessageDialog.openError(shell, "Composite Keys Not Supported",
                     "Cannot proceed with breaking relationships:\n" + e.getMessage());
@@ -406,6 +408,7 @@ public class UnmapJpaRelationships extends ViewPart {
     
     private void detectRelationships(List<ClassObject> selectedEntities) {
         detectedRelationships.clear();
+        skippedRelationships.clear();
 
         Set<String> selectedEntityNames = selectedEntities.stream()
             .map(ClassObject::getName)
@@ -466,6 +469,18 @@ public class UnmapJpaRelationships extends ViewPart {
                         	isOwningSide = mappedBy == null;
                         }
 
+                        // The owning side is replaced by a generated set that syncs its elements into the element collection, 
+                        // so a List-declared field would no longer compile.
+                        if (relationshipType == JpaRelationshipType.MANY_TO_MANY) {
+                            String owningCollectionType = jpaExtractor.extractManyToManyOwningCollectionType(fieldObject);
+                            if (!"Set".equals(UnmapJpaRelationshipsUtils.getSimpleClassName(owningCollectionType))) {
+                                skippedRelationships.add(UnmapJpaRelationshipsUtils.getSimpleClassName(sourceEntity.getName())
+                                    + "." + fieldObject.getName() + "  @ManyToMany needs a Set-declared owning side, found "
+                                    + (owningCollectionType != null ? owningCollectionType : "an unresolvable owning side"));
+                                continue;
+                            }
+                        }
+
                         String joinColumnName = jpaExtractor.extractJoinColumnName(fieldObject, isOwningSide);
                         String originPkType = jpaExtractor.extractIdFieldType(sourceEntity.getName());
                         String referencedPkType = jpaExtractor.extractIdFieldType(fieldTypeName);
@@ -500,6 +515,25 @@ public class UnmapJpaRelationships extends ViewPart {
                 }
             }
         }
+    }
+
+    /**
+     * Relationships the tool cannot unmap will remain mapped instead of aborting the run, so the
+     * user learns which parts of the boundary stay coupled while the rest are still refactored.
+     */
+    private void reportSkippedRelationships(Shell shell) {
+        if (skippedRelationships.isEmpty()) {
+            return;
+        }
+
+        StringBuilder skipped = new StringBuilder();
+        for (String skippedRelationship : skippedRelationships) {
+            skipped.append("  ").append(skippedRelationship).append("\n");
+        }
+
+        MessageDialog.openWarning(shell, "Unsupported Relationships Skipped",
+            "These relationships cross the boundary but cannot be unmapped:\n\n"
+            + skipped);
     }
 
     /**
