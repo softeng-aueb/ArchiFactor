@@ -327,7 +327,16 @@ public class EntityTransformer {
         columnName.setLiteralValue(fkFieldName);
         nameValue.setValue(columnName);
         columnAnnotation.values().add(nameValue);
-        
+
+        // A @OneToOne join column is unique by definition, so the plain column has to say so
+        // or schema generation would silently allow the relationship to become one-to-many
+        if (relationship.getRelationshipType() == JpaRelationshipType.ONE_TO_ONE) {
+            MemberValuePair uniqueValue = ast.newMemberValuePair();
+            uniqueValue.setName(ast.newSimpleName("unique"));
+            uniqueValue.setValue(ast.newBooleanLiteral(true));
+            columnAnnotation.values().add(uniqueValue);
+        }
+
         fkField.modifiers().add(columnAnnotation);
         fkField.modifiers().add(ast.newModifier(Modifier.ModifierKeyword.PRIVATE_KEYWORD));
 
@@ -613,7 +622,7 @@ public class EntityTransformer {
         if (genericType != null && !genericType.isEmpty()) {
             newMethodBody = createCollectionLazyLoadingBlock(ast, fieldName, entity, relationship, importRewrite);
         } else {
-            newMethodBody = createSimpleTypeLazyLoadingBlock(ast, fieldName, relationship, importRewrite);
+            newMethodBody = createSimpleTypeLazyLoadingBlock(ast, fieldName, entity, relationship, importRewrite);
         }
 
         // Replace the method body
@@ -791,7 +800,7 @@ public class EntityTransformer {
         return ast.newExpressionStatement(addAllCall);
     }
 
-    private Block createSimpleTypeLazyLoadingBlock(AST ast, String fieldName, RelationshipInfo relationship, ImportRewrite importRewrite) {
+    private Block createSimpleTypeLazyLoadingBlock(AST ast, String fieldName, ClassObject entity, RelationshipInfo relationship, ImportRewrite importRewrite) {
         Block newBody = ast.newBlock();
 
         String targetEntityName = relationship.getToEntity();
@@ -811,17 +820,26 @@ public class EntityTransformer {
         fieldNullCheck.setOperator(InfixExpression.Operator.EQUALS);
         fieldNullCheck.setRightOperand(ast.newNullLiteral());
 
-        String fkFieldName = relationship.getJoinColumnName();
-        InfixExpression fkNotNullCheck = ast.newInfixExpression();
-        fkNotNullCheck.setLeftOperand(ast.newSimpleName(fkFieldName));
-        fkNotNullCheck.setOperator(InfixExpression.Operator.NOT_EQUALS);
-        String fkFieldType = relationship.getReferencedPkType();
-        fkNotNullCheck.setRightOperand(UnmapJpaRelationshipsUtils.createDefaultValueForPrimitiveType(ast, fkFieldType));
+        // The owning side looks the target up by the foreign key it now holds. The inverse side of a
+        // @OneToOne holds no foreign key, so it looks the target up by its own id, like a @OneToMany does.
+        Expression keyIsSetCheck;
+        Expression serviceMethodArgument;
+        if (relationship.isOwningSide()) {
+            String fkFieldName = relationship.getJoinColumnName();
+            keyIsSetCheck = createKeyIsSetCheck(ast, ast.newSimpleName(fkFieldName), relationship.getReferencedPkType());
+            serviceMethodArgument = ast.newSimpleName(fkFieldName);
+        } else {
+            JpaAnnotationExtractorUtils jpaAnnotationExtractor = new JpaAnnotationExtractorUtils(systemObject);
+            String idFieldName = jpaAnnotationExtractor.extractIdFieldName(entity.getName());
+            String idFieldType = jpaAnnotationExtractor.extractIdFieldType(entity.getName());
+            keyIsSetCheck = createKeyIsSetCheck(ast, createIdAccessExpression(ast, entity, idFieldName), idFieldType);
+            serviceMethodArgument = createIdAccessExpression(ast, entity, idFieldName);
+        }
 
         InfixExpression combinedCondition = ast.newInfixExpression();
         combinedCondition.setLeftOperand(fieldNullCheck);
         combinedCondition.setOperator(InfixExpression.Operator.CONDITIONAL_AND);
-        combinedCondition.setRightOperand(fkNotNullCheck);
+        combinedCondition.setRightOperand(keyIsSetCheck);
 
         MethodInvocation isContainerAvailableCall = ast.newMethodInvocation();
         isContainerAvailableCall.setExpression(ast.newName("ServiceFactory"));
@@ -852,7 +870,7 @@ public class EntityTransformer {
         MethodInvocation serviceMethodCall = ast.newMethodInvocation();
         serviceMethodCall.setExpression(ast.newSimpleName(serviceName));
         serviceMethodCall.setName(ast.newSimpleName(serviceMethodName));
-        serviceMethodCall.arguments().add(ast.newSimpleName(fkFieldName));
+        serviceMethodCall.arguments().add(serviceMethodArgument);
 
         Assignment assignment = ast.newAssignment();
         assignment.setLeftHandSide(ast.newSimpleName(fieldName));
@@ -870,6 +888,15 @@ public class EntityTransformer {
         importRewrite.addImport(serviceFactoryPackage + ".ServiceFactory");
 
         return newBody;
+    }
+
+    // Create: <key> != null, or a comparison against 0 / 0L when the key is a primitive
+    private Expression createKeyIsSetCheck(AST ast, Expression key, String keyType) {
+        InfixExpression keyIsSet = ast.newInfixExpression();
+        keyIsSet.setLeftOperand(key);
+        keyIsSet.setOperator(InfixExpression.Operator.NOT_EQUALS);
+        keyIsSet.setRightOperand(UnmapJpaRelationshipsUtils.createDefaultValueForPrimitiveType(ast, keyType));
+        return keyIsSet;
     }
 
     private boolean replaceFieldAccessesWithMethodCalls(

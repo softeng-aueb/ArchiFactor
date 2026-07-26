@@ -6,22 +6,26 @@ import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 import java.util.Collections;
 import java.util.Set;
 
-public class ManyToOneServiceMethodProvider extends AbstractServiceMethodProvider {
+/**
+ * The owning side of a to-one association, whether it was declared @ManyToOne or @OneToOne.
+ * Both keep the foreign key on this entity, so both look the target up by its primary key.
+ */
+public class ToOneOwningServiceMethodProvider extends AbstractServiceMethodProvider {
 	private final String toEntityIdTypeSimple;
 
-	private ManyToOneServiceMethodProvider(String toEntity, String toEntityIdTypeSimple, String methodName) {
+	private ToOneOwningServiceMethodProvider(String toEntity, String toEntityIdTypeSimple, String methodName) {
 		super(toEntity, methodName);
 		this.toEntityIdTypeSimple = toEntityIdTypeSimple;
 	}
 
-	public static ManyToOneServiceMethodProvider fromRelationship(RelationshipInfo relationship) {
+	public static ToOneOwningServiceMethodProvider fromRelationship(RelationshipInfo relationship) {
 		String toEntity = relationship.getToEntity();
 		String toEntitySimple = UnmapJpaRelationshipsUtils.getSimpleClassName(toEntity);
 		String toEntityIdType = relationship.getReferencedPkType();
 		String toEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(toEntityIdType);
 		String methodName = "get" + toEntitySimple + "ById";
 
-		return new ManyToOneServiceMethodProvider(toEntity, toEntityIdTypeSimple, methodName);
+		return new ToOneOwningServiceMethodProvider(toEntity, toEntityIdTypeSimple, methodName);
 	}
 
 	@Override

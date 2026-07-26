@@ -9,7 +9,7 @@ refactoring.
 ## What the refactoring did (and why some queries now break)
 
 For each relationship listed in the manifest below, a JPA association field (for example a
-`@ManyToOne`, `@OneToMany`, or `@ManyToMany`) was turned into a `@Transient` field that
+`@ManyToOne`, `@OneToMany`, `@ManyToMany`, or `@OneToOne`) was turned into a `@Transient` field that
 is lazy-loaded through a generated service. The relationship data is now kept differently:
 - On the **owning side**, the association was replaced by a real persistent field:
   - a **foreign-key field** for to-one relationships (manifest: `newForeignKeyField`), or
@@ -163,7 +163,7 @@ the manifest tell you where the data now lives.
 - **Never** edit test code, test resources, or assertions to make a test pass. The tests define
   correct behavior; if a test fails, the production query is still wrong.
 - **Never** re-introduce a removed mapping: do not add back `@ManyToOne` / `@OneToMany` /
-  `@ManyToMany` / `@JoinColumn` / `@JoinTable` / `mappedBy`, and do not un-`@Transient` the
+  `@ManyToMany` / `@OneToOne` / `@JoinColumn` / `@JoinTable` / `mappedBy`, and do not un-`@Transient` the
   unmapped fields. The refactoring is intentional.
 - Touch **only** query code (JPQL strings, `@Query` / `@NamedQuery` values, Criteria builders,
   repository method declarations and their call sites) and the generated service

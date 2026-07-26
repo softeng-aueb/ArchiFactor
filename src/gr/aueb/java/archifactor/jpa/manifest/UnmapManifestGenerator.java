@@ -99,9 +99,7 @@ public class UnmapManifestGenerator {
                 sb.append("      }");
             }
         } else {
-            // For inverse sides the relationship data now lives on the target
-            // entity; record where, so each entry is self-contained.
-            if (relationship.getRelationshipType() == JpaRelationshipType.ONE_TO_MANY) {
+            if (relationship.getRelationshipType() == JpaRelationshipType.ONE_TO_MANY || relationship.getRelationshipType() == JpaRelationshipType.ONE_TO_ONE) {
                 sb.append(",\n");
                 sb.append("      \"targetForeignKeyField\": ").append(quote(relationship.getJoinColumnName()));
             } else if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY) {

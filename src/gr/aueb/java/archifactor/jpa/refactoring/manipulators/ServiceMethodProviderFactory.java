@@ -8,7 +8,7 @@ public class ServiceMethodProviderFactory {
 	public static ServiceMethodProvider createProvider(RelationshipInfo relationship) {
 		JpaRelationshipType relationshipType = relationship.getRelationshipType();
 		if (relationshipType == JpaRelationshipType.MANY_TO_ONE) {
-			return ManyToOneServiceMethodProvider.fromRelationship(relationship);
+			return ToOneOwningServiceMethodProvider.fromRelationship(relationship);
 		} else if (relationshipType == JpaRelationshipType.ONE_TO_MANY) {
 			return OneToManyServiceMethodProvider.fromRelationship(relationship);
 		} else if (relationshipType == JpaRelationshipType.MANY_TO_MANY) {
@@ -16,6 +16,12 @@ public class ServiceMethodProviderFactory {
 				return ManyToManyOwningServiceMethodProvider.fromRelationship(relationship);
 			} else {
 				return ManyToManyNonOwningServiceMethodProvider.fromRelationship(relationship);
+			}
+		} else if (relationshipType == JpaRelationshipType.ONE_TO_ONE) {
+			if (relationship.isOwningSide()) {
+				return ToOneOwningServiceMethodProvider.fromRelationship(relationship);
+			} else {
+				return OneToOneInverseServiceMethodProvider.fromRelationship(relationship);
 			}
 		}
 		return null;
