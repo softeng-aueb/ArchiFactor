@@ -263,8 +263,6 @@ public class AggregationsIdentificationView extends ViewPart {
             	sb.append(" [Transactional]");
             }
             sb.append("\n");
-            sb.append("Accessed Entities: ");
-            sb.append(callGraph.getRoot().accessedEntities.toString()).append("\n");
             sb.append("Defined Entities: ");
             sb.append(callGraph.getRoot().definedEntities.toString()).append("\n");
             sb.append("Created Entities: ");
@@ -290,12 +288,6 @@ public class AggregationsIdentificationView extends ViewPart {
     private void appendCalls(StringBuilder sb, CallGraphNode node, String indent) {
         for (CallGraphNode calledMethod : node.calledMethods) {
             sb.append(indent).append(calledMethod.methodName);
-            if(calledMethod.isEntityMethod) {
-            	sb.append(" [Entity method]");
-            	if(calledMethod.isReadOnly()) {
-            		sb.append(" [ReadOnly]");
-            	}
-            }
             sb.append("\n");
             appendCalls(sb, calledMethod, indent + "  ");
         }

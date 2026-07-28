@@ -158,7 +158,7 @@ public abstract class BaseCallGraphBuilder {
         if (persistedEntityType != null) {
             handlePersistenceCall(parentNode, invokedMethodType, fullMethodName, persistedEntityType);
         } else {
-        	handleUserWrittenCall(parentNode, methodBinding, invokedMethodType, invokedMethodTypeFqn, fullMethodName, visitedMethods);
+        	handleUserWrittenCall(parentNode, methodBinding, invokedMethodTypeFqn, fullMethodName, visitedMethods);
         }
     }
 
@@ -207,14 +207,10 @@ public abstract class BaseCallGraphBuilder {
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
     }
 
-    private void handleUserWrittenCall(CallGraphNode parentNode, IMethodBinding methodBinding, ITypeBinding invokedMethodType, String invokedMethodTypeName, String fullMethodName, Set<String> visitedMethods) {
+    private void handleUserWrittenCall(CallGraphNode parentNode, IMethodBinding methodBinding, String invokedMethodTypeName, String fullMethodName, Set<String> visitedMethods) {
         CallGraphNode calledNode = new CallGraphNode(fullMethodName);
         ClassObject invokedMethodClass = systemObject.getClassObject(invokedMethodTypeName);
         calledNode.classObject = invokedMethodClass;
-
-        if (isEntityType(invokedMethodType)) {
-            recordEntityAccess(calledNode, invokedMethodTypeName, invokedMethodClass);
-        }
 
         MethodObject calleeMethod = resolveCalleeMethod(methodBinding);
         if (calleeMethod == null) {
@@ -235,14 +231,6 @@ public abstract class BaseCallGraphBuilder {
         calledNode.isTransactional = resolveTransactional(parentNode, calleeMethodDeclaration);
         findMethodCalls(calledNode, calleeMethodDeclaration, visitedMethods);
         mergeCalledNodeIntoParent(parentNode, calledNode);
-    }
-
-    private void recordEntityAccess(CallGraphNode calledNode, String invokedMethodTypeName, ClassObject invokedMethodClass) {
-        calledNode.isEntityMethod = true;
-        calledNode.accessedEntities.add(invokedMethodTypeName);
-        if (invokedMethodClass != null) {
-            calledNode.accessedEntitiesObjects.add(invokedMethodClass);
-        }
     }
 
     private MethodObject resolveCalleeMethod(IMethodBinding methodBinding) {
@@ -267,8 +255,6 @@ public abstract class BaseCallGraphBuilder {
     }
 
     private void mergeCalledNodeIntoParent(CallGraphNode parentNode, CallGraphNode calledNode) {
-        parentNode.accessedEntities.addAll(calledNode.accessedEntities);
-        parentNode.accessedEntitiesObjects.addAll(calledNode.accessedEntitiesObjects);
         parentNode.definedEntities.addAll(calledNode.definedEntities);
         parentNode.definedEntitiesObjects.addAll(calledNode.definedEntitiesObjects);
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
