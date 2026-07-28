@@ -5,7 +5,6 @@ import org.eclipse.jdt.core.*;
 import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jdt.core.search.*;
 
-import gr.aueb.java.archifactor.util.PackageUtils;
 import gr.uom.java.ast.ASTReader;
 import gr.uom.java.ast.ClassObject;
 import gr.uom.java.ast.MethodObject;
@@ -16,13 +15,13 @@ import java.util.*;
 public abstract class BaseCallGraphBuilder {
     protected final IJavaProject javaProject;
     protected final SystemObject systemObject;
-    protected final String projectPackagePrefix;
+    protected final Set<String> projectSourcePackages;
     private final Map<String, IMethod> implementationCache = new HashMap<String, IMethod>();
 
     public BaseCallGraphBuilder(IJavaProject javaProject, SystemObject systemObject) throws JavaModelException {
         this.javaProject = javaProject;
         this.systemObject = systemObject;
-        this.projectPackagePrefix = determineProjectPackagePrefix(javaProject.getPackageFragments());
+        this.projectSourcePackages = determineProjectSourcePackages(javaProject.getPackageFragments());
     }
 
     protected abstract boolean isController(TypeDeclaration node);
@@ -145,7 +144,7 @@ public abstract class BaseCallGraphBuilder {
 
         ITypeBinding persistedEntityType = resolvePersistedEntityType(methodInvocation, methodBinding);
         String invokedMethodTypeFqn = invokedMethodType.getQualifiedName();
-        boolean userWritten = invokedMethodTypeFqn.startsWith(projectPackagePrefix);
+        boolean userWritten = isProjectSource(invokedMethodTypeFqn);
         if (persistedEntityType == null && !userWritten) {
             return;
         }
@@ -391,7 +390,7 @@ public abstract class BaseCallGraphBuilder {
                 if (type.getCompilationUnit() == null) {
                     return;
                 }
-                if (!type.getPackageFragment().getElementName().startsWith(projectPackagePrefix)) {
+                if (!isProjectSource(type.getPackageFragment().getElementName())) {
                     return;
                 }
                 implementers.add(type);
@@ -564,7 +563,7 @@ public abstract class BaseCallGraphBuilder {
         return (callerNode != null && callerNode.isTransactional) || isTransactional(type) || isTransactional(method);
     }
 
-    private String determineProjectPackagePrefix(IPackageFragment[] packageFragments) throws JavaModelException {
+    private Set<String> determineProjectSourcePackages(IPackageFragment[] packageFragments) throws JavaModelException {
         Set<String> packageNames = new HashSet<String>();
         for (IPackageFragment packageFragment : packageFragments) {
             if (packageFragment.getKind() != IPackageFragmentRoot.K_SOURCE) {
@@ -579,6 +578,18 @@ public abstract class BaseCallGraphBuilder {
             }
             packageNames.add(name);
         }
-        return PackageUtils.findCommonAncestorPackage(packageNames);
+        return packageNames;
+    }
+
+    private boolean isProjectSource(String qualifiedName) {
+        String candidate = qualifiedName;
+        while (candidate != null) {
+            if (projectSourcePackages.contains(candidate)) {
+                return true;
+            }
+            int lastDot = candidate.lastIndexOf('.');
+            candidate = lastDot > 0 ? candidate.substring(0, lastDot) : null;
+        }
+        return false;
     }
 }
