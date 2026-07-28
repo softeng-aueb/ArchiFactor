@@ -6,11 +6,13 @@ public class LouvainClustering<T> {
     private static final double RESOLUTION = 1.0;
 
     // Full Louvain: alternate local moving and graph coarsening until no further merging happens.
-    public List<Set<T>> louvainClustering(ClusteringGraph<T> graph) {
+    public List<Set<T>> louvainClustering(ClusteringGraph<T> graph, Comparator<T> vertexOrder) {
         List<T> originalNodes = new ArrayList<T>(graph.getVertices());
         if (originalNodes.isEmpty()) {
             return new ArrayList<Set<T>>();
         }
+
+        Collections.sort(originalNodes, vertexOrder);
 
         Map<T, Integer> originalNodeId = new HashMap<T, Integer>();
         Map<Integer, Set<T>> superNodeMembers = new HashMap<Integer, Set<T>>();
@@ -22,7 +24,7 @@ public class LouvainClustering<T> {
             superNodeMembers.put(i, singleton);
         }
 
-        ClusteringGraph<Integer> workingGraph = liftToIntegerGraph(graph, originalNodeId);
+        ClusteringGraph<Integer> workingGraph = liftToIntegerGraph(graph, originalNodeId, originalNodes);
 
         while (true) {
             List<Set<Integer>> communities = localMovingPhase(workingGraph);
@@ -49,16 +51,16 @@ public class LouvainClustering<T> {
         return new ArrayList<Set<T>>(superNodeMembers.values());
     }
 
-    private static <X> ClusteringGraph<Integer> liftToIntegerGraph(ClusteringGraph<X> source, Map<X, Integer> nodeIdMap) {
+    private static <X> ClusteringGraph<Integer> liftToIntegerGraph(ClusteringGraph<X> source, Map<X, Integer> nodeIdMap, List<X> orderedNodes) {
         ClusteringGraph<Integer> result = new ClusteringGraph<Integer>();
-        for (X node : source.getVertices()) {
+        for (X node : orderedNodes) {
             result.addVertex(nodeIdMap.get(node));
         }
 
         // Each undirected edge is stored twice in the source adjacency lists, so emit once per pair
         // to avoid doubling weights when ClusteringGraph.addEdge re-inserts in both directions.
         Set<Long> emittedPairs = new HashSet<Long>();
-        for (X node : source.getVertices()) {
+        for (X node : orderedNodes) {
             int srcId = nodeIdMap.get(node);
             for (ClusteringGraph.Edge<X> edge : source.getNeighbors(node)) {
                 int dstId = nodeIdMap.get(edge.getTarget());

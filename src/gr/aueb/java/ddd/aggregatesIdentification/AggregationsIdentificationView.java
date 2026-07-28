@@ -9,6 +9,7 @@ import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -234,7 +235,11 @@ public class AggregationsIdentificationView extends ViewPart {
 	        text.append(enhancedGraphString.toString());
 
 	        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>();
-	        List<Set<ClassObject>> clusters = clustering.louvainClustering(clusteringGraph);
+	        List<Set<ClassObject>> clusters = clustering.louvainClustering(clusteringGraph, new Comparator<ClassObject>() {
+	            public int compare(ClassObject a, ClassObject b) {
+	                return a.getName().compareTo(b.getName());
+	            }
+	        });
 
 	        if (displayLogs) {
 	        	displayCallGraphs(callGraphs);
