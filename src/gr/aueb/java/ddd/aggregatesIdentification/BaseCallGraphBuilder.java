@@ -149,11 +149,12 @@ public abstract class BaseCallGraphBuilder {
             return;
         }
 
-        String fullMethodName = invokedMethodTypeFqn + "." + methodInvocation.getName().getIdentifier();
-        if (!visitedMethods.add(fullMethodName)) {
+        // Key by binding signature: a name-only key collapses overloads and truncates self-delegating overload chains.
+        if (!visitedMethods.add(methodBinding.getMethodDeclaration().getKey())) {
             return;
         }
 
+        String fullMethodName = invokedMethodTypeFqn + "." + methodInvocation.getName().getIdentifier();
         if (persistedEntityType != null) {
             handlePersistenceCall(parentNode, invokedMethodType, fullMethodName, persistedEntityType);
         } else {
