@@ -260,9 +260,6 @@ public abstract class BaseCallGraphBuilder {
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
         parentNode.createdEntities.addAll(calledNode.createdEntities);
         parentNode.creationRecords.addAll(calledNode.creationRecords);
-        if (calledNode.isTransactional) {
-            parentNode.isTransactional = true;
-        }
     }
 
     private void handleInstanceCreation(CallGraphNode parentNode, ClassInstanceCreation node) {
@@ -440,6 +437,11 @@ public abstract class BaseCallGraphBuilder {
     }
     
     private void handleEntityFieldWrite(CallGraphNode parentNode, Expression writtenExpression) {
+        // A field mutation only reaches the database via dirty checking, which requires an active transaction.
+        if (!parentNode.isTransactional) {
+            return;
+        }
+
         IVariableBinding fieldBinding = extractFieldBinding(writtenExpression);
         if (fieldBinding == null || !fieldBinding.isField()) {
             return;
