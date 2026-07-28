@@ -156,7 +156,7 @@ public abstract class BaseCallGraphBuilder {
 
         String fullMethodName = invokedMethodTypeFqn + "." + methodInvocation.getName().getIdentifier();
         if (persistedEntityType != null) {
-            handlePersistenceCall(parentNode, invokedMethodType, fullMethodName, persistedEntityType);
+            handlePersistenceCall(parentNode, fullMethodName, persistedEntityType, isDeleteMethodName(methodBinding.getName()));
         } else {
         	handleUserWrittenCall(parentNode, methodBinding, invokedMethodTypeFqn, fullMethodName, visitedMethods);
         }
@@ -172,7 +172,7 @@ public abstract class BaseCallGraphBuilder {
         String invokedMethodName = methodBinding.getName();
 
         boolean isEntityManager = invokedMethodTypeFqn.equals("jakarta.persistence.EntityManager") || invokedMethodTypeFqn.equals("javax.persistence.EntityManager");
-        boolean isPersistenceCall = invokedMethodName.equals("persist") || invokedMethodName.equals("merge");
+        boolean isPersistenceCall = invokedMethodName.equals("persist") || invokedMethodName.equals("merge") || invokedMethodName.equals("remove");
         if (isEntityManager && isPersistenceCall) {
             return extractEntityTypeFromFirstArgument(methodInvocation);
         }
@@ -190,21 +190,32 @@ public abstract class BaseCallGraphBuilder {
         return firstArg.resolveTypeBinding();
     }
 
-    private void handlePersistenceCall(CallGraphNode parentNode, ITypeBinding invokedMethodType, String fullMethodName, ITypeBinding persistedEntityType) {
+    private void handlePersistenceCall(CallGraphNode parentNode, String fullMethodName, ITypeBinding persistedEntityType, boolean isDelete) {
         CallGraphNode calledNode = new CallGraphNode(fullMethodName);
 
-        ClassObject entityCreatedClass = systemObject.getClassObject(persistedEntityType.getQualifiedName());
-        if (entityCreatedClass == null) {
+        ClassObject entityClass = systemObject.getClassObject(persistedEntityType.getQualifiedName());
+        if (entityClass == null) {
             parentNode.calledMethods.add(calledNode);
             return;
         }
 
-        calledNode.createdEntities.add(entityCreatedClass.getName());
-        calledNode.createdEntitiesObjects.add(entityCreatedClass);
+        if (isDelete) {
+            calledNode.deletedEntities.add(entityClass.getName());
+            calledNode.deletedEntitiesObjects.add(entityClass);
+        } else {
+            calledNode.createdEntities.add(entityClass.getName());
+            calledNode.createdEntitiesObjects.add(entityClass);
+        }
 
         parentNode.calledMethods.add(calledNode);
         parentNode.createdEntities.addAll(calledNode.createdEntities);
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
+        parentNode.deletedEntities.addAll(calledNode.deletedEntities);
+        parentNode.deletedEntitiesObjects.addAll(calledNode.deletedEntitiesObjects);
+    }
+
+    private static boolean isDeleteMethodName(String methodName) {
+        return methodName.startsWith("delete") || methodName.startsWith("remove");
     }
 
     private void handleUserWrittenCall(CallGraphNode parentNode, IMethodBinding methodBinding, String invokedMethodTypeName, String fullMethodName, Set<String> visitedMethods) {
@@ -259,6 +270,8 @@ public abstract class BaseCallGraphBuilder {
         parentNode.definedEntitiesObjects.addAll(calledNode.definedEntitiesObjects);
         parentNode.createdEntitiesObjects.addAll(calledNode.createdEntitiesObjects);
         parentNode.createdEntities.addAll(calledNode.createdEntities);
+        parentNode.deletedEntities.addAll(calledNode.deletedEntities);
+        parentNode.deletedEntitiesObjects.addAll(calledNode.deletedEntitiesObjects);
         parentNode.creationRecords.addAll(calledNode.creationRecords);
     }
 

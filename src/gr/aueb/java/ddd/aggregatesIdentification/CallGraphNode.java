@@ -14,6 +14,8 @@ public class CallGraphNode {
     HashSet<ClassObject> createdEntitiesObjects;
     HashSet<String> definedEntities;
     HashSet<ClassObject> definedEntitiesObjects;
+    HashSet<String> deletedEntities;
+    HashSet<ClassObject> deletedEntitiesObjects;
     HashSet<CreationRecord> creationRecords;
 
     public CallGraphNode(String methodName) {
@@ -24,11 +26,13 @@ public class CallGraphNode {
         this.createdEntitiesObjects = new HashSet<ClassObject>();
         this.definedEntities = new HashSet<String>();
         this.definedEntitiesObjects = new HashSet<ClassObject>();
+        this.deletedEntities = new HashSet<String>();
+        this.deletedEntitiesObjects = new HashSet<ClassObject>();
         this.creationRecords = new HashSet<CreationRecord>();
     }
 
     public boolean isReadOnly() {
-        return definedEntitiesObjects.isEmpty() && createdEntitiesObjects.isEmpty();
+        return definedEntitiesObjects.isEmpty() && createdEntitiesObjects.isEmpty() && deletedEntitiesObjects.isEmpty();
     }
 
 }

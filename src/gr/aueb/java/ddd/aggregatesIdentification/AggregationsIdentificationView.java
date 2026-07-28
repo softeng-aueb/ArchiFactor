@@ -267,6 +267,8 @@ public class AggregationsIdentificationView extends ViewPart {
             sb.append(callGraph.getRoot().definedEntities.toString()).append("\n");
             sb.append("Created Entities: ");
             sb.append(callGraph.getRoot().createdEntities.toString()).append("\n");
+            sb.append("Deleted Entities: ");
+            sb.append(callGraph.getRoot().deletedEntities.toString()).append("\n");
             sb.append("Calls: \n");
             appendCalls(sb, callGraph.getRoot(), "  ");
             sb.append("\n");

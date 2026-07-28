@@ -66,6 +66,7 @@ public class ClusteringGraphEnhancer<T> {
             Set<ClassObject> writtenEntitiesSet = new HashSet<ClassObject>();
             writtenEntitiesSet.addAll(root.createdEntitiesObjects);
             writtenEntitiesSet.addAll(root.definedEntitiesObjects);
+            writtenEntitiesSet.addAll(root.deletedEntitiesObjects);
             List<ClassObject> writtenEntities = new ArrayList<ClassObject>(writtenEntitiesSet);
 
             for (ClassObject entity : writtenEntities) {

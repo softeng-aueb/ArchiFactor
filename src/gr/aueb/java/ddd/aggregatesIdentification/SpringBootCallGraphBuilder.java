@@ -52,12 +52,23 @@ public class SpringBootCallGraphBuilder extends BaseCallGraphBuilder {
     private static final String LIST_CRUD_REPOSITORY = "org.springframework.data.repository.ListCrudRepository";
     private static final String JPA_REPOSITORY = "org.springframework.data.jpa.repository.JpaRepository";
 
-    private static final Set<String> SAVE_METHODS = new HashSet<String>(Arrays.asList(
-        "save", 
-        "saveAll", 
-        "saveAndFlush", 
-        "saveAllAndFlush"
+    private static final Set<String> WRITE_METHODS = new HashSet<String>(Arrays.asList(
+        "save",
+        "saveAll",
+        "saveAndFlush",
+        "saveAllAndFlush",
+        "delete",
+        "deleteById",
+        "deleteAll",
+        "deleteAllById",
+        "deleteInBatch",
+        "deleteAllInBatch",
+        "deleteAllByIdInBatch"
     ));
+
+    private static boolean isWriteMethod(String methodName) {
+        return WRITE_METHODS.contains(methodName) || methodName.startsWith("deleteBy") || methodName.startsWith("removeBy");
+    }
 
     public SpringBootCallGraphBuilder(IJavaProject javaProject, SystemObject systemObject) throws JavaModelException {
         super(javaProject, systemObject);
@@ -85,7 +96,7 @@ public class SpringBootCallGraphBuilder extends BaseCallGraphBuilder {
 
     @Override
     protected ITypeBinding resolveFrameworkPersistedEntityType(MethodInvocation invocation, IMethodBinding binding) {
-        if (!SAVE_METHODS.contains(binding.getName())) {
+        if (!isWriteMethod(binding.getName())) {
             return null;
         }
 

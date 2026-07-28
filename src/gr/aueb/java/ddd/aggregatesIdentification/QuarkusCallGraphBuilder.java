@@ -57,9 +57,12 @@ public class QuarkusCallGraphBuilder extends BaseCallGraphBuilder {
     private static final String PANACHE_REPOSITORY = "io.quarkus.hibernate.orm.panache.PanacheRepository";
     private static final String PANACHE_ENTITY_BASE = "io.quarkus.hibernate.orm.panache.PanacheEntityBase";
 
-    private static final Set<String> SAVE_METHODS = new HashSet<String>(Arrays.asList(
-        "persist", 
-        "merge"
+    private static final Set<String> WRITE_METHODS = new HashSet<String>(Arrays.asList(
+        "persist",
+        "merge",
+        "delete",
+        "deleteById",
+        "deleteAll"
     ));
 
     public QuarkusCallGraphBuilder(IJavaProject javaProject, SystemObject systemObject) throws JavaModelException {
@@ -88,7 +91,7 @@ public class QuarkusCallGraphBuilder extends BaseCallGraphBuilder {
 
     @Override
     protected ITypeBinding resolveFrameworkPersistedEntityType(MethodInvocation invocation, IMethodBinding binding) {
-        if (!SAVE_METHODS.contains(binding.getName())) {
+        if (!WRITE_METHODS.contains(binding.getName())) {
             return null;
         }
 
