@@ -98,6 +98,7 @@ public abstract class BaseCallGraphBuilder {
         method.accept(new ASTVisitor() {
             @Override
             public boolean visit(MethodInvocation methodInvocation) {
+                handleCollectionMutation(parentNode, methodInvocation);
                 handleMethodInvocation(parentNode, methodInvocation, visitedMethods);
                 return super.visit(methodInvocation);
             }
@@ -465,7 +466,74 @@ public abstract class BaseCallGraphBuilder {
             return;
         }
 
-        String mutatedEntityFqn = fieldType.getQualifiedName();
+        recordDefinedEntity(parentNode, fieldType);
+    }
+
+    private static final Set<String> COLLECTION_MUTATORS = new HashSet<String>(Arrays.asList(
+        "add",
+        "addAll",
+        "remove",
+        "removeAll",
+        "retainAll",
+        "clear",
+        "put",
+        "putAll"
+    ));
+
+    // Collection mutations persist through dirty checking like field assignments, so the same
+    // transactional gate applies. Each captured mutation records both ends of the association.
+    private void handleCollectionMutation(CallGraphNode parentNode, MethodInvocation methodInvocation) {
+        if (!parentNode.isTransactional) {
+            return;
+        }
+
+        if (!COLLECTION_MUTATORS.contains(methodInvocation.getName().getIdentifier())) {
+            return;
+        }
+
+        Expression receiver = methodInvocation.getExpression();
+        if (receiver == null) {
+            return;
+        }
+
+        ITypeBinding mutatedEntityType = resolveMutatedEntityType(receiver);
+        if (mutatedEntityType == null) {
+            return;
+        }
+
+        recordDefinedEntity(parentNode, mutatedEntityType);
+        recordEntityTypeArguments(parentNode, receiver.resolveTypeBinding());
+    }
+
+    // Decides whether the mutation deserves recording at all. Only collections owned by an
+    // entity qualify, found through the declaring class of the field (this.items.add(x))
+    // or of the accessor (entity.getItems().add(x)).
+    private ITypeBinding resolveMutatedEntityType(Expression receiver) {
+        IVariableBinding fieldBinding = extractFieldBinding(receiver);
+        if (fieldBinding != null && fieldBinding.isField()) {
+            ITypeBinding declaringClass = fieldBinding.getDeclaringClass();
+            if (declaringClass != null && isEntityType(declaringClass)) {
+                return declaringClass;
+            }
+            return null;
+        }
+
+        if (receiver instanceof MethodInvocation) {
+            IMethodBinding accessorBinding = ((MethodInvocation) receiver).resolveMethodBinding();
+            if (accessorBinding == null) {
+                return null;
+            }
+            ITypeBinding declaringClass = accessorBinding.getDeclaringClass();
+            if (declaringClass != null && isEntityType(declaringClass)) {
+                return declaringClass;
+            }
+        }
+
+        return null;
+    }
+
+    private void recordDefinedEntity(CallGraphNode parentNode, ITypeBinding entityType) {
+        String mutatedEntityFqn = entityType.getQualifiedName();
         ClassObject mutatedEntityClass = systemObject.getClassObject(mutatedEntityFqn);
         if (mutatedEntityClass == null) {
             return;
@@ -473,6 +541,20 @@ public abstract class BaseCallGraphBuilder {
 
         parentNode.definedEntities.add(mutatedEntityFqn);
         parentNode.definedEntitiesObjects.add(mutatedEntityClass);
+    }
+
+    // Records the element half of the co-written pair. Whichever way the association is mapped,
+    // the mutation touches its other end, so entity type arguments count as written too.
+    private void recordEntityTypeArguments(CallGraphNode parentNode, ITypeBinding collectionType) {
+        if (collectionType == null) {
+            return;
+        }
+
+        for (ITypeBinding typeArgument : collectionType.getTypeArguments()) {
+            if (isEntityType(typeArgument)) {
+                recordDefinedEntity(parentNode, typeArgument);
+            }
+        }
     }
 
     private IVariableBinding extractFieldBinding(Expression expression) {
