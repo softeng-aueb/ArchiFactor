@@ -47,6 +47,11 @@ public class QuarkusCallGraphBuilder extends BaseCallGraphBuilder {
         "Path"
     ));
 
+    private static final Set<String> SCHEDULED_ANNOTATIONS = new HashSet<String>(Arrays.asList(
+        "io.quarkus.scheduler.Scheduled",
+        "Scheduled"
+    ));
+
     private static final Set<String> TRANSACTIONAL_ANNOTATIONS = new HashSet<String>(Arrays.asList(
         "jakarta.transaction.Transactional", 
         "javax.transaction.Transactional", 
@@ -77,6 +82,11 @@ public class QuarkusCallGraphBuilder extends BaseCallGraphBuilder {
     @Override
     protected boolean isEndpoint(MethodDeclaration method) {
         return hasAnyAnnotation(method.modifiers(), ENDPOINT_ANNOTATIONS);
+    }
+
+    @Override
+    protected boolean isScheduledJobMethod(MethodDeclaration method) {
+        return hasAnyAnnotation(method.modifiers(), SCHEDULED_ANNOTATIONS);
     }
 
     @Override

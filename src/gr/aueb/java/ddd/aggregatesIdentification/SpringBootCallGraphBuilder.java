@@ -41,6 +41,11 @@ public class SpringBootCallGraphBuilder extends BaseCallGraphBuilder {
         "RequestMapping"
     ));
 
+    private static final Set<String> SCHEDULED_ANNOTATIONS = new HashSet<String>(Arrays.asList(
+        "org.springframework.scheduling.annotation.Scheduled",
+        "Scheduled"
+    ));
+
     private static final Set<String> TRANSACTIONAL_ANNOTATIONS = new HashSet<String>(Arrays.asList(
         "org.springframework.transaction.annotation.Transactional",
         "jakarta.transaction.Transactional",
@@ -82,6 +87,11 @@ public class SpringBootCallGraphBuilder extends BaseCallGraphBuilder {
     @Override
     protected boolean isEndpoint(MethodDeclaration method) {
         return hasAnyAnnotation(method.modifiers(), ENDPOINT_ANNOTATIONS);
+    }
+
+    @Override
+    protected boolean isScheduledJobMethod(MethodDeclaration method) {
+        return hasAnyAnnotation(method.modifiers(), SCHEDULED_ANNOTATIONS);
     }
 
     @Override

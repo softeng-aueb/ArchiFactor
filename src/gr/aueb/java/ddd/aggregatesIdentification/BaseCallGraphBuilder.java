@@ -26,6 +26,7 @@ public abstract class BaseCallGraphBuilder {
 
     protected abstract boolean isController(TypeDeclaration node);
     protected abstract boolean isEndpoint(MethodDeclaration method);
+    protected abstract boolean isScheduledJobMethod(MethodDeclaration method);
     protected abstract boolean isTransactional(MethodDeclaration method);
     protected abstract boolean isTransactional(TypeDeclaration type);
     protected abstract ITypeBinding resolveFrameworkPersistedEntityType(MethodInvocation invocation, IMethodBinding binding);
@@ -52,12 +53,10 @@ public abstract class BaseCallGraphBuilder {
             astRoot.accept(new ASTVisitor() {
                 @Override
                 public boolean visit(TypeDeclaration node) {
-                    if (!isController(node)) {
-                        return super.visit(node);
-                    }
+                    boolean isController = isController(node);
 
                     for (MethodDeclaration method : node.getMethods()) {
-                        if (!isEndpoint(method)) {
+                        if (!(isController && isEndpoint(method)) && !isScheduledJobMethod(method)) {
                             continue;
                         }
                         
@@ -66,17 +65,17 @@ public abstract class BaseCallGraphBuilder {
                             continue;
                         }
 
-                        ITypeBinding controllerClass = methodBinding.getDeclaringClass();
-                        if (controllerClass == null) {
+                        ITypeBinding rootClass = methodBinding.getDeclaringClass();
+                        if (rootClass == null) {
                             continue;
                         }
 
-                        String controllerClassFqn = controllerClass.getQualifiedName();
-                        ClassObject controllerClassObject = systemObject.getClassObject(controllerClassFqn);
+                        String rootClassFqn = rootClass.getQualifiedName();
+                        ClassObject rootClassObject = systemObject.getClassObject(rootClassFqn);
 
                         String methodName = node.getName().getIdentifier() + "." + method.getName().getIdentifier();
                         CallGraphNode rootNode = new CallGraphNode(methodName);
-                        rootNode.classObject = controllerClassObject;
+                        rootNode.classObject = rootClassObject;
                         rootNode.isTransactional = isTransactional(node, method, null);
                         
                         CallGraph callGraph = new CallGraph();
