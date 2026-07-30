@@ -82,9 +82,6 @@ public class ClusteringGraphBuilder {
         for (ClassObject entity : initialVertices) {
             List<ClassObject> ancestors = collectAncestorsInInheritanceHierarchy(entity);
             for (ClassObject ancestor : ancestors) {
-                if (!initialVertices.contains(ancestor)) {
-                    graph.addVertex(ancestor);
-                }
                 addOrUpgradeEdge(graph, entity, ancestor, EdgeType.INHERITANCE);
             }
         }
@@ -106,7 +103,9 @@ public class ClusteringGraphBuilder {
                 break;
             }
 
-            ancestorChain.add(superclass);
+            if (JpaAnnotationExtractorUtils.hasClassAnnotation(superclass, "Entity")) {
+                ancestorChain.add(superclass);
+            }
             if (JpaAnnotationExtractorUtils.hasClassAnnotation(superclass, "Inheritance")) {
                 hierarchyHasInheritanceAnnotation = true;
             }
