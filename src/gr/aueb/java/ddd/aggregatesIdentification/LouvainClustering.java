@@ -30,6 +30,15 @@ public class LouvainClustering<T> {
 
         ClusteringGraph<Integer> workingGraph = liftToIntegerGraph(graph, originalNodeId, originalNodes);
 
+        // Hard-constraint pre-merge. Nodes joined by INHERITANCE or IDENTITY edges collapse into
+        // one super node before clustering, so no resolution setting can ever split them apart.
+        List<Set<Integer>> hardCommunities = hardConstraintCommunities(workingGraph);
+        if (hardCommunities.size() < workingGraph.getVertices().size()) {
+            Map<Integer, Integer> oldIdToNewId = new HashMap<Integer, Integer>();
+            superNodeMembers = collapseCommunities(hardCommunities, superNodeMembers, oldIdToNewId);
+            workingGraph = coarsen(workingGraph, oldIdToNewId);
+        }
+
         while (true) {
             List<Set<Integer>> communities = localMovingPhase(workingGraph);
             if (communities.size() == workingGraph.getVertices().size()) {
@@ -37,22 +46,66 @@ public class LouvainClustering<T> {
             }
 
             Map<Integer, Integer> oldIdToNewId = new HashMap<Integer, Integer>();
-            Map<Integer, Set<T>> nextSuperNodeMembers = new HashMap<Integer, Set<T>>();
-            int newId = 0;
-            for (Set<Integer> community : communities) {
-                Set<T> expandedMembers = new HashSet<T>();
-                for (Integer oldId : community) {
-                    oldIdToNewId.put(oldId, newId);
-                    expandedMembers.addAll(superNodeMembers.get(oldId));
-                }
-                nextSuperNodeMembers.put(newId, expandedMembers);
-                newId++;
-            }
-            superNodeMembers = nextSuperNodeMembers;
+            superNodeMembers = collapseCommunities(communities, superNodeMembers, oldIdToNewId);
             workingGraph = coarsen(workingGraph, oldIdToNewId);
         }
 
         return new ArrayList<Set<T>>(superNodeMembers.values());
+    }
+
+    // Rebuilds the super node member map with one new id per community, recording into oldIdToNewId
+    // the remapping that coarsen needs.
+    private Map<Integer, Set<T>> collapseCommunities(List<Set<Integer>> communities, Map<Integer, Set<T>> members, Map<Integer, Integer> oldIdToNewId) {
+        Map<Integer, Set<T>> collapsed = new HashMap<Integer, Set<T>>();
+        int newId = 0;
+        for (Set<Integer> community : communities) {
+            Set<T> expandedMembers = new HashSet<T>();
+            for (Integer oldId : community) {
+                oldIdToNewId.put(oldId, newId);
+                expandedMembers.addAll(members.get(oldId));
+            }
+            collapsed.put(newId, expandedMembers);
+            newId++;
+        }
+        return collapsed;
+    }
+
+    // Connected components over INHERITANCE and IDENTITY edges only. Nodes without such edges
+    // come back as singleton communities.
+    private static List<Set<Integer>> hardConstraintCommunities(ClusteringGraph<Integer> graph) {
+        List<Integer> nodes = new ArrayList<Integer>(graph.getVertices());
+        Collections.sort(nodes);
+
+        List<Set<Integer>> communities = new ArrayList<Set<Integer>>();
+        Set<Integer> visited = new HashSet<Integer>();
+        for (Integer node : nodes) {
+            if (visited.contains(node)) {
+                continue;
+            }
+            visited.add(node);
+
+            Set<Integer> community = new HashSet<Integer>();
+            community.add(node);
+            Deque<Integer> pending = new ArrayDeque<Integer>();
+            pending.add(node);
+            while (!pending.isEmpty()) {
+                Integer current = pending.poll();
+                for (ClusteringGraph.Edge<Integer> edge : graph.getNeighbors(current)) {
+                    if (edge.getType() != EdgeType.INHERITANCE && edge.getType() != EdgeType.IDENTITY) {
+                        continue;
+                    }
+                    Integer target = edge.getTarget();
+                    if (visited.contains(target)) {
+                        continue;
+                    }
+                    visited.add(target);
+                    community.add(target);
+                    pending.add(target);
+                }
+            }
+            communities.add(community);
+        }
+        return communities;
     }
 
     private static <X> ClusteringGraph<Integer> liftToIntegerGraph(ClusteringGraph<X> source, Map<X, Integer> nodeIdMap, List<X> orderedNodes) {
