@@ -74,6 +74,10 @@ public class ClusteringGraphBuilder {
             return EdgeType.OWNERSHIP;
         }
 
+        if (JpaAnnotationExtractorUtils.hasConvenienceCascade(field)) {
+            return EdgeType.CASCADE;
+        }
+
         return EdgeType.REFERENCE;
     }
 

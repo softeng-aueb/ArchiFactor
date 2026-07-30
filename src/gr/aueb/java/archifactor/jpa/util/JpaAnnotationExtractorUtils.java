@@ -383,11 +383,28 @@ public class JpaAnnotationExtractorUtils {
         return annotationSimpleName.equals(simpleName);
     }
 
-    private static final Set<String> OWNERSHIP_CASCADE_TYPES =
-        new HashSet<String>(Arrays.asList("ALL", "PERSIST", "REMOVE", "MERGE"));
+    private static final Set<String> LIFECYCLE_CASCADE_TYPES =
+        new HashSet<String>(Arrays.asList("ALL", "REMOVE"));
+
+    private static final Set<String> CONVENIENCE_CASCADE_TYPES =
+        new HashSet<String>(Arrays.asList("PERSIST", "MERGE"));
 
     public static boolean hasOwnershipCascade(FieldObject field) {
-        return !extractOwnershipCascadeTypes(field).isEmpty();
+        for (String cascade : extractOwnershipCascadeTypes(field)) {
+            if (LIFECYCLE_CASCADE_TYPES.contains(cascade)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasConvenienceCascade(FieldObject field) {
+        for (String cascade : extractOwnershipCascadeTypes(field)) {
+            if (CONVENIENCE_CASCADE_TYPES.contains(cascade)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static Set<String> extractOwnershipCascadeTypes(FieldObject field) {
@@ -399,7 +416,7 @@ public class JpaAnnotationExtractorUtils {
             }
 
             for (String cascade : extractCascadeTypes(annotation)) {
-                if (OWNERSHIP_CASCADE_TYPES.contains(cascade)) {
+                if (LIFECYCLE_CASCADE_TYPES.contains(cascade) || CONVENIENCE_CASCADE_TYPES.contains(cascade)) {
                     ownershipCascadeTypes.add(cascade);
                 }
             }
