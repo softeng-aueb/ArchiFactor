@@ -45,6 +45,8 @@ public class AggregationsIdentificationView extends ViewPart {
     private ComboViewer frameworkComboViewer;
     private FrameworkType selectedFramework = FrameworkType.QUARKUS;
     private Boolean displayLogs;
+    private Text resolutionText;
+    private double resolution;
     private Text text;
 
     @Override
@@ -95,6 +97,14 @@ public class AggregationsIdentificationView extends ViewPart {
         frameworkComboViewer.setInput(FrameworkType.values());
         frameworkComboViewer.setSelection(new StructuredSelection(selectedFramework));
 
+        // Louvain resolution input
+        Label resolutionLabel = new Label(parent, SWT.NONE);
+        resolutionLabel.setText("Resolution:");
+
+        resolutionText = new Text(parent, SWT.BORDER);
+        resolutionText.setText("1.0");
+        resolutionText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
         // Display Logs checkbox
         final Button logsCheck = new Button(parent, SWT.CHECK);
         logsCheck.setText("Display Logs");
@@ -110,6 +120,20 @@ public class AggregationsIdentificationView extends ViewPart {
         runButton.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 displayLogs = logsCheck.getSelection();
+
+                double parsedResolution;
+                try {
+                    parsedResolution = Double.parseDouble(resolutionText.getText().trim());
+                } catch (NumberFormatException e) {
+                    MessageDialog.openError(getSite().getShell(), "Invalid Resolution", "Resolution must be a positive number.");
+                    return;
+                }
+                if (parsedResolution <= 0) {
+                    MessageDialog.openError(getSite().getShell(), "Invalid Resolution", "Resolution must be a positive number.");
+                    return;
+                }
+                resolution = parsedResolution;
+
                 runAggregationIdentification();
             }
         });
@@ -234,7 +258,7 @@ public class AggregationsIdentificationView extends ViewPart {
 	        enhancedGraphString.append(clusteringGraph.printGraph());
 	        text.append(enhancedGraphString.toString());
 
-	        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>();
+	        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>(resolution);
 	        List<Set<ClassObject>> clusters = clustering.louvainClustering(clusteringGraph, new Comparator<ClassObject>() {
 	            public int compare(ClassObject a, ClassObject b) {
 	                return a.getName().compareTo(b.getName());

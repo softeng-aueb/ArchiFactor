@@ -3,7 +3,11 @@ package gr.aueb.java.ddd.aggregatesIdentification;
 import java.util.*;
 
 public class LouvainClustering<T> {
-    private static final double RESOLUTION = 1.0;
+    private final double resolution;
+
+    public LouvainClustering(double resolution) {
+        this.resolution = resolution;
+    }
 
     // Full Louvain: alternate local moving and graph coarsening until no further merging happens.
     public List<Set<T>> louvainClustering(ClusteringGraph<T> graph, Comparator<T> vertexOrder) {
@@ -137,7 +141,7 @@ public class LouvainClustering<T> {
         return ((long) lo << 32) | (hi & 0xFFFFFFFFL);
     }
 
-    private static <X> List<Set<X>> localMovingPhase(final ClusteringGraph<X> graph) {
+    private <X> List<Set<X>> localMovingPhase(final ClusteringGraph<X> graph) {
         Map<X, Integer> nodeToCommunity = new HashMap<X, Integer>();
         Map<Integer, Set<X>> communities = new HashMap<Integer, Set<X>>();
         Map<Integer, Double> communityTotalWeight = new HashMap<Integer, Double>();
@@ -266,12 +270,12 @@ public class LouvainClustering<T> {
 
     // Classical Louvain modularity gain of placing a node into a community:
     // ΔQ ∝ k_i_in − γ · Σ_tot · k_i / (2m).
-    private static double computeModularityGain(
+    private double computeModularityGain(
 		double edgeWeightIntoCommunity, 
 		double communityTotalWeight,
         double nodeWeight, 
         double graphTotalWeight
     ) {
-        return edgeWeightIntoCommunity - RESOLUTION * communityTotalWeight * nodeWeight / graphTotalWeight;
+        return edgeWeightIntoCommunity - resolution * communityTotalWeight * nodeWeight / graphTotalWeight;
     }
 }
