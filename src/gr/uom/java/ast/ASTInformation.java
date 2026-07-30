@@ -23,6 +23,9 @@ public class ASTInformation {
 	public ASTNode recoverASTNode() {
         CompilationUnit compilationUnit = CompilationUnitCache.getInstance().getCompilationUnit(iTypeRoot);
         ASTNode astNode = NodeFinder.perform(compilationUnit, startPosition, length);
+        while (astNode != null && astNode.getNodeType() != nodeType) {
+            astNode = astNode.getParent();
+        }
 		return astNode;
 	}
 	
