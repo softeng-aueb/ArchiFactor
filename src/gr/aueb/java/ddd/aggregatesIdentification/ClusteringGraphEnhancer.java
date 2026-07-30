@@ -39,6 +39,9 @@ public class ClusteringGraphEnhancer<T> {
                     if (record.getCreatedBy() != parent || record.getCreated() != edge.getTarget()) {
                         continue;
                     }
+                    if (EdgeType.OWNERSHIP.getBaseline() <= edge.getType().getBaseline()) {
+                        continue;
+                    }
                     edge.setType(EdgeType.OWNERSHIP);
                     edge.setWeight(EdgeType.OWNERSHIP.getBaseline());
                     graph.setEdge(edge.getTarget(), parent, edge);
