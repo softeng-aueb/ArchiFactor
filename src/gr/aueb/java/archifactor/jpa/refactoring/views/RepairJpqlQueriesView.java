@@ -52,6 +52,7 @@ public class RepairJpqlQueriesView extends ViewPart {
     private ComboViewer agentComboViewer;
     private RepairHarness selectedHarness = RepairHarness.NONE;
     private Text modelText;
+    private Text instructionsText;
 
     @Override
     public void createPartControl(Composite parent) {
@@ -62,7 +63,9 @@ public class RepairJpqlQueriesView extends ViewPart {
         // 4) Row 2 | Column 2: ComboViewer (dropdown)
         // 5) Row 3 | Column 1: Label ("Model:")
         // 6) Row 3 | Column 2: Text (model field)
-        // 7) Row 4 | Columns 1+2: Run button
+        // 7) Row 4 | Column 1: Label ("Additional instructions:")
+        // 8) Row 4 | Column 2: Text (multi-line instructions field)
+        // 9) Row 5 | Columns 1+2: Run button
         Composite container = new Composite(parent, SWT.NONE);
         GridLayout layout = new GridLayout(2, false);
         layout.verticalSpacing = 10;
@@ -123,6 +126,19 @@ public class RepairJpqlQueriesView extends ViewPart {
         modelText.setToolTipText("The model the agent should use (for example \"opus\" or \"gpt-5.5\").");
         modelText.setEnabled(false);
 
+        // Additional instructions field
+        Label instructionsLabel = new Label(container, SWT.NONE);
+        instructionsLabel.setText("Additional instructions:");
+        instructionsLabel.setLayoutData(new GridData(SWT.LEFT, SWT.TOP, false, false));
+
+        instructionsText = new Text(container, SWT.BORDER | SWT.MULTI | SWT.WRAP | SWT.V_SCROLL);
+        GridData instructionsGridData = new GridData(SWT.FILL, SWT.FILL, true, false);
+        instructionsGridData.heightHint = 80;
+        instructionsText.setLayoutData(instructionsGridData);
+        instructionsText.setToolTipText("Optional project-specific guidance passed to the agent verbatim "
+            + "(for example, how to run this project's test suite).");
+        instructionsText.setEnabled(false);
+
         // Enables the Model field
         agentComboViewer.addSelectionChangedListener(new ISelectionChangedListener() {
             @Override
@@ -152,6 +168,8 @@ public class RepairJpqlQueriesView extends ViewPart {
             selectedHarness = RepairHarness.NONE;
             modelText.setText("");
             modelText.setEnabled(false);
+            instructionsText.setText("");
+            instructionsText.setEnabled(false);
             return;
         }
 
@@ -166,6 +184,7 @@ public class RepairJpqlQueriesView extends ViewPart {
 
         selectedHarness = harness;
         modelText.setEnabled(true);
+        instructionsText.setEnabled(true);
     }
 
     private boolean isHarnessAvailable(final RepairHarness harness) {
@@ -239,7 +258,7 @@ public class RepairJpqlQueriesView extends ViewPart {
 
         String prompt;
         try {
-            prompt = AgentPromptBuilder.build(manifestJson, baselineCommit);
+            prompt = AgentPromptBuilder.build(manifestJson, baselineCommit, instructionsText.getText());
         } catch (IOException e) {
             MessageDialog.openError(shell, "Agent Prompt Error", "Could not build the agent prompt: " + e.getMessage());
             return;

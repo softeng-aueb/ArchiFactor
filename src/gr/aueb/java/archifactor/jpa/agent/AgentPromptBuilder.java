@@ -14,10 +14,21 @@ import org.osgi.framework.FrameworkUtil;
 public class AgentPromptBuilder {
     private static final String TEMPLATE_PATH = "resources/jpql-repair-agent-prompt.md";
 
-    public static String build(String manifestJson, String baselineCommit) throws IOException {
+    public static String build(String manifestJson, String baselineCommit, String operatorInstructions) throws IOException {
         return loadTemplate()
             .replace("{{BASELINE_COMMIT}}", baselineCommit)
+            .replace("{{OPERATOR_INSTRUCTIONS_SECTION}}", operatorInstructionsSection(operatorInstructions))
             .replace("{{MANIFEST}}", manifestJson);
+    }
+
+    private static String operatorInstructionsSection(String operatorInstructions) {
+        if (operatorInstructions == null || operatorInstructions.trim().isEmpty()) {
+            return "";
+        }
+
+        return "## Operator instructions\n\n"
+            + "Project-specific guidance that takes precedence over the generic discovery advice above, but not over the hard constraints:\n"
+            + operatorInstructions.trim();
     }
 
     private static String loadTemplate() throws IOException {

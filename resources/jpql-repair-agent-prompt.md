@@ -60,6 +60,8 @@ the new module boundary. Recognize them, leave them alone, and list them in your
   README, the build files -`pom.xml`, `build.gradle`, `package.json`, `Makefile`- or any
   documented script), then run it to verify your work and iterate.
 
+{{OPERATOR_INSTRUCTIONS_SECTION}}
+
 ## How to find the broken queries
 
 For each unmapped relationship in the manifest, take `fromEntity` + `fieldName` (the removed
