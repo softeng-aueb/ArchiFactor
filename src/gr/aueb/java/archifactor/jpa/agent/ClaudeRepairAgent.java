@@ -26,7 +26,9 @@ public class ClaudeRepairAgent implements RepairAgent {
 
     // Bash is allowed broadly so the agent can run whatever command the project
     // uses for its tests; file edits are auto-accepted via --permission-mode acceptEdits.
-    private static final String ALLOWED_TOOLS = "Read,Grep,Glob,Edit,Write,Bash";
+    // Monitor lets it block on a long test run inside one turn instead of burning a
+    // turn per one-off poll of the log.
+    private static final String ALLOWED_TOOLS = "Read,Grep,Glob,Edit,Write,Bash,Monitor";
 
     // Deny rules take precedence over the allowlist: never let the agent change the
     // git history or reach the network.
@@ -34,6 +36,10 @@ public class ClaudeRepairAgent implements RepairAgent {
         "WebFetch,WebSearch,"
         + "Bash(git commit:*),Bash(git reset:*),Bash(git checkout:*),"
         + "Bash(git rebase:*),Bash(git stash:*),Bash(git push:*)";
+
+    // A full test suite can take ~15 minutes inside a single Bash call; the CLI's default
+    // 2-minute limit would force the agent to poll, burning a turn every few seconds.
+    private static final String BASH_TIMEOUT_MS = String.valueOf(TimeUnit.MINUTES.toMillis(30));
 
     private final String model;
 
@@ -117,6 +123,8 @@ public class ClaudeRepairAgent implements RepairAgent {
 
         ProcessBuilder processBuilder = new ProcessBuilder(command);
         processBuilder.directory(workingDirectory);
+        processBuilder.environment().put("BASH_DEFAULT_TIMEOUT_MS", BASH_TIMEOUT_MS);
+        processBuilder.environment().put("BASH_MAX_TIMEOUT_MS", BASH_TIMEOUT_MS);
         return processBuilder.start();
     }
 
