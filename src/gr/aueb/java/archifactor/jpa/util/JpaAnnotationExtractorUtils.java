@@ -226,10 +226,7 @@ public class JpaAnnotationExtractorUtils {
         if (annotation instanceof SingleMemberAnnotation) {
             SingleMemberAnnotation singleMember = (SingleMemberAnnotation) annotation;
             if (propertyName.equals("value")) {
-                Expression value = singleMember.getValue();
-                if (value instanceof StringLiteral) {
-                    return ((StringLiteral) value).getLiteralValue();
-                }
+                return resolveStringValue(singleMember.getValue());
             }
         } else if (annotation instanceof NormalAnnotation) {
             NormalAnnotation normalAnnotation = (NormalAnnotation) annotation;
@@ -237,11 +234,27 @@ public class JpaAnnotationExtractorUtils {
                 MemberValuePair pair = (MemberValuePair) obj;
                 String pairName = pair.getName().getIdentifier();
                 if (propertyName.equals(pairName)) {
-                    Expression value = pair.getValue();
-                    if (value instanceof StringLiteral) {
-                        return ((StringLiteral) value).getLiteralValue();
-                    }
+                    return resolveStringValue(pair.getValue());
                 }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Annotation members are compile-time constants, so a non-literal value (for example
+     * @JoinColumn(name = BaseEntity.CreatedByUserColumnName)) must be resolved through its
+     * binding; otherwise callers fall back to JPA-default naming and generate a column
+     * that does not exist in the schema.
+     */
+    private static String resolveStringValue(Expression value) {
+        if (value instanceof StringLiteral) {
+            return ((StringLiteral) value).getLiteralValue();
+        }
+        if (value != null) {
+            Object constant = value.resolveConstantExpressionValue();
+            if (constant instanceof String) {
+                return (String) constant;
             }
         }
         return null;
