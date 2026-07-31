@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.Set;
 
 import gr.aueb.java.archifactor.jpa.enums.JpaRelationshipType;
+import gr.aueb.java.archifactor.jpa.util.UnmapJpaRelationshipsUtils;
 
 public class RelationshipInfo {
     private String fromEntity;
@@ -60,6 +61,10 @@ public class RelationshipInfo {
     
     public String getJoinColumnName() {
         return joinColumnName;
+    }
+
+    public String getFkFieldName() {
+        return UnmapJpaRelationshipsUtils.toCamelCase(joinColumnName);
     }
     
     public String getFieldName() {

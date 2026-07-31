@@ -93,7 +93,7 @@ public class UnmapManifestGenerator {
             } else {
                 sb.append(",\n");
                 sb.append("      \"newForeignKeyField\": {\n");
-                sb.append("        \"name\": ").append(quote(relationship.getJoinColumnName())).append(",\n");
+                sb.append("        \"name\": ").append(quote(relationship.getFkFieldName())).append(",\n");
                 sb.append("        \"type\": ").append(quote(UnmapJpaRelationshipsUtils.getSimpleTypeName(relationship.getReferencedPkType()))).append(",\n");
                 sb.append("        \"columnName\": ").append(quote(relationship.getJoinColumnName())).append("\n");
                 sb.append("      }");
@@ -101,7 +101,7 @@ public class UnmapManifestGenerator {
         } else {
             if (relationship.getRelationshipType() == JpaRelationshipType.ONE_TO_MANY || relationship.getRelationshipType() == JpaRelationshipType.ONE_TO_ONE) {
                 sb.append(",\n");
-                sb.append("      \"targetForeignKeyField\": ").append(quote(relationship.getJoinColumnName()));
+                sb.append("      \"targetForeignKeyField\": ").append(quote(relationship.getFkFieldName()));
             } else if (relationship.getRelationshipType() == JpaRelationshipType.MANY_TO_MANY) {
                 sb.append(",\n");
                 sb.append("      \"targetElementCollectionField\": ").append(quote(relationship.getJoinTableInverseJoinColumns() + "s"));

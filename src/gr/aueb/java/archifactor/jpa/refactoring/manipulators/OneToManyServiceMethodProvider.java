@@ -22,7 +22,7 @@ public class OneToManyServiceMethodProvider extends AbstractServiceMethodProvide
 		String fromEntityIdType = relationship.getOriginPkType();
 		String fromEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(fromEntityIdType);
 
-		String fkFieldName = relationship.getJoinColumnName();
+		String fkFieldName = relationship.getFkFieldName();
 		String methodName = "get" + toEntitySimple + "sBy" + UnmapJpaRelationshipsUtils.capitalize(fkFieldName);
 
 		return new OneToManyServiceMethodProvider(toEntity, fromEntityIdTypeSimple, fkFieldName, methodName);

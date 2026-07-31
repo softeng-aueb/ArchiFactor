@@ -127,6 +127,22 @@ public class UnmapJpaRelationshipsUtils {
         }
     }
 
+    public static String toCamelCase(String columnName) {
+        if (columnName == null || columnName.isEmpty()) {
+            return columnName;
+        }
+
+        StringBuilder camelCase = new StringBuilder();
+        for (String segment : columnName.split("_")) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+            String normalized = segment.equals(segment.toUpperCase()) ? segment.toLowerCase() : segment;
+            camelCase.append(camelCase.length() == 0 ? normalized : capitalize(normalized));
+        }
+        return camelCase.length() > 0 ? camelCase.toString() : columnName;
+    }
+
     public static String capitalize(String str) {
         if (str == null || str.isEmpty()) {
             return str;

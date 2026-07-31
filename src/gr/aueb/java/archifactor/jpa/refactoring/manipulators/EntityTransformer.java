@@ -304,7 +304,7 @@ public class EntityTransformer {
         AST ast,
         TextEditGroup editGroup
     ) {
-        String fkFieldName = relationship.getJoinColumnName();
+        String fkFieldName = relationship.getFkFieldName();
         String fkFieldType = relationship.getReferencedPkType();
         if (fkFieldType.contains(".")) {
             fkFieldType = fkFieldType.substring(fkFieldType.lastIndexOf(".") + 1);
@@ -324,7 +324,7 @@ public class EntityTransformer {
         MemberValuePair nameValue = ast.newMemberValuePair();
         nameValue.setName(ast.newSimpleName("name"));
         StringLiteral columnName = ast.newStringLiteral();
-        columnName.setLiteralValue(fkFieldName);
+        columnName.setLiteralValue(relationship.getJoinColumnName());
         nameValue.setValue(columnName);
         columnAnnotation.values().add(nameValue);
 
@@ -825,7 +825,7 @@ public class EntityTransformer {
         Expression keyIsSetCheck;
         Expression serviceMethodArgument;
         if (relationship.isOwningSide()) {
-            String fkFieldName = relationship.getJoinColumnName();
+            String fkFieldName = relationship.getFkFieldName();
             keyIsSetCheck = createKeyIsSetCheck(ast, ast.newSimpleName(fkFieldName), relationship.getReferencedPkType());
             serviceMethodArgument = ast.newSimpleName(fkFieldName);
         } else {
@@ -1103,7 +1103,7 @@ public class EntityTransformer {
 
         // Create: this.fkField = (field != null) ? field.getPkMethod() : defaultValue;
         private Statement createFKUpdateStatement() {
-            String fkFieldName = relationship.getJoinColumnName();
+            String fkFieldName = relationship.getFkFieldName();
 
             Assignment fkAssignment = ast.newAssignment();
             FieldAccess thisFkField = ast.newFieldAccess();
@@ -1237,7 +1237,7 @@ public class EntityTransformer {
         Assignment fkAssignment = ast.newAssignment();
         FieldAccess thisFkField = ast.newFieldAccess();
         thisFkField.setExpression(ast.newThisExpression());
-        thisFkField.setName(ast.newSimpleName(relationship.getJoinColumnName()));
+        thisFkField.setName(ast.newSimpleName(relationship.getFkFieldName()));
         fkAssignment.setLeftHandSide(thisFkField);
 
         MethodInvocation getPkCall = ast.newMethodInvocation();

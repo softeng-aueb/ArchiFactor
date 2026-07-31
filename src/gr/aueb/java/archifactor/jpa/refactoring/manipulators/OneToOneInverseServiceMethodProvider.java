@@ -22,7 +22,7 @@ public class OneToOneInverseServiceMethodProvider extends AbstractServiceMethodP
 		String fromEntityIdType = relationship.getOriginPkType();
 		String fromEntityIdTypeSimple = UnmapJpaRelationshipsUtils.getSimpleTypeName(fromEntityIdType);
 
-		String fkFieldName = relationship.getJoinColumnName();
+		String fkFieldName = relationship.getFkFieldName();
 		String methodName = "get" + toEntitySimple + "By" + UnmapJpaRelationshipsUtils.capitalize(fkFieldName);
 
 		return new OneToOneInverseServiceMethodProvider(toEntity, fromEntityIdTypeSimple, fkFieldName, methodName);
