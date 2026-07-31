@@ -44,7 +44,7 @@ import gr.uom.java.jdeodorant.refactoring.views.ElementChangedListener;
  * the "Unmap JPA Relationships" refactoring having written the manifest and committed.
  */
 public class RepairJpqlQueriesView extends ViewPart {
-    private static final int AGENT_MAX_TURNS = 40;
+    private static final int AGENT_MAX_TURNS = 100;
     private static final String MODEL_PATTERN = "[A-Za-z0-9._/\\[\\]-]+";
 
     private ComboViewer projectComboViewer;
