@@ -1,6 +1,8 @@
 package gr.aueb.java.ddd.aggregatesIdentification;
 
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.jdt.core.*;
 import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jdt.core.search.*;
@@ -32,7 +34,7 @@ public abstract class BaseCallGraphBuilder {
     protected abstract ITypeBinding resolveFrameworkPersistedEntityType(MethodInvocation invocation, IMethodBinding binding);
     protected abstract IType selectPrimaryImplementation(List<IType> candidates);
 
-    public List<CallGraph> buildCallGraphs() throws JavaModelException {
+    public List<CallGraph> buildCallGraphs(IProgressMonitor monitor) throws JavaModelException {
         List<CallGraph> callGraphs = new ArrayList<CallGraph>();
 
         List<ICompilationUnit> compilationUnits = new ArrayList<ICompilationUnit>();
@@ -44,7 +46,13 @@ public abstract class BaseCallGraphBuilder {
             }
         }
 
+        monitor.beginTask("Building endpoint call graphs", compilationUnits.size());
         for (ICompilationUnit cu : compilationUnits) {
+            if (monitor.isCanceled()) {
+                throw new OperationCanceledException();
+            }
+            monitor.subTask("Analyzing " + cu.getElementName());
+
             ASTParser parser = ASTParser.newParser(ASTReader.JLS);
             parser.setSource(cu);
             parser.setResolveBindings(true);
@@ -88,6 +96,8 @@ public abstract class BaseCallGraphBuilder {
                     return super.visit(node);
                 }
             });
+
+            monitor.worked(1);
         }
 
         return callGraphs;

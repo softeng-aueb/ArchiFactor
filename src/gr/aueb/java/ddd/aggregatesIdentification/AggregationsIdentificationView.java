@@ -15,6 +15,7 @@ import java.util.Set;
 
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
@@ -251,46 +252,79 @@ public class AggregationsIdentificationView extends ViewPart {
             return;
         }
 
+        final StringBuilder output = new StringBuilder();
         try {
-        	BaseCallGraphBuilder callGraphBuilder = CallGraphBuilderFactory.create(selectedFramework, selectedProject, cachedSystemObject);
-	        List<CallGraph> callGraphs = callGraphBuilder.buildCallGraphs();
+            IWorkbench wb = PlatformUI.getWorkbench();
+            IProgressService ps = wb.getProgressService();
+            ps.busyCursorWhile(new IRunnableWithProgress() {
+                public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
+                    SubMonitor subMonitor = SubMonitor.convert(monitor, "Aggregation Identification", 100);
+                    try {
+                        BaseCallGraphBuilder callGraphBuilder = CallGraphBuilderFactory.create(selectedFramework, selectedProject, cachedSystemObject);
+                        List<CallGraph> callGraphs = callGraphBuilder.buildCallGraphs(subMonitor.newChild(85));
 
-	        ClusteringGraphBuilder clusteringGraphBuilder = new ClusteringGraphBuilder(callGraphs, cachedSystemObject);
-	        ClusteringGraph<ClassObject> clusteringGraph = clusteringGraphBuilder.buildClusteringGraph();
+                        if (subMonitor.isCanceled()) {
+                            throw new InterruptedException();
+                        }
 
-	        StringBuilder graphString = new StringBuilder();
-	        graphString.append("\n\n Graph after static association:\n");
-	        graphString.append(clusteringGraph.printGraph());
-	        text.append(graphString.toString());
-	        
-	        
-	        ClusteringGraphEnhancer<ClassObject> enhancer = new ClusteringGraphEnhancer<ClassObject>();
-	        enhancer.enhanceGraph(clusteringGraph, callGraphs);
-	        
-	        StringBuilder enhancedGraphString = new StringBuilder();
-	        enhancedGraphString.append("\n\n Graph after enhancement:\n");
-	        enhancedGraphString.append(clusteringGraph.printGraph());
-	        text.append(enhancedGraphString.toString());
+                        subMonitor.subTask("Building clustering graph");
 
-	        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>(resolution);
-	        List<Set<ClassObject>> clusters = clustering.louvainClustering(clusteringGraph, new Comparator<ClassObject>() {
-	            public int compare(ClassObject a, ClassObject b) {
-	                return a.getName().compareTo(b.getName());
-	            }
-	        });
+                        ClusteringGraphBuilder clusteringGraphBuilder = new ClusteringGraphBuilder(callGraphs, cachedSystemObject);
+                        ClusteringGraph<ClassObject> clusteringGraph = clusteringGraphBuilder.buildClusteringGraph();
 
-	        if (displayLogs) {
-	        	displayCallGraphs(callGraphs);
-	        }
-	        displayClusters(clusters);
-        } catch (Exception e) {
+                        output.append("\n\n Graph after static association:\n");
+                        output.append(clusteringGraph.printGraph());
+
+                        subMonitor.worked(5);
+                        if (subMonitor.isCanceled()) {
+                            throw new InterruptedException();
+                        }
+
+                        subMonitor.subTask("Enhancing clustering graph");
+
+                        ClusteringGraphEnhancer<ClassObject> enhancer = new ClusteringGraphEnhancer<ClassObject>();
+                        enhancer.enhanceGraph(clusteringGraph, callGraphs);
+
+                        output.append("\n\n Graph after enhancement:\n");
+                        output.append(clusteringGraph.printGraph());
+
+                        subMonitor.worked(5);
+                        if (subMonitor.isCanceled()) {
+                            throw new InterruptedException();
+                        }
+
+                        subMonitor.subTask("Running Louvain clustering");
+
+                        LouvainClustering<ClassObject> clustering = new LouvainClustering<ClassObject>(resolution);
+                        List<Set<ClassObject>> clusters = clustering.louvainClustering(clusteringGraph, new Comparator<ClassObject>() {
+                            public int compare(ClassObject a, ClassObject b) {
+                                return a.getName().compareTo(b.getName());
+                            }
+                        });
+
+                        subMonitor.worked(5);
+
+                        if (displayLogs) {
+                            appendCallGraphs(output, callGraphs);
+                        }
+                        appendClusters(output, clusters);
+                    } catch (JavaModelException e) {
+                        throw new InvocationTargetException(e);
+                    } finally {
+                        monitor.done();
+                    }
+                }
+            });
+            text.append(output.toString());
+        } catch (InterruptedException e) {
+            // canceled by the user
+        } catch (InvocationTargetException e) {
             e.printStackTrace();
-            text.setText("Error: " + e.getMessage());
+            text.setText("Error: " + e.getTargetException().getMessage());
         }
     }
 
-    private void displayCallGraphs(List<CallGraph> callGraphs) {
-        StringBuilder sb = new StringBuilder();
+    private void appendCallGraphs(StringBuilder sb, List<CallGraph> callGraphs) {
         sb.append("\n\n Callgraphs:\n");
         for (CallGraph callGraph : callGraphs) {
             sb.append("Endpoint: ").append(callGraph.getRoot().methodName);
@@ -311,18 +345,15 @@ public class AggregationsIdentificationView extends ViewPart {
             appendCalls(sb, callGraph.getRoot(), "  ");
             sb.append("\n");
         }
-        text.append(sb.toString());
     }
-    
-    private void displayClusters(List<Set<ClassObject>> clusters) {
-        StringBuilder sb = new StringBuilder();
+
+    private void appendClusters(StringBuilder sb, List<Set<ClassObject>> clusters) {
         for (Set<ClassObject> cluster : clusters) {
         	sb.append("\nCluster:\n");
             for (ClassObject entityClass : cluster) {
             	 sb.append("\t" + ClusteringGraph.getSimpleName(entityClass.getName()) + "\n");
             }
         }
-        text.append(sb.toString());
     }
 
     private void appendCalls(StringBuilder sb, CallGraphNode node, String indent) {
