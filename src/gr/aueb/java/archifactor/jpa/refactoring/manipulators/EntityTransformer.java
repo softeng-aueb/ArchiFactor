@@ -1,6 +1,7 @@
 package gr.aueb.java.archifactor.jpa.refactoring.manipulators;
 
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ImportRewrite;
@@ -461,7 +462,7 @@ public class EntityTransformer {
     private MethodDeclaration findDirectFieldAccessMethod(CompilationUnit astRoot, String fieldName) {
         for (TypeDeclaration type : (List<TypeDeclaration>) astRoot.types()) {
             for (MethodDeclaration method : type.getMethods()) {
-                if (returnsFieldDirectly(method, fieldName)) {
+                if (isDeclaredInSource(astRoot, method) && returnsFieldDirectly(method, fieldName)) {
                     return method;
                 }
             }
@@ -472,12 +473,30 @@ public class EntityTransformer {
     private MethodDeclaration findMethodByName(CompilationUnit astRoot, String methodName) {
         for (TypeDeclaration type : (List<TypeDeclaration>) astRoot.types()) {
             for (MethodDeclaration method : type.getMethods()) {
-                if (methodName.equals(method.getName().getIdentifier())) {
+                if (isDeclaredInSource(astRoot, method) && methodName.equals(method.getName().getIdentifier())) {
                     return method;
                 }
             }
         }
         return null;
+    }
+
+    // Lombok's Eclipse agent injects the accessors it generates into the AST, but they have no text
+    // in the file, so ASTRewrite resolves their edits to no source range and silently drops them.
+    // Treat them as absent, so an accessor that really is in the file gets generated instead.
+    private boolean isDeclaredInSource(CompilationUnit astRoot, MethodDeclaration method) {
+        int start = method.getStartPosition();
+        if (start < 0) {
+            return false;
+        }
+
+        try {
+            String source = astRoot.getTypeRoot().getSource();
+            int end = start + method.getLength();
+            return end <= source.length() && source.substring(start, end).contains(method.getName().getIdentifier());
+        } catch (JavaModelException e) {
+            throw new IllegalStateException("Could not read the source of " + astRoot.getTypeRoot().getElementName(), e);
+        }
     }
 
     private boolean returnsFieldDirectly(MethodDeclaration method, String fieldName) {
