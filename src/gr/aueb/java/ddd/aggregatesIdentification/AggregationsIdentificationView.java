@@ -56,7 +56,7 @@ public class AggregationsIdentificationView extends ViewPart {
         // 2) Row 1 | Column 2: ComboViewer (dropdown)
         // 3) Row 2 | Columns 1+2: Strict Aggregates checkbox
         // 4) Row 3 | Columns 1+2: Display Logs checkbox
-        // 5) Row 4 | Columns 1+2: Run button
+        // 5) Row 4 | Columns 1+2: Run and Clear buttons
         // 6) Row 5 | Columns 1+2: Text area
         GridLayout layout = new GridLayout(2, false);
         layout.verticalSpacing = 10;
@@ -112,11 +112,17 @@ public class AggregationsIdentificationView extends ViewPart {
         GridData logsCheckGD = new GridData(SWT.LEFT, SWT.CENTER, true, false, 2, 1);
         logsCheck.setLayoutData(logsCheckGD);
 
-        // Run button
-        Button runButton = new Button(parent, SWT.PUSH);
+        // Run and Clear buttons
+        Composite buttonsComposite = new Composite(parent, SWT.NONE);
+        GridData buttonsGridData = new GridData(SWT.CENTER, SWT.CENTER, true, false, 2, 1);
+        buttonsComposite.setLayoutData(buttonsGridData);
+        GridLayout buttonsLayout = new GridLayout(2, false);
+        buttonsLayout.marginWidth = 0;
+        buttonsLayout.marginHeight = 0;
+        buttonsComposite.setLayout(buttonsLayout);
+
+        Button runButton = new Button(buttonsComposite, SWT.PUSH);
         runButton.setText("Run Aggregation Identification");
-        GridData buttonGridData = new GridData(SWT.CENTER, SWT.CENTER, true, false, 2, 1);
-        runButton.setLayoutData(buttonGridData);
         runButton.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 displayLogs = logsCheck.getSelection();
@@ -135,6 +141,14 @@ public class AggregationsIdentificationView extends ViewPart {
                 resolution = parsedResolution;
 
                 runAggregationIdentification();
+            }
+        });
+
+        Button clearButton = new Button(buttonsComposite, SWT.PUSH);
+        clearButton.setText("Clear");
+        clearButton.addListener(SWT.Selection, new Listener() {
+            public void handleEvent(Event event) {
+                text.setText("");
             }
         });
 
