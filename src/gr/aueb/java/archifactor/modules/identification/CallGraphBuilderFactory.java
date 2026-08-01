@@ -1,4 +1,4 @@
-package gr.aueb.java.ddd.aggregatesIdentification;
+package gr.aueb.java.archifactor.modules.identification;
 
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaModelException;

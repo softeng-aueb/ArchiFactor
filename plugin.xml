@@ -72,12 +72,12 @@
                id="gr.uom.java.jdeodorant.actions.DuplicatedCode">
          </action>
          <action
-               label="Aggregations Identification"
+               label="Identify Candidate Modules"
                icon="icons/repair.png"
                class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
-               tooltip="Aggregations Identification"
+               tooltip="Identify Candidate Modules"
                menubarPath="BadSmellsMenu/sampleGroup"
-               id="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentification">
+               id="gr.aueb.java.jdeodorant.actions.IdentifyCandidateModules">
          </action>
       </actionSet>
    </extension>
@@ -153,10 +153,10 @@
       </view>
       <view
             category="gr.uom.java.jdeodorant"
-            class="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView"
+            class="gr.aueb.java.archifactor.modules.identification.ModuleIdentificationView"
             icon="icons/repair.png"
-            id="gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView"
-            name="Aggregations Identification">
+            id="gr.aueb.java.jdeodorant.views.IdentifyCandidateModules"
+            name="Identify Candidate Modules">
       </view>
    </extension>
    

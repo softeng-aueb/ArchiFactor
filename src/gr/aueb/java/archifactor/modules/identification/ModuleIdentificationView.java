@@ -1,4 +1,4 @@
-package gr.aueb.java.ddd.aggregatesIdentification;
+package gr.aueb.java.archifactor.modules.identification;
 
 import gr.aueb.java.archifactor.jpa.enums.FrameworkType;
 import gr.uom.java.ast.ASTReader;
@@ -37,8 +37,8 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.progress.IProgressService;
 
-public class AggregationsIdentificationView extends ViewPart {
-    public static final String ID = "gr.aueb.java.ddd.aggregatesIdentification.AggregationsIdentificationView";
+public class ModuleIdentificationView extends ViewPart {
+    public static final String ID = "gr.aueb.java.jdeodorant.views.IdentifyCandidateModules";
 
     private ComboViewer projectComboViewer;
     private IJavaProject selectedProject;
@@ -53,12 +53,12 @@ public class AggregationsIdentificationView extends ViewPart {
     @Override
     public void createPartControl(Composite parent) {
         // Grid layout:
-        // 1) Row 1 | Column 1: Label ("Select project:")
-        // 2) Row 1 | Column 2: ComboViewer (dropdown)
-        // 3) Row 2 | Columns 1+2: Strict Aggregates checkbox
-        // 4) Row 3 | Columns 1+2: Display Logs checkbox
-        // 5) Row 4 | Columns 1+2: Run and Clear buttons
-        // 6) Row 5 | Columns 1+2: Text area
+        // 1) Row 1 | Column 1: Label ("Select project:") | Column 2: ComboViewer (dropdown)
+        // 2) Row 2 | Column 1: Label ("Select framework:") | Column 2: ComboViewer (dropdown)
+        // 3) Row 3 | Column 1: Label ("Resolution:") | Column 2: Text input
+        // 4) Row 4 | Columns 1+2: Display Logs checkbox
+        // 5) Row 5 | Columns 1+2: Run and Clear buttons
+        // 6) Row 6 | Columns 1+2: Text area
         GridLayout layout = new GridLayout(2, false);
         layout.verticalSpacing = 10;
         layout.horizontalSpacing = 10;
@@ -123,7 +123,7 @@ public class AggregationsIdentificationView extends ViewPart {
         buttonsComposite.setLayout(buttonsLayout);
 
         Button runButton = new Button(buttonsComposite, SWT.PUSH);
-        runButton.setText("Run Aggregation Identification");
+        runButton.setText("Identify Candidate Modules");
         runButton.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 displayLogs = logsCheck.getSelection();
@@ -141,7 +141,7 @@ public class AggregationsIdentificationView extends ViewPart {
                 }
                 resolution = parsedResolution;
 
-                runAggregationIdentification();
+                runModuleIdentification();
             }
         });
 
@@ -246,7 +246,7 @@ public class AggregationsIdentificationView extends ViewPart {
         }
     }
 
-    private void runAggregationIdentification() {
+    private void runModuleIdentification() {
         if (selectedProject == null || cachedSystemObject == null) {
             MessageDialog.openError(getSite().getShell(), "Project Not Loaded", "Project structure is not loaded. Please reselect the project and try again.");
             return;
@@ -258,7 +258,7 @@ public class AggregationsIdentificationView extends ViewPart {
             IProgressService ps = wb.getProgressService();
             ps.busyCursorWhile(new IRunnableWithProgress() {
                 public void run(IProgressMonitor monitor) throws InvocationTargetException, InterruptedException {
-                    SubMonitor subMonitor = SubMonitor.convert(monitor, "Aggregation Identification", 100);
+                    SubMonitor subMonitor = SubMonitor.convert(monitor, "Identifying candidate modules", 100);
                     try {
                         BaseCallGraphBuilder callGraphBuilder = CallGraphBuilderFactory.create(selectedFramework, selectedProject, cachedSystemObject);
                         List<CallGraph> callGraphs = callGraphBuilder.buildCallGraphs(subMonitor.newChild(85));

@@ -1,4 +1,4 @@
-package gr.aueb.java.ddd.aggregatesIdentification;
+package gr.aueb.java.archifactor.modules.identification;
 
 import java.util.ArrayList;
 import java.util.HashMap;

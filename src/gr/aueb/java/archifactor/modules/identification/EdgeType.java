@@ -1,4 +1,4 @@
-package gr.aueb.java.ddd.aggregatesIdentification;
+package gr.aueb.java.archifactor.modules.identification;
 
 public enum EdgeType {
     INHERITANCE(1.5),
