@@ -272,7 +272,7 @@ public class AggregationsIdentificationView extends ViewPart {
                         ClusteringGraphBuilder clusteringGraphBuilder = new ClusteringGraphBuilder(callGraphs, cachedSystemObject);
                         ClusteringGraph<ClassObject> clusteringGraph = clusteringGraphBuilder.buildClusteringGraph();
 
-                        output.append("\n\n Graph after static association:\n");
+                        output.append("===== Graph after static association =====\n");
                         output.append(clusteringGraph.printGraph());
 
                         subMonitor.worked(5);
@@ -285,7 +285,7 @@ public class AggregationsIdentificationView extends ViewPart {
                         ClusteringGraphEnhancer<ClassObject> enhancer = new ClusteringGraphEnhancer<ClassObject>();
                         enhancer.enhanceGraph(clusteringGraph, callGraphs);
 
-                        output.append("\n\n Graph after enhancement:\n");
+                        output.append("\n\n===== Graph after enhancement =====\n");
                         output.append(clusteringGraph.printGraph());
 
                         subMonitor.worked(5);
