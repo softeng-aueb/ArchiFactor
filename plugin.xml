@@ -16,22 +16,6 @@
             </separator>
          </menu>
          <action
-               label="Unmap JPA Relationships"
-               icon="icons/repair.png"
-               class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
-               tooltip="Unmap JPA Relationships"
-               menubarPath="BadSmellsMenu/sampleGroup"
-               id="gr.aueb.java.jdeodorant.actions.UnmapJpaRelationships">
-         </action>
-         <action
-               label="Repair JPQL Queries"
-               icon="icons/repair.png"
-               class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
-               tooltip="Repair JPQL Queries"
-               menubarPath="BadSmellsMenu/sampleGroup"
-               id="gr.aueb.java.jdeodorant.actions.RepairJpqlQueries">
-         </action>
-         <action
                class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
                icon="icons/repair.png"
                id="gr.uom.java.jdeodorant.actions.FeatureEnvy"
@@ -71,12 +55,40 @@
                menubarPath="BadSmellsMenu/sampleGroup"
                id="gr.uom.java.jdeodorant.actions.DuplicatedCode">
          </action>
+      </actionSet>
+      <actionSet
+            label="ArchiFactor"
+            visible="true"
+            id="gr.aueb.java.archifactor.ArchiFactor">
+         <menu
+               label="ArchiFactor"
+               id="ArchiFactorMenu">
+            <separator
+                  name="archifactorGroup">
+            </separator>
+         </menu>
+         <action
+               label="Repair JPQL Queries"
+               icon="icons/repair.png"
+               class="gr.aueb.java.archifactor.actions.ArchiFactorMenu"
+               tooltip="Repair JPQL Queries"
+               menubarPath="ArchiFactorMenu/archifactorGroup"
+               id="gr.aueb.java.jdeodorant.actions.RepairJpqlQueries">
+         </action>
+         <action
+               label="Unmap JPA Relationships"
+               icon="icons/repair.png"
+               class="gr.aueb.java.archifactor.actions.ArchiFactorMenu"
+               tooltip="Unmap JPA Relationships"
+               menubarPath="ArchiFactorMenu/archifactorGroup"
+               id="gr.aueb.java.jdeodorant.actions.UnmapJpaRelationships">
+         </action>
          <action
                label="Identify Candidate Modules"
                icon="icons/repair.png"
-               class="gr.uom.java.jdeodorant.refactoring.actions.BadSmellsMenu"
+               class="gr.aueb.java.archifactor.actions.ArchiFactorMenu"
                tooltip="Identify Candidate Modules"
-               menubarPath="BadSmellsMenu/sampleGroup"
+               menubarPath="ArchiFactorMenu/archifactorGroup"
                id="gr.aueb.java.jdeodorant.actions.IdentifyCandidateModules">
          </action>
       </actionSet>
@@ -88,15 +100,19 @@
             name="Bad Smells"
             id="gr.uom.java.jdeodorant">
       </category>
+      <category
+            name="ArchiFactor"
+            id="gr.aueb.java.archifactor">
+      </category>
       <view
-            category="gr.uom.java.jdeodorant"
+            category="gr.aueb.java.archifactor"
             class="gr.aueb.java.archifactor.jpa.refactoring.views.UnmapJpaRelationships"
             icon="icons/repair.png"
             id="gr.aueb.java.jdeodorant.views.UnmapJpaRelationships"
             name="Unmap JPA Relationships">
       </view>
       <view
-            category="gr.uom.java.jdeodorant"
+            category="gr.aueb.java.archifactor"
             class="gr.aueb.java.archifactor.jpa.refactoring.views.RepairJpqlQueriesView"
             icon="icons/repair.png"
             id="gr.aueb.java.jdeodorant.views.RepairJpqlQueries"
@@ -152,7 +168,7 @@
             name="Code Smell Package Explorer">
       </view>
       <view
-            category="gr.uom.java.jdeodorant"
+            category="gr.aueb.java.archifactor"
             class="gr.aueb.java.archifactor.modules.identification.ModuleIdentificationView"
             icon="icons/repair.png"
             id="gr.aueb.java.jdeodorant.views.IdentifyCandidateModules"

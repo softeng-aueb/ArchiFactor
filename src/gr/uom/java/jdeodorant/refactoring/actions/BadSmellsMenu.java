@@ -26,12 +26,6 @@ public class BadSmellsMenu implements IWorkbenchWindowActionDelegate {
                 page.showView("gr.uom.java.jdeodorant.views.GodClass");
             } else if (action.getId().equals("gr.uom.java.jdeodorant.actions.DuplicatedCode")) {
                 page.showView("gr.uom.java.jdeodorant.views.DuplicatedCode");
-            } else if (action.getId().equals("gr.aueb.java.jdeodorant.actions.UnmapJpaRelationships")) {
-                page.showView("gr.aueb.java.jdeodorant.views.UnmapJpaRelationships");
-            } else if (action.getId().equals("gr.aueb.java.jdeodorant.actions.RepairJpqlQueries")) {
-                page.showView("gr.aueb.java.jdeodorant.views.RepairJpqlQueries");
-            } else if (action.getId().equals("gr.aueb.java.jdeodorant.actions.IdentifyCandidateModules")) {
-                page.showView("gr.aueb.java.jdeodorant.views.IdentifyCandidateModules");
             }
         } catch (PartInitException e) {
             e.printStackTrace();
